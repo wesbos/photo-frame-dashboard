@@ -301,7 +301,7 @@ button.card:active, .h-hero:active, .h-photo:active { transform: scale(.985); }
 
 /* ---------------------------------------------------------------- diagnostics overlay (?diag) */
 .diag {
-  position: absolute; right: 8px; bottom: 8px; z-index: 100; pointer-events: none;
+  position: absolute; right: 8px; top: 96px; z-index: 100; pointer-events: none;
   max-width: 520px; padding: 8px 10px; border-radius: 8px;
   background: rgba(0, 0, 0, .82); color: #7CFC9A;
   font: 13px/1.35 ui-monospace, Menlo, monospace;
