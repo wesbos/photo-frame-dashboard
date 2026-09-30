@@ -1,8 +1,14 @@
 /* Calendar */
 .cal { height: 100%; display: flex; flex-direction: column; }
-.cal-head { display: flex; align-items: center; gap: 12px; height: 76px; margin-bottom: 14px; flex: none; }
-.cal-title { min-width: 330px; padding: 0 6px; }
-.cal-title .serif { font-size: 48px; line-height: 1; white-space: nowrap; }
+#view-calendar { padding-top: 14px; }
+.cal-head { display: flex; align-items: center; gap: 8px; height: 52px; margin-bottom: 8px; flex: none; }
+.cal-head .icon-btn { width: 52px; height: 52px; }
+.cal-head .fab { width: 52px; height: 52px; }
+.cal-head .btn { min-height: 52px; padding: 0 20px; font-size: 15px; }
+.cal-head .seg { padding: 3px; }
+.cal-head .seg button { min-height: 46px; padding: 0 18px; font-size: 15px; }
+.cal-title { display: flex; align-items: baseline; gap: 12px; min-width: 300px; padding: 0 6px; }
+.cal-title .serif { font-size: 34px; line-height: 1; white-space: nowrap; }
 .cal-head [data-today] { margin-right: auto; }
 .cal-body { flex: 1; min-height: 0; position: relative; }
 .cal-body.slide-l { animation: cal-l .3s var(--ease); }
@@ -17,9 +23,9 @@
 .lane-head { display: flex; align-items: center; gap: 10px; padding: 0 12px 10px; border-bottom: 5px solid var(--c); margin: 0 4px; }
 .lane-head b { font-size: 22px; font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: .04em; }
 .lane-head small { margin-left: auto; font-size: var(--fs-min); color: var(--mute); font-weight: 700; }
-.day-head { display: flex; align-items: baseline; gap: 10px; padding: 0 14px 10px; margin: 0 4px; border-bottom: 5px solid var(--ink); }
-.day-head .num { font-size: 44px; line-height: .9; }
-.day-head b { font-size: 20px; font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: .05em; }
+.day-head { display: flex; align-items: baseline; gap: 10px; padding: 0 14px 6px; margin: 0 4px; border-bottom: 5px solid var(--ink); }
+.day-head .num { font-size: 30px; line-height: .9; }
+.day-head b { font-size: 17px; font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: .05em; }
 .day-head small { margin-left: auto; font-size: var(--fs-min); color: var(--mute); font-weight: 700; text-transform: uppercase; }
 .day-head.is-today { background: var(--ink); color: var(--paper); border-radius: 12px 12px 0 0; padding-top: 8px; }
 
@@ -110,7 +116,7 @@
 .wk-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .wk-head { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 10px 8px; border-bottom: 5px solid var(--ink); margin-bottom: 4px; }
 .wk-head b { font-size: 18px; font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: .06em; }
-.wk-head .num { font-size: 40px; line-height: .9; }
+.wk-head .num { font-size: 32px; line-height: .9; }
 .wk-col.is-today .wk-head { background: var(--ink); color: var(--paper); border-radius: 12px 12px 0 0; }
 .wk-ad {
   min-height: 40px; padding: 0 10px; border-radius: 8px;

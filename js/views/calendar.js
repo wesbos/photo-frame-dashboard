@@ -88,10 +88,6 @@
     var day = V.date;
     var fam = App.timedOn(day).filter(App.isFamily);
     var allDay = App.allDayOn(day);
-    var head = '<div class="lanes-head"><div class="gutter"></div>' + D.people.map(function (p) {
-      var n = App.timedOn(day, p.id).length;
-      return '<div class="lane-head" style="' + App.pstyle(p) + '">' + App.avatar(p, 40) + '<b>' + p.name + '</b><small>' + (n ? n + (n === 1 ? ' event' : ' events') : 'Free') + '</small></div>';
-    }).join('') + '</div>';
     var ad = allDay.length ? '<div class="allday"><div class="gutter label">All day</div><div class="allday-grid">' + allDay.map(function (e) {
       var fam2 = App.isFamily(e);
       var idx = D.people.map(function (p) { return p.id; }).indexOf(e.people[0]);
@@ -113,7 +109,7 @@
       nowLine([day]) + '</div>' +
       '</div></div>';
     var empty = !App.timedOn(day).length ? '<div class="cal-empty serif">Nothing on the calendar.<br><i>A rare, quiet day.</i></div>' : '';
-    return '<div class="cal-day">' + head + ad + grid + empty + '</div>';
+    return '<div class="cal-day">' + ad + grid + empty + '</div>';
   }
 
   // ------------------------------------------------------------ 3 day
@@ -196,12 +192,12 @@
     var t = title();
     var isToday = V.mode === 'month' ? (V.date.getMonth() === App.now().getMonth()) : App.sameDay(V.date, App.now());
     return '<header class="cal-head">' +
-      '<button class="icon-btn" data-nav="-1" aria-label="Previous">' + App.icon('left', 30) + '</button>' +
-      '<div class="cal-title"><div class="label">' + t.k + '</div><div class="serif">' + t.t + '</div></div>' +
-      '<button class="icon-btn" data-nav="1" aria-label="Next">' + App.icon('right', 30) + '</button>' +
+      '<button class="icon-btn" data-nav="-1" aria-label="Previous">' + App.icon('left', 24) + '</button>' +
+      '<div class="cal-title"><div class="serif">' + t.t + '</div><div class="label">' + t.k + '</div></div>' +
+      '<button class="icon-btn" data-nav="1" aria-label="Next">' + App.icon('right', 24) + '</button>' +
       '<button class="btn btn--ghost' + (isToday ? ' is-hidden' : '') + '" data-today>Today</button>' +
       '<div class="seg">' + MODES.map(function (m) { return '<button class="' + (V.mode === m[0] ? 'is-on' : '') + '" data-mode="' + m[0] + '">' + m[1] + '</button>'; }).join('') + '</div>' +
-      '<button class="fab" data-add aria-label="Add event">' + App.icon('plus', 34) + '</button>' +
+      '<button class="fab" data-add aria-label="Add event">' + App.icon('plus', 26) + '</button>' +
       '</header>';
   }
 
