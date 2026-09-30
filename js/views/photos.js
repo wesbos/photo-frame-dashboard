@@ -45,10 +45,6 @@
             if (!p) return;
             p.fav = !p.fav;
             heart();
-            if (p.fav) {
-              var pt = App.centerOf(t);
-              App.confetti(['#E4007C', '#FF5A8A', '#fff'], { x: pt.x, y: pt.y, count: 30, power: 160 });
-            }
             App.toast(p.fav ? 'Added to favourites · it’ll show up more often' : 'Removed from favourites', { icon: 'heart', ms: 2500 });
           }
         });

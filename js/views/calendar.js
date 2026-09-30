@@ -217,8 +217,6 @@
     else V.date = App.addDays(V.date, dir * ({ day: 1, '3day': 3, week: 7 }[V.mode]));
     V.scroll = null;
     render();
-    var b = V.el.querySelector('.cal-body');
-    b.classList.add(dir > 0 ? 'slide-l' : 'slide-r');
   }
 
   function onClick(e) {

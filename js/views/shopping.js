@@ -119,14 +119,11 @@
     rowEl.classList.add('is-checking');
     setTimeout(function () {
       if (!V.pending[g.id]) return;
-      rowEl.classList.add('is-leaving');
-      setTimeout(function () {
-        delete V.pending[g.id];
-        g.done = true;
-        paintList(); paintSuggest();
-        App.emit('data');
-      }, 320);
-    }, 1800);
+      delete V.pending[g.id];
+      g.done = true;
+      paintList(); paintSuggest();
+      App.emit('data');
+    }, 1200);
     App.toast('<b>' + App.esc(g.name) + '</b> checked off', {
       icon: 'check',
       undo: function () {

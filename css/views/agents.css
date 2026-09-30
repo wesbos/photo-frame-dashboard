@@ -4,8 +4,6 @@
 .ag-top h1 { font-size: 64px; line-height: .95; }
 .ag-sync { display: flex; align-items: center; gap: 14px; }
 .ag-sync .icon-btn .i { transform: scaleX(-1); }
-.ag-sync .is-spinning .i { animation: ag-spin .9s var(--ease); }
-@keyframes ag-spin { to { transform: scaleX(-1) rotate(-360deg); } }
 
 .ag-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 14px; }
 .ag-card {
@@ -20,7 +18,6 @@
 .ag-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ok); white-space: nowrap; }
 .ag-status i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 .ag-status.is-warn { color: #B45F00; }
-.ag-status.is-warn i { animation: blink 1.2s infinite; }
 .ag-incident {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 10px; border-radius: 8px; background: rgb(var(--amber-rgb) / .2); color: #8A4A00;

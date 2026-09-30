@@ -127,11 +127,9 @@
     var shown = false;
     function show() {
       if (shown) return; shown = true;
-      requestAnimationFrame(function () {
-        node.classList.add('is-in');
-        node.style.opacity = '';
-        setTimeout(function () { old.forEach(function (o) { o.remove(); }); }, 1700);
-      });
+      node.classList.add('is-in');
+      node.style.opacity = '';
+      old.forEach(function (o) { o.remove(); });
     }
     if (first && !first.complete) { first.addEventListener('load', show); first.addEventListener('error', show); setTimeout(show, 2500); }
     else show();

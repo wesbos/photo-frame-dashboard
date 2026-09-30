@@ -11,10 +11,6 @@
 .cal-title .serif { font-size: 34px; line-height: 1; white-space: nowrap; }
 .cal-head [data-today] { margin-right: auto; }
 .cal-body { flex: 1; min-height: 0; position: relative; }
-.cal-body.slide-l { animation: cal-l .3s var(--ease); }
-.cal-body.slide-r { animation: cal-r .3s var(--ease); }
-@keyframes cal-l { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
-@keyframes cal-r { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
 
 /* ---- time grid (Today + 3 day) */
 .cal-day { height: 100%; display: flex; flex-direction: column; position: relative; }
@@ -64,7 +60,6 @@
   padding: 7px 12px; border-radius: 12px;
   background: var(--c); color: var(--c-ink);
   text-align: left; z-index: 1;
-  transition: transform .12s var(--ease);
 }
 .ev:active { transform: scale(.98); }
 .ev-title { font-size: 18px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 30px; }
@@ -177,7 +172,6 @@
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 12px; border-radius: 20px; min-width: 104px;
   font-size: 17px; font-weight: 700;
-  transition: background .2s, transform .15s var(--spring);
 }
 .who-btn:active { transform: scale(.95); }
 .who-btn.is-on { background: rgb(var(--c-rgb) / .16); box-shadow: inset 0 0 0 3px var(--c); }

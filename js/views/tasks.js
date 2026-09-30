@@ -77,15 +77,9 @@
       var laneList = listFor(c.who, r);
       var laneDone = laneList.every(function (x) { return x.done; });
       var allDone = D.chores.filter(function (x) { return x.r === r.id; }).every(function (x) { return x.done; });
-      var laneEl = V.el.querySelector('[data-lane="' + c.who + '"]');
       if (allDone) {
-        App.confetti(D.people.map(function (p) { return p.color; }), { count: 160, power: 520 });
         App.toast('<b>' + r.name + ' routine complete!</b> Everyone crushed it.', { icon: 'star', ms: 5000 });
         return;
-      }
-      if (laneDone && laneEl) {
-        var pt = App.centerOf(laneEl);
-        App.confetti([App.person(c.who).color, '#111', '#fff'], { x: pt.x, y: pt.y - 60, count: 70 });
       }
       App.toast('<b>' + App.esc(c.title) + '</b> done' + (earner && c.stars ? ' · +' + c.stars + '★ ' + App.person(earner).name : ''), {
         icon: 'check',
@@ -97,7 +91,7 @@
           App.emit('data');
         }
       });
-    }, 900);
+    }, 350);
   }
 
   // "Anyone" chores ask who did it, so stars go to the right kid

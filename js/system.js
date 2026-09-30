@@ -11,7 +11,6 @@
     var el = $('#takeover');
     el.className = 'takeover ' + (cls || '');
     el.innerHTML = html;
-    el.offsetWidth;
     el.classList.add('is-open');
     App.closeSheet();
     if (App.mode !== 'day') App.setMode('day');
@@ -20,7 +19,7 @@
   function closeTakeover() {
     var el = $('#takeover');
     el.classList.remove('is-open');
-    setTimeout(function () { if (!el.classList.contains('is-open')) el.innerHTML = ''; }, 350);
+    el.innerHTML = '';
   }
   App.closeTakeover = closeTakeover;
 
@@ -34,7 +33,7 @@
       '  <h1 class="serif tk-title">Someone’s at<br>the front door</h1>' +
       '  <div class="tk-actions">' +
       '    <button class="tk-btn" data-talk>' + App.icon('mic', 30) + '<span>Talk</span></button>' +
-      '    <button class="tk-btn tk-btn--hold" data-unlock>' + App.icon('unlock', 30) + '<span>Hold to unlock</span><i class="hold-fill"></i></button>' +
+      '    <button class="tk-btn tk-btn--hold" data-unlock>' + App.icon('unlock', 30) + '<span>Hold to unlock</span></button>' +
       '    <button class="tk-btn tk-btn--solid" data-dismiss>' + App.icon('x', 30) + '<span>Dismiss</span></button>' +
       '  </div>' +
       '</div>', 'takeover--door');
@@ -66,7 +65,7 @@
       '  <h1 class="tk-huge">Water leak</h1>' +
       '  <p class="tk-sub">Laundry room sensor detected water on the floor.</p>' +
       '  <div class="tk-actions">' +
-      '    <button class="tk-btn tk-btn--hold tk-btn--light" data-valve>' + App.icon('drop', 30) + '<span>Hold to shut off water</span><i class="hold-fill"></i></button>' +
+      '    <button class="tk-btn tk-btn--hold tk-btn--light" data-valve>' + App.icon('drop', 30) + '<span>Hold to shut off water</span></button>' +
       '    <button class="tk-btn tk-btn--solid tk-btn--light" data-ack>' + App.icon('check', 30) + '<span>Acknowledge</span></button>' +
       '  </div>' +
       '</div>', 'takeover--alarm');
@@ -90,8 +89,8 @@
       (opts.action ? '<button class="banner-btn banner-btn--solid" data-act>' + opts.action + '</button>' : '') +
       '<button class="banner-btn" data-x>' + (opts.dismiss || 'Dismiss') + '</button>';
     box.appendChild(b);
-    requestAnimationFrame(function () { b.classList.add('is-in'); });
-    function kill() { b.classList.remove('is-in'); setTimeout(function () { b.remove(); }, 300); }
+    b.classList.add('is-in');
+    function kill() { b.remove(); }
     b.querySelector('[data-x]').onclick = kill;
     if (opts.action) b.querySelector('[data-act]').onclick = function () { kill(); opts.onAction(); };
     if (opts.ms) setTimeout(kill, opts.ms);

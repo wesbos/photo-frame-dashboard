@@ -1,4 +1,4 @@
-// Core shell: router, demo clock, idle/ambient, toasts, sheets, confetti, helpers.
+// Core shell: router, demo clock, idle/ambient, toasts, sheets, helpers.
 (function () {
   'use strict';
   var D = window.DATA;
@@ -184,11 +184,10 @@
     t.className = 'toast' + (opts.tone ? ' toast--' + opts.tone : '');
     t.style.setProperty('--ms', ms + 'ms');
     t.innerHTML = (opts.icon ? App.icon(opts.icon, 26) : '') + '<span class="toast-msg">' + html + '</span>' +
-      (opts.undo ? '<button class="toast-undo">' + App.icon('undo', 22) + 'Undo</button>' : '') +
-      '<span class="toast-bar"></span>';
+      (opts.undo ? '<button class="toast-undo">' + App.icon('undo', 22) + 'Undo</button>' : '');
     box.appendChild(t);
-    requestAnimationFrame(function () { t.classList.add('is-in'); });
-    function kill() { t.classList.remove('is-in'); setTimeout(function () { t.remove(); }, 300); }
+    t.classList.add('is-in');
+    function kill() { t.remove(); }
     toastTimer = setTimeout(kill, ms);
     if (opts.undo) t.querySelector('.toast-undo').addEventListener('click', function () { clearTimeout(toastTimer); opts.undo(); kill(); });
   };
@@ -199,13 +198,12 @@
     var layer = $('#sheetLayer');
     layer.innerHTML = '<div class="sheet-scrim"></div><div class="sheet ' + (opts.cls || '') + '">' +
       '<button class="sheet-x" data-close aria-label="Close">' + App.icon('x', 28) + '</button>' + html + '</div>';
-    layer.offsetWidth; // reflow so the transition runs
     layer.classList.add('is-open');
     function close() {
       if (!layer.classList.contains('is-open')) return;
       layer.classList.remove('is-open');
       if (opts.onClose) opts.onClose();
-      setTimeout(function () { if (!layer.classList.contains('is-open')) layer.innerHTML = ''; }, 300);
+      layer.innerHTML = '';
     }
     App.closeSheet = close;
     layer.querySelector('.sheet-scrim').addEventListener('click', close);
@@ -215,31 +213,6 @@
   };
   App.closeSheet = function () {};
 
-  // ------------------------------------------------------------ confetti
-  App.confetti = function (colors, opts) {
-    opts = opts || {};
-    var layer = $('#confetti');
-    var count = opts.count || 90;
-    var ox = opts.x != null ? opts.x : 640, oy = opts.y != null ? opts.y : 520;
-    for (var i = 0; i < count; i++) {
-      var s = document.createElement('i');
-      var ang = (Math.random() * 140 + 200) * Math.PI / 180; // mostly upward
-      var pow = 180 + Math.random() * (opts.power || 380);
-      s.style.left = ox + 'px';
-      s.style.top = oy + 'px';
-      s.style.background = colors[i % colors.length];
-      s.style.setProperty('--dx', Math.cos(ang) * pow + 'px');
-      s.style.setProperty('--dy', Math.sin(ang) * pow + 'px');
-      s.style.setProperty('--fall', 260 + Math.random() * 360 + 'px');
-      s.style.setProperty('--r', (Math.random() * 1080 - 540) + 'deg');
-      s.style.width = 8 + Math.random() * 8 + 'px';
-      s.style.height = 10 + Math.random() * 12 + 'px';
-      if (Math.random() > 0.7) s.style.borderRadius = '50%';
-      s.style.animationDuration = 1.3 + Math.random() * 1.1 + 's';
-      layer.appendChild(s);
-    }
-    setTimeout(function () { layer.innerHTML = ''; }, 2800);
-  };
   // Stage-local coordinates for an element's center (stage may be scaled on desktop)
   App.centerOf = function (el) {
     var stage = $('#stage').getBoundingClientRect(), r = el.getBoundingClientRect(), k = stage.width / 1280;

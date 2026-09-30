@@ -96,8 +96,8 @@
         el.addEventListener('click', function (e) {
           var b = e.target.closest('[data-refresh]');
           if (!b) return;
-          b.classList.add('is-spinning');
-          setTimeout(function () { V.synced = Date.now(); render(); }, 900);
+          V.synced = Date.now();
+          render();
         });
       }
       render();

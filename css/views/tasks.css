@@ -7,7 +7,7 @@
 .t-progress > .num { font-size: 64px; line-height: .8; }
 .t-progress small { font-size: 32px; color: var(--mute); }
 .t-bar { width: 120px; height: 12px; border-radius: 6px; background: var(--paper-2); overflow: hidden; }
-.t-bar i { display: block; height: 100%; background: var(--ink); border-radius: 6px; transition: width .6s var(--ease); }
+.t-bar i { display: block; height: 100%; background: var(--ink); border-radius: 6px; }
 
 .ch-lanes { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .ch-lane { display: flex; flex-direction: column; min-height: 0; background: var(--card); border-radius: var(--r); overflow: hidden; position: relative; }
@@ -29,7 +29,6 @@
   display: flex; align-items: center; gap: 10px;
   min-height: 74px; padding: 8px 10px 8px 8px; border-radius: 14px;
   background: var(--paper); text-align: left; position: relative;
-  transition: background .25s, transform .15s var(--ease), opacity .3s;
 }
 .ch:active { transform: scale(.97); }
 .ch-emoji {
@@ -47,24 +46,18 @@
   position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: 14px;
   display: grid; place-items: center;
   background: var(--c); opacity: 0; transform: scale(.6);
-  transition: opacity .2s, transform .35s var(--spring);
 }
 .ch-check svg { fill: none; stroke: var(--c-ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; }
 .ch.is-checking .ch-check, .ch.is-done .ch-check { opacity: 1; transform: none; }
-.ch.is-checking .ch-emoji { animation: bump .4s var(--spring); }
-@keyframes bump { 40% { transform: scale(1.18); } }
-.ch.is-checking .ch-check svg { animation: draw .35s .12s var(--ease) forwards; }
-.ch.is-done .ch-check svg { stroke-dashoffset: 0; }
+.ch.is-checking .ch-check svg, .ch.is-done .ch-check svg { stroke-dashoffset: 0; }
 .ch.is-checking { background: rgb(var(--c-rgb) / .16); }
-@keyframes draw { to { stroke-dashoffset: 0; } }
 .ch.is-done { background: transparent; }
 .ch.is-done .ch-text b { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--mute); }
 .ch.is-done .ch-emoji { box-shadow: none; }
 .ch-none { font-size: 22px; color: var(--mute); padding: 12px 6px; }
-.ch-alldone { font-size: 40px; text-align: center; padding: 6px 0 4px; color: var(--c); animation: pop .5s var(--spring); }
+.ch-alldone { font-size: 40px; text-align: center; padding: 6px 0 4px; color: var(--c); }
 .ch-lane:not([data-lane="otto"]) .ch-alldone { color: var(--c); }
 .ch-lane[data-lane="otto"] .ch-alldone { color: #C98A00; }
-@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .ch-week { padding: 10px 12px 14px; border-top: 1px solid var(--line); flex: none; }
 .ch-week .label { font-size: 12px; margin-bottom: 6px; }

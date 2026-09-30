@@ -188,7 +188,7 @@
         var sx = null, max;
         knob.addEventListener('pointerdown', function (e) {
           sx = e.clientX; max = track.getBoundingClientRect().width - knob.getBoundingClientRect().width - 8;
-          knob.setPointerCapture(e.pointerId); knob.style.transition = 'none'; fill.style.transition = 'none';
+          knob.setPointerCapture(e.pointerId);
         });
         knob.addEventListener('pointermove', function (e) {
           if (sx == null) return;
@@ -201,7 +201,7 @@
         knob.addEventListener('pointerup', function () {
           if (sx == null) return;
           sx = null;
-          knob.style.transition = ''; fill.style.transition = '';
+
           if (knob._x >= knob._max - 6) {
             close();
             g.state = opening ? 'opening' : 'closing';
@@ -275,7 +275,7 @@
       var k = t.dataset.sum;
       if (k === 'lights' || k === 'security') return listSheet(k);
       var target = V.el.querySelector(k === 'climate' ? '.hc-climate' : '.hc-media');
-      target.classList.remove('is-pulse'); target.offsetWidth; target.classList.add('is-pulse');
+      target.classList.add('is-pulse'); setTimeout(function () { target.classList.remove('is-pulse'); }, 900);
       return;
     }
     if ((t = e.target.closest('[data-temp]'))) {
@@ -304,7 +304,6 @@
       V.camTimer = setInterval(function () {
         V.camAge = V.camAge >= 20 ? 1 : V.camAge + 1;
         App.$$('.cam-age', el).forEach(function (a) { a.textContent = V.camAge + 's ago'; });
-        if (V.camAge === 1) App.$$('.cam', el).forEach(function (c) { c.classList.remove('is-fresh'); c.offsetWidth; c.classList.add('is-fresh'); });
       }, 1000);
     },
     hide: function () { clearInterval(V.camTimer); }
