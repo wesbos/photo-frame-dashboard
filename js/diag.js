@@ -10,6 +10,26 @@
 
   var S = { down: null, switches: [], frames: [], jank: 0, last: performance.now() };
 
+  // A/B experiments: ?diag&exp=font,scale,has,shadow,img (comma separated)
+  var em = location.search.match(/[?&]exp=([^&]*)/);
+  var EXP = em ? decodeURIComponent(em[1]).split(',') : [];
+  function has(x) { return EXP.indexOf(x) > -1; }
+  function dropRules(test) {
+    Array.prototype.forEach.call(document.styleSheets, function (sh) {
+      var rules; try { rules = sh.cssRules; } catch (e) { return; }
+      for (var i = rules.length - 1; i >= 0; i--) if (test(rules[i].cssText)) sh.deleteRule(i);
+    });
+  }
+  function applyExperiments() {
+    var css = '';
+    if (has('font')) css += 'body, .serif, .num, button, input { font-family: sans-serif !important; font-stretch: normal !important; }';
+    if (has('shadow')) css += '*, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }';
+    if (has('img')) css += 'img { visibility: hidden !important; }';
+    if (css) { var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); }
+    if (has('has')) dropRules(function (t) { return t.indexOf(':has(') > -1 || t.indexOf('[style*=') > -1; });
+    if (has('scale')) { var st2 = App.$('#stage'); st2.style.transform = 'none'; window.addEventListener('resize', function () { st2.style.transform = 'none'; }); }
+  }
+
   function ua() {
     var m = navigator.userAgent.match(/(Firefox|Chrome)\/(\d+)/);
     return (m ? m[1] + ' ' + m[2] : navigator.userAgent.slice(0, 30)) + (/Android ([\d.]+)/.test(navigator.userAgent) ? ' · Android ' + RegExp.$1 : '');
@@ -26,6 +46,7 @@
   }
 
   App.on('ready', function () {
+    applyExperiments();
     var panel = document.createElement('div');
     panel.className = 'diag';
     App.$('#stage').appendChild(panel);
@@ -52,7 +73,7 @@
             view: name, js: t1 - t0, layout: t2 - t1, paint: t3 - t2,
             total: t3 - (fromTap || t0), tap: S.clickDelay
           });
-          S.switches.length = Math.min(S.switches.length, 6);
+          S.switches.length = Math.min(S.switches.length, 7);
           S.down = null; S.clickDelay = null;
         });
       });
@@ -69,7 +90,7 @@
       var mpx = imgs.reduce(function (s, i) { return s + i.naturalWidth * i.naturalHeight; }, 0) / 1e6;
       var mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : 'n/a';
       panel.innerHTML =
-        '<b>DIAG</b> ' + ua() + '<br>' +
+        '<b>DIAG</b> ' + ua() + ' · exp ' + (EXP.join(',') || 'none') + '<br>' +
         'viewport ' + innerWidth + '×' + innerHeight + ' · dpr ' + devicePixelRatio + ' · scale ' + scale.toFixed(3) + '<br>' +
         'fps ' + (1000 / avg).toFixed(0) + ' · frame ' + avg.toFixed(0) + 'ms · jank>50ms ' + S.jank + '<br>' +
         'dom ' + document.getElementsByTagName('*').length + ' · imgs ' + imgs.length + ' (' + mpx.toFixed(1) + ' MP) · heap ' + mem + '<br>' +
