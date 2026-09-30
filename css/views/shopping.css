@@ -13,6 +13,7 @@
   min-height: 76px; border-bottom: 1px solid var(--line);
   max-height: 120px; overflow: hidden;
 }
+.s-row.is-flash { background: rgb(var(--warm-rgb) / .45); }
 .s-hit { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 14px; padding: 0 10px 0 4px; }
 .s-box {
   width: 40px; height: 40px; border-radius: 12px; flex: none;

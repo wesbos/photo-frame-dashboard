@@ -180,26 +180,36 @@
     else if (view.resume) view.resume($('#view-' + name));
     if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   };
-  function markStale() { Object.keys(App.views).forEach(function (k) { if (k !== App.current) App.views[k]._dirty = true; }); }
+  // Build a hidden view and lay it out now (cached by content-visibility; no paint happens).
+  function prebuild(name) {
+    var el = $('#view-' + name), view = App.views[name];
+    build(name);
+    if (view.hide) view.hide();
+    el.classList.add('is-warming');
+    el.offsetHeight;
+    el.classList.remove('is-warming');
+  }
+  // Pre-build (startup) and re-build (after data changes) hidden views in the background, one per
+  // slot, so navigating to them never pays the rebuild cost.
+  var refreshTimer = null;
+  function refreshStale(delay) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function next() {
+      var name = Object.keys(App.views).filter(function (k) {
+        var v = App.views[k];
+        return k !== App.current && (!v._built || v._dirty);
+      })[0];
+      if (!name) return;
+      prebuild(name);
+      refreshTimer = setTimeout(next, 400);
+    }, delay);
+  }
+  function markStale() {
+    Object.keys(App.views).forEach(function (k) { if (k !== App.current) App.views[k]._dirty = true; });
+    refreshStale(1500);
+  }
   App.on('data', markStale);
   App.on('time', markStale);
-  // Pre-build + pre-lay-out hidden views one at a time after startup so first visits are fast too.
-  function warm() {
-    var queue = Object.keys(App.views).filter(function (k) { return k !== App.current && !App.views[k]._built; });
-    (function next() {
-      var name = queue.shift();
-      if (!name) return;
-      if (!App.views[name]._built && App.current !== name) {
-        var el = $('#view-' + name);
-        build(name);
-        if (App.views[name].hide) App.views[name].hide();
-        el.classList.add('is-warming');
-        el.offsetHeight; // style + layout now, cached by content-visibility; no paint happens
-        el.classList.remove('is-warming');
-      }
-      setTimeout(next, 400);
-    })();
-  }
   App.rerender = function () {
     if (App.current) App.views[App.current].show($('#view-' + App.current), { rerender: true });
   };
@@ -336,7 +346,7 @@
     tick();
     setInterval(tick, 1000);
     App.emit('ready');
-    setTimeout(warm, 1500);
+    refreshStale(1500);
     setTimeout(function () { App.toast('Tip: press and hold the <b>clock</b> in the sidebar for demo controls', { ms: 6000, icon: 'bolt' }); }, 1200);
   };
   document.addEventListener('DOMContentLoaded', function () { App.start(); });

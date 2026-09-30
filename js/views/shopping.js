@@ -20,7 +20,7 @@
   }
 
   function row(g) {
-    return '<div class="s-row' + (V.pending[g.id] ? ' is-checking' : '') + (V.flash === g.id ? ' is-flash' : '') + '" data-id="' + g.id + '">' +
+    return '<div class="s-row' + (V.pending[g.id] ? ' is-checking' : '') + '" data-id="' + g.id + '">' +
       '<button class="s-hit" data-check="' + g.id + '">' +
       '<span class="s-box">' + App.icon('check', 22) + '</span>' +
       '<span class="s-name"><b>' + App.esc(g.name) + '</b>' + (g.note ? '<small>' + App.esc(g.note) + '</small>' : '') + '</span>' +
@@ -35,7 +35,7 @@
     var groups = order.map(function (cat) { return { cat: cat, items: items.filter(function (g) { return g.cat === cat; }) }; }).filter(function (x) { return x.items.length; });
     var d = done();
     return (items.length ? groups.map(function (gr) {
-      return '<div class="s-cat"><div class="s-cat-h"><span class="label">' + gr.cat + '</span><span class="label">' + gr.items.length + '</span></div>' + gr.items.map(row).join('') + '</div>';
+      return '<div class="s-cat" data-cat="' + gr.cat + '"><div class="s-cat-h"><span class="label">' + gr.cat + '</span><span class="label" data-cat-count>' + gr.items.length + '</span></div>' + gr.items.map(row).join('') + '</div>';
     }).join('') : '<div class="s-empty serif">All stocked up.<br><i>Nothing left to buy.</i></div>') +
       (d.length ? '<div class="s-drawer' + (V.drawer ? ' is-open' : '') + '">' +
         '<button class="s-drawer-h" data-drawer><span>' + App.icon('check', 22) + ' Got it <b class="num">(' + d.length + ')</b></span><span class="label">' + (V.drawer ? 'Hide' : 'Show') + '</span></button>' +
@@ -56,11 +56,58 @@
         return '<button class="s-ac-row" data-add="' + App.esc(m[0]) + '"><b>' + App.esc(m[0]) + '</b><span class="label">' + (on ? 'On list · ×' + on.qty : m[1]) + '</span>' + App.icon('plus', 26) + '</button>';
       }).join('') + (exact ? '' : '<button class="s-ac-row s-ac-row--new" data-add="' + App.esc(V.query.trim()) + '"><b>Add “' + App.esc(V.query.trim()) + '”</b><span class="label">' + categorize(V.query) + '</span>' + App.icon('plus', 26) + '</button>') + '</div>';
     }
-    return '<div class="label">Usuals · tap to add</div><div class="s-usuals">' + D.usuals.map(function (name) {
-      var on = find(name, false);
-      return '<button class="s-tile' + (on ? ' is-on' : '') + '" data-add="' + App.esc(name) + '">' +
-        '<b>' + App.esc(name) + '</b><span>' + (on ? App.icon('check', 16) + 'On list' + (on.qty > 1 ? ' ×' + on.qty : '') : categorize(name)) + '</span></button>';
-    }).join('') + '</div>';
+    return '<div class="label">Usuals · tap to add</div><div class="s-usuals">' + D.usuals.map(usualTile).join('') + '</div>';
+  }
+  function usualTile(name) {
+    var on = find(name, false);
+    return '<button class="s-tile' + (on ? ' is-on' : '') + '" data-add="' + App.esc(name) + '">' +
+      '<b>' + App.esc(name) + '</b><span>' + (on ? App.icon('check', 16) + 'On list' + (on.qty > 1 ? ' ×' + on.qty : '') : categorize(name)) + '</span></button>';
+  }
+
+  // ---- granular updates (full list + usuals rebuild costs ~500ms on the wall tablet)
+  function swap(old, html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    old.parentNode.replaceChild(tmp.firstChild, old);
+  }
+  function refreshSuggestFor(g) {
+    if (V.query.trim()) return paintSuggest();
+    var t = V.el.querySelector('.s-usuals [data-add="' + App.esc(g.name) + '"]');
+    if (t) swap(t, usualTile(g.name));
+  }
+  function catCount(cat) {
+    var c = V.el.querySelector('.s-cat[data-cat="' + cat + '"]');
+    if (!c) return;
+    var n = c.querySelectorAll('.s-row').length;
+    if (!n) c.parentNode.removeChild(c);
+    else c.querySelector('[data-cat-count]').textContent = n;
+  }
+  function inView(g) { return !g.done && (V.store === 'all' || g.store === V.store); }
+  function insertRow(g) {
+    var cat = V.el.querySelector('.s-cat[data-cat="' + g.cat + '"]');
+    if (!inView(g)) return paintHead();
+    if (!cat) return paintList();
+    var tmp = document.createElement('div');
+    tmp.innerHTML = row(g);
+    cat.appendChild(tmp.firstChild);
+    catCount(g.cat);
+    paintHead();
+  }
+  function removeRow(g) {
+    var r = V.el.querySelector('.s-list [data-id="' + g.id + '"]');
+    var drawer = V.el.querySelector('.s-drawer');
+    if (!r || !drawer || V.drawer || !open().length) return paintList();
+    r.parentNode.removeChild(r);
+    catCount(g.cat);
+    drawer.querySelector('.num').textContent = '(' + done().length + ')';
+    paintHead();
+  }
+  function flash(g) {
+    var r = V.el.querySelector('.s-list [data-id="' + g.id + '"]');
+    if (!r) return;
+    r.classList.add('is-flash');
+    if (r.scrollIntoView) r.scrollIntoView({ block: 'nearest' });
+    setTimeout(function () { r.classList.remove('is-flash'); }, 1200);
   }
 
   function paintList() { var l = V.el.querySelector('.s-list'); var st = l.scrollTop; l.innerHTML = listHTML(); l.scrollTop = st; paintHead(); }
@@ -93,22 +140,28 @@
   function add(name) {
     name = name.trim();
     var g = find(name, false), msg;
-    if (g) { g.qty++; msg = 'Already on the list · now <b>×' + g.qty + '</b> ' + App.esc(g.name); }
-    else if ((g = find(name, true))) { g.done = false; g.qty = 1; msg = 'Added back <b>' + App.esc(g.name) + '</b>'; }
-    else {
+    if (g) {
+      g.qty++;
+      msg = 'Already on the list · now <b>×' + g.qty + '</b> ' + App.esc(g.name);
+      var q = V.el.querySelector('.s-list [data-id="' + g.id + '"] .s-qty .num');
+      if (q) q.textContent = g.qty;
+    } else if ((g = find(name, true))) {
+      g.done = false; g.qty = 1;
+      msg = 'Added back <b>' + App.esc(g.name) + '</b>';
+      paintList();
+    } else {
       var cat = D.catalog.filter(function (c) { return c[0].toLowerCase() === name.toLowerCase(); })[0];
       g = { id: D._gid(), name: cat ? cat[0] : name.charAt(0).toUpperCase() + name.slice(1), cat: categorize(name), qty: 1, store: V.store === 'all' ? 'grocer' : V.store, done: false, note: '' };
       D.groceries.push(g);
       msg = 'Added <b>' + App.esc(g.name) + '</b> to ' + g.cat;
+      insertRow(g);
     }
+    var hadQuery = !!V.query.trim();
     V.query = '';
     var input = V.el.querySelector('.s-input');
     if (input) input.value = '';
-    V.flash = g.id;
-    paintList(); paintSuggest();
-    var el = V.el.querySelector('[data-id="' + g.id + '"]');
-    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    setTimeout(function () { V.flash = null; }, 1200);
+    if (hadQuery) paintSuggest(); else refreshSuggestFor(g);
+    flash(g);
     App.emit('data');
     App.toast(msg, { icon: 'cart', ms: 3000 });
   }
@@ -121,15 +174,19 @@
       if (!V.pending[g.id]) return;
       delete V.pending[g.id];
       g.done = true;
-      paintList(); paintSuggest();
+      removeRow(g);
+      refreshSuggestFor(g);
       App.emit('data');
     }, 1200);
     App.toast('<b>' + App.esc(g.name) + '</b> checked off', {
       icon: 'check',
       undo: function () {
+        var wasDone = g.done;
         delete V.pending[g.id];
         g.done = false;
-        paintList(); paintSuggest();
+        if (wasDone) paintList();
+        else { var r = V.el.querySelector('.s-list [data-id="' + g.id + '"]'); if (r) r.classList.remove('is-checking'); }
+        refreshSuggestFor(g);
         App.emit('data');
       }
     });
@@ -147,7 +204,7 @@
       var q = D.groceries.filter(function (x) { return x.id === t.dataset.id; })[0];
       q.qty = Math.max(1, q.qty + +t.dataset.qty);
       t.parentNode.querySelector('.num').textContent = q.qty;
-      paintSuggest();
+      refreshSuggestFor(q);
       return;
     }
     if ((t = e.target.closest('[data-add]'))) return add(t.dataset.add);

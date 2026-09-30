@@ -11,16 +11,14 @@
     var d = dev(id), before = {};
     Object.keys(patch).forEach(function (k) { before[k] = d[k]; d[k] = patch[k]; });
     V.pending[id] = true;
-    paint();
-    App.emit('data');
+    changed([id]);
     setTimeout(function () {
       delete V.pending[id];
       if (d.flaky && !(opts && opts.silent)) {
         Object.keys(before).forEach(function (k) { d[k] = before[k]; });
         App.toast('Couldn’t reach <b>' + d.name + '</b> · it may be offline', { tone: 'error', icon: 'bolt' });
-      }
-      paint();
-      App.emit('data');
+        changed([id]);
+      } else paintTile(id);
     }, d.flaky ? 2600 : 600);
   };
 
@@ -77,11 +75,15 @@
     }).join('');
   }
 
+  function roomCount(room) {
+    var on = D.devices.filter(function (d) { return d.room === room && d.type === 'light' && d.on; }).length;
+    return on ? on + ' on' : 'All off';
+  }
   function rooms() {
     return D.rooms.map(function (r) {
       var list = D.devices.filter(function (d) { return d.room === r.id; });
       var on = list.filter(function (d) { return d.type === 'light' && d.on; }).length;
-      return '<section class="room"><div class="room-h"><h3 class="serif">' + r.name + '</h3><span class="label">' + (on ? on + ' on' : 'All off') + '</span></div>' +
+      return '<section class="room"><div class="room-h"><h3 class="serif">' + r.name + '</h3><span class="label" data-room-count="' + r.id + '">' + roomCount(r.id) + '</span></div>' +
         '<div class="tiles">' + list.map(tile).join('') + '</div></section>';
     }).join('');
   }
@@ -112,6 +114,29 @@
       '<button class="np-btn" data-play aria-label="Play/Pause">' + App.icon(m.playing ? 'pause' : 'play', 30) + '</button>';
   }
 
+  // Granular updates: an action repaints only what it touched (full paint() rebuilds ~270 nodes,
+  // which costs ~350ms on the wall tablet).
+  function paintTile(id) {
+    var d = dev(id);
+    [V.el && V.el.querySelector('.hc-rooms'), V.sheetBox].forEach(function (root) {
+      var old = root && root.querySelector('[data-dev="' + id + '"]');
+      if (!old) return;
+      var tmp = document.createElement('div');
+      tmp.innerHTML = tile(d);
+      var nt = tmp.firstChild;
+      old.parentNode.replaceChild(nt, old);
+      bindTile(nt);
+    });
+    var c = V.el && V.el.querySelector('[data-room-count="' + d.room + '"]');
+    if (c) c.textContent = roomCount(d.room);
+  }
+  function paintPart(sel, html) { if (V.el) V.el.querySelector(sel).innerHTML = html; }
+  function changed(ids) {
+    ids.forEach(paintTile);
+    paintPart('.hc-sum', summary());
+    App.emit('data');
+  }
+
   function paint() {
     if (!V.el) return;
     var el = V.el;
@@ -123,7 +148,6 @@
     bindTiles(rs);
     el.querySelector('.hc-climate').innerHTML = climate();
     el.querySelector('.hc-media').innerHTML = media();
-    if (V.sheetPaint) V.sheetPaint();
   }
 
   // ------------------------------------------------------------ tile gestures
@@ -133,7 +157,7 @@
     t.addEventListener('pointerdown', function (e) {
       sx = e.clientX; dragging = false; w = t.getBoundingClientRect().width;
       startLvl = d.type === 'light' ? (d.on ? d.level : 0) : d.pos;
-      t.setPointerCapture(e.pointerId);
+      try { t.setPointerCapture(e.pointerId); } catch (err) {}
     });
     t.addEventListener('pointermove', function (e) {
       if (sx == null) return;
@@ -158,11 +182,12 @@
       } else if (d.type === 'light') App.setDevice(d.id, { on: !d.on, level: d.level || 100 });
       else App.setDevice(d.id, { pos: d.pos > 0 ? 0 : 100 });
     });
-    t.addEventListener('pointercancel', function () { sx = null; t.classList.remove('is-drag'); paint(); });
+    t.addEventListener('pointercancel', function () { sx = null; t.classList.remove('is-drag'); paintTile(d.id); });
   }
 
-  function bindTiles(root) {
-    App.$$('[data-dev]', root).forEach(function (t) {
+  function bindTiles(root) { App.$$('[data-dev]', root).forEach(bindTile); }
+  function bindTile(t) {
+    (function () {
       var d = dev(t.dataset.dev);
       if (d.type === 'light' || d.type === 'blind') sliderTile(t, d);
       if (d.type === 'lock') {
@@ -174,7 +199,7 @@
         t.addEventListener('click', function () { if (!d.locked && Date.now() - (V.lastHold || 0) > 800) App.setDevice(d.id, { locked: true }); });
       }
       if (d.type === 'garage') t.addEventListener('click', function () { App.openGarageSheet(); });
-    });
+    })();
   }
 
   // Slide-to-confirm for the garage
@@ -206,8 +231,8 @@
             close();
             g.state = opening ? 'opening' : 'closing';
             V.scene = null;
-            paint(); App.emit('data');
-            setTimeout(function () { g.state = opening ? 'open' : 'closed'; paint(); App.emit('data'); App.toast('Garage ' + g.state, { icon: 'garage', ms: 2500 }); }, 4000);
+            changed(['g-door']);
+            setTimeout(function () { g.state = opening ? 'open' : 'closed'; changed(['g-door']); App.toast('Garage ' + g.state, { icon: 'garage', ms: 2500 }); }, 4000);
           } else { knob.style.transform = ''; fill.style.width = ''; }
         });
       }
@@ -226,21 +251,22 @@
       '<div class="tiles tiles--sheet">' + list.map(tile).join('') + '</div>' +
       '<div class="sheet-actions">' + (kind === 'lights' ? '<button class="btn btn--solid" data-alloff>Turn everything off</button>' : '<button class="btn btn--solid" data-lockall>Lock all doors</button>') + '</div></div>', {
       cls: 'sheet--wide',
-      onClose: function () { V.sheetPaint = null; },
+      onClose: function () { V.sheetBox = null; },
       onMount: function (s, close) {
         var box = s.querySelector('.tiles--sheet');
-        V.sheetPaint = function () { box.innerHTML = list.map(tile).join(''); bindTiles(box); };
+        V.sheetBox = box;
         bindTiles(box);
         var off = s.querySelector('[data-alloff]'), lk = s.querySelector('[data-lockall]');
         if (off) off.onclick = function () {
           var prev = D.devices.filter(function (d) { return d.type === 'light' && d.on; });
           prev.forEach(function (d) { d.on = false; });
-          close(); paint(); App.emit('data');
-          App.toast('Turned off ' + prev.length + ' lights', { icon: 'bulb', undo: function () { prev.forEach(function (d) { d.on = true; }); paint(); App.emit('data'); } });
+          close(); changed(prev.map(function (d) { return d.id; }));
+          App.toast('Turned off ' + prev.length + ' lights', { icon: 'bulb', undo: function () { prev.forEach(function (d) { d.on = true; }); changed(prev.map(function (d) { return d.id; })); } });
         };
         if (lk) lk.onclick = function () {
-          D.devices.forEach(function (d) { if (d.type === 'lock') d.locked = true; });
-          close(); paint(); App.emit('data');
+          var locks = D.devices.filter(function (d) { return d.type === 'lock'; });
+          locks.forEach(function (d) { d.locked = true; });
+          close(); changed(locks.map(function (d) { return d.id; }));
           App.toast('All doors locked', { icon: 'lock' });
         };
       }
@@ -259,11 +285,19 @@
     });
     if (id === 'away' || id === 'night') D.devices.forEach(function (d) { if (d.type === 'lock') d.locked = true; });
     V.scene = id;
-    paint(); App.emit('data');
+    function diff() {
+      return snapshot.filter(function (o) { var d = dev(o.id); return o.on !== d.on || o.level !== d.level || o.pos !== d.pos || o.locked !== d.locked; })
+        .map(function (o) { return o.id; });
+    }
+    var ids = diff();
+    paintPart('.hc-scenes', scenes());
+    changed(ids);
     App.toast('<b>' + s.name + '</b> scene on', {
       icon: s.icon, undo: function () {
         snapshot.forEach(function (o) { Object.assign(dev(o.id), o); });
-        V.scene = prevScene; paint(); App.emit('data');
+        V.scene = prevScene;
+        paintPart('.hc-scenes', scenes());
+        changed(ids);
       }
     });
   }
@@ -281,12 +315,13 @@
     if ((t = e.target.closest('[data-temp]'))) {
       D.climate.set = Math.max(15, Math.min(28, D.climate.set + +t.dataset.temp));
       if (D.climate.mode === 'off') D.climate.mode = 'heat';
-      return paint();
+      return climateChanged();
     }
-    if ((t = e.target.closest('[data-tmode]'))) { D.climate.mode = t.dataset.tmode; return paint(); }
+    if ((t = e.target.closest('[data-tmode]'))) { D.climate.mode = t.dataset.tmode; return climateChanged(); }
     if ((t = e.target.closest('[data-cam]'))) return App.cameraSheet(D.cameras.filter(function (c) { return c.id === t.dataset.cam; })[0]);
-    if ((t = e.target.closest('[data-play]'))) { D.media.playing = !D.media.playing; return paint(); }
+    if ((t = e.target.closest('[data-play]'))) { D.media.playing = !D.media.playing; paintPart('.hc-media', media()); paintPart('.hc-sum', summary()); }
   }
+  function climateChanged() { paintPart('.hc-climate', climate()); paintPart('.hc-sum', summary()); App.emit('data'); }
 
   function camTimer() {
     clearInterval(V.camTimer);
