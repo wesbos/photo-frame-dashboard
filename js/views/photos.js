@@ -51,6 +51,7 @@
       }
       V.show.start();
     },
+    resume: function () { V.show.start(); },
     hide: function () { if (V.show) V.show.stop(); }
   });
 })();

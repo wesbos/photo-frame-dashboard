@@ -25,8 +25,8 @@
     if (has('font')) css += 'body, .serif, .num, button, input { font-family: sans-serif !important; font-stretch: normal !important; }';
     if (has('shadow')) css += '*, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }';
     if (has('img')) css += 'img { visibility: hidden !important; }';
-    if (css) { var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); }
     if (has('has')) dropRules(function (t) { return t.indexOf(':has(') > -1 || t.indexOf('[style*=') > -1; });
+    if (css) { var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); }
     if (has('scale')) { var st2 = App.$('#stage'); st2.style.transform = 'none'; window.addEventListener('resize', function () { st2.style.transform = 'none'; }); }
   }
 
@@ -64,7 +64,7 @@
       var fromTap = S.down && t0 - S.down.now < 1000 ? S.down.now : null;
       go(name, opts);
       var t1 = performance.now();
-      document.body.offsetHeight; // force style + layout so it is counted
+      if (!window.__diagPause) document.body.offsetHeight; // force style + layout so it is counted
       var t2 = performance.now();
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
@@ -79,10 +79,11 @@
       });
     };
 
-    requestAnimationFrame(frame);
+    if (!has('noframe')) requestAnimationFrame(frame);
 
     function f(n) { return n == null ? '–' : Math.round(n); }
     setInterval(function () {
+      if (window.__diagPause) return;
       var fr = S.frames.slice(-90), avg = fr.reduce(function (a, b) { return a + b; }, 0) / (fr.length || 1);
       var stage = App.$('#stage');
       var scale = stage.getBoundingClientRect().width / 1280;

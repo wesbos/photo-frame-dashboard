@@ -90,6 +90,7 @@
   }
 
   App.register('agents', {
+    minutely: true,
     show: function (el) {
       if (!V.el) {
         V.el = el;

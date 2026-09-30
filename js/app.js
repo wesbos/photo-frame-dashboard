@@ -159,15 +159,47 @@
 
   // ------------------------------------------------------------ router
   App.register = function (name, view) { App.views[name] = view; };
+  // Views are built once and kept laid out (hidden with content-visibility), so switching tabs
+  // only has to paint. A view is rebuilt when its data changed ('data'/'time' events) or, for
+  // time-sensitive views (minutely: true), when the minute has rolled over since it was built.
+  function minuteKey() { return Math.floor(App.now().getTime() / 60000); }
+  function build(name, opts) {
+    var view = App.views[name];
+    view.show($('#view-' + name), opts || {});
+    view._built = true; view._dirty = false; view._min = minuteKey();
+  }
   App.go = function (name, opts) {
+    opts = opts || {};
     if (!App.views[name]) name = 'home';
     if (App.current && App.current !== name && App.views[App.current].hide) App.views[App.current].hide();
     App.$$('.view').forEach(function (v) { v.classList.toggle('is-active', v.dataset.view === name); });
     App.$$('.rail-item').forEach(function (b) { b.classList.toggle('is-active', b.dataset.go === name); });
     App.current = name;
-    App.views[name].show($('#view-' + name), opts || {});
+    var view = App.views[name];
+    if (!view._built || view._dirty || opts.rerender || (view.minutely && view._min !== minuteKey())) build(name, opts);
+    else if (view.resume) view.resume($('#view-' + name));
     if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   };
+  function markStale() { Object.keys(App.views).forEach(function (k) { if (k !== App.current) App.views[k]._dirty = true; }); }
+  App.on('data', markStale);
+  App.on('time', markStale);
+  // Pre-build + pre-lay-out hidden views one at a time after startup so first visits are fast too.
+  function warm() {
+    var queue = Object.keys(App.views).filter(function (k) { return k !== App.current && !App.views[k]._built; });
+    (function next() {
+      var name = queue.shift();
+      if (!name) return;
+      if (!App.views[name]._built && App.current !== name) {
+        var el = $('#view-' + name);
+        build(name);
+        if (App.views[name].hide) App.views[name].hide();
+        el.classList.add('is-warming');
+        el.offsetHeight; // style + layout now, cached by content-visibility; no paint happens
+        el.classList.remove('is-warming');
+      }
+      setTimeout(next, 400);
+    })();
+  }
   App.rerender = function () {
     if (App.current) App.views[App.current].show($('#view-' + App.current), { rerender: true });
   };
@@ -288,9 +320,15 @@
     App.setTime(15, 18); // demo default: a busy weekday afternoon
     fit();
     window.addEventListener('resize', fit);
+    // Switch tabs the instant a finger lands (pointerdown), not on release. Keyboard "clicks"
+    // (detail === 0) still work.
+    $('#rail').addEventListener('pointerdown', function (e) {
+      var b = e.target.closest('[data-go]');
+      if (b && e.button === 0) App.go(b.dataset.go);
+    });
     $('#rail').addEventListener('click', function (e) {
       var b = e.target.closest('[data-go]');
-      if (b) App.go(b.dataset.go);
+      if (b && e.detail === 0) App.go(b.dataset.go);
     });
     document.addEventListener('pointerdown', App.resetIdle, true);
     window.addEventListener('hashchange', function () { App.go(location.hash.slice(1)); });
@@ -298,6 +336,7 @@
     tick();
     setInterval(tick, 1000);
     App.emit('ready');
+    setTimeout(warm, 1500);
     setTimeout(function () { App.toast('Tip: press and hold the <b>clock</b> in the sidebar for demo controls', { ms: 6000, icon: 'bolt' }); }, 1200);
   };
   document.addEventListener('DOMContentLoaded', function () { App.start(); });

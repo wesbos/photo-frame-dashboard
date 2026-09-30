@@ -172,8 +172,15 @@
       paint();
       V.slides.start();
     },
+    resume: function () { V.slides.start(); },
     hide: function () { if (V.slides) V.slides.stop(); }
   });
-  App.on('minute', function () { if (App.current === 'home') paint(); });
+  // Every minute: just the clock and next-up countdown (cheap, even while hidden). Weather on the hour.
+  App.on('minute', function (n) {
+    if (!V.el || !V.el.firstChild) return;
+    V.el.querySelector('.h-clock').innerHTML = clock();
+    V.el.querySelector('.h-hero-slot').innerHTML = hero();
+    if (n.getMinutes() === 0) { V.el.querySelector('.h-weather').innerHTML = weather(); V.el.querySelector('.h-lanes').innerHTML = lanes(); }
+  });
   App.on('data', function () { if (App.current === 'home') paint(); });
 })();

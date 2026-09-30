@@ -53,6 +53,11 @@
     <div class="demo" id="demo"></div>
   </div>
 
+  <script>
+    // Wall-display self-healing: if the app bundle failed to load (e.g. a stale page right after a
+    // deploy, or a network blip), reload until it starts.
+    setTimeout(function () { if (!window.App) location.reload(); }, 10000);
+  </script>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

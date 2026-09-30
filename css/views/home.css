@@ -64,12 +64,13 @@
 .h-lane-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .h-lane-head b { font-size: 18px; font-weight: 800; font-stretch: 80%; text-transform: uppercase; letter-spacing: .06em; }
 .h-ev {
+  width: 100%; min-width: 0; overflow: hidden;
   display: flex; flex-direction: column; gap: 1px;
   min-height: 60px; padding: 7px 12px; border-radius: 12px;
   background: rgb(var(--c-rgb) / .12);
 }
 .h-ev-t { font-size: 16px; font-weight: 800; font-stretch: 70%; font-variant-numeric: tabular-nums; color: var(--ink-2); }
-.h-ev-n { font-size: 18px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-ev-n { display: block; width: 100%; font-size: 18px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .h-ev.is-now { background: var(--c); color: var(--c-ink); }
 .h-ev.is-now .h-ev-t { color: inherit; text-transform: uppercase; letter-spacing: .08em; }
 .h-free { font-size: 21px; color: var(--mute); padding: 6px 2px; line-height: 1.1; }

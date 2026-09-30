@@ -113,7 +113,7 @@
   }
 
   function paint() {
-    if (!V.el || App.current !== 'control') return;
+    if (!V.el) return;
     var el = V.el;
     el.querySelector('.hc-sum').innerHTML = summary();
     el.querySelector('.hc-scenes').innerHTML = scenes();
@@ -288,6 +288,14 @@
     if ((t = e.target.closest('[data-play]'))) { D.media.playing = !D.media.playing; return paint(); }
   }
 
+  function camTimer() {
+    clearInterval(V.camTimer);
+    V.camTimer = setInterval(function () {
+      V.camAge = V.camAge >= 20 ? 1 : V.camAge + 1;
+      App.$$('.cam-age', V.el).forEach(function (a) { a.textContent = V.camAge + 's ago'; });
+    }, 1000);
+  }
+
   App.register('control', {
     show: function (el) {
       if (!V.el) {
@@ -300,12 +308,9 @@
       }
       el.querySelector('.hc-cams').innerHTML = cams();
       paint();
-      clearInterval(V.camTimer);
-      V.camTimer = setInterval(function () {
-        V.camAge = V.camAge >= 20 ? 1 : V.camAge + 1;
-        App.$$('.cam-age', el).forEach(function (a) { a.textContent = V.camAge + 's ago'; });
-      }, 1000);
+      camTimer();
     },
+    resume: function () { camTimer(); },
     hide: function () { clearInterval(V.camTimer); }
   });
 })();

@@ -75,8 +75,9 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 /* ---------------------------------------------------------------- views */
 .views { position: relative; overflow: hidden; }
-.view { position: absolute; top: 0; right: 0; bottom: 0; left: 0; padding: var(--pad); display: none; }
-.view.is-active { display: block; }
+.view { position: absolute; top: 0; right: 0; bottom: 0; left: 0; padding: var(--pad); content-visibility: hidden; z-index: 0; }
+.view.is-active, .view.is-warming { content-visibility: visible; }
+.view.is-active { z-index: 1; }
 .view--bleed { padding: 0; }
 
 /* ---------------------------------------------------------------- components */
