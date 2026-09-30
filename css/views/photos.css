@@ -1,0 +1,60 @@
+/* Slides (shared by Photos, Ambient, Home tile) */
+.slide { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: #1A1917; transition: opacity 1.5s ease; }
+.slide img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.slide img.is-broken { visibility: hidden; }
+.kb { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: linear-gradient(135deg, #3B3934, #111); }
+.kb img { animation: kenburns 18s linear forwards; will-change: transform; }
+.kb--still img { animation: none; }
+@keyframes kenburns { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.08) translate(var(--dx), var(--dy)); } }
+.blurfill { position: absolute; top: 0; left: 0; filter: blur(40px) brightness(.55); transform: scale(1.25); }
+.slide--fit .fitimg { position: absolute; top: 0; left: 50%; width: auto; height: 100%; transform: translateX(-50%); object-fit: contain; box-shadow: 0 0 60px rgba(0, 0, 0, .5); }
+
+.slide--pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #000; }
+.slide--collage { display: grid; grid-template-columns: 3fr 2fr; grid-template-rows: 1fr 1fr; gap: 6px; background: #000; }
+.pane { position: relative; overflow: hidden; }
+.pane--a { grid-row: 1 / 3; }
+
+.slide--polaroid .blurfill { width: 100%; height: 100%; }
+.polaroid {
+  position: absolute; left: 50%; top: 50%; margin: 0;
+  background: #FBF9F4; padding: 18px 18px 0; border-radius: 4px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, .55);
+  translate: -50% -52%;
+}
+.polaroid-img { width: 660px; height: 470px; overflow: hidden; background: #ddd; }
+.polaroid--p .polaroid-img { width: 420px; height: 560px; }
+.polaroid figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 16px 6px 20px; color: var(--ink); font-size: 30px; }
+
+.slide--cover::after, .slide--pair::after, .slide--collage::after, .slide--fit::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
+  background: linear-gradient(0deg, rgba(0, 0, 0, .7), rgba(0, 0, 0, 0)); pointer-events: none;
+}
+.cap { position: absolute; left: 44px; bottom: 40px; z-index: 2; color: #fff; max-width: 70%; opacity: .7; transition: opacity .4s; }
+.cap-kicker { font-size: 15px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.cap-kicker b { color: var(--warm); }
+.cap-date { font-size: 88px; line-height: .95; margin-top: 8px; }
+.cap--m .cap-date { font-size: 60px; }
+.slide.is-in .cap { animation: cap-in 1.2s .4s var(--ease) both; }
+@keyframes cap-in { from { opacity: 0; transform: translateY(16px); } }
+
+/* Photos view chrome */
+.photos { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: #000; color: #fff; overflow: hidden; }
+.ph-stage { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.photos.is-loud .cap { opacity: 1; }
+.ph-zone { position: absolute; top: 90px; bottom: 110px; z-index: 3; }
+.ph-zone--l { left: 0; width: 22%; }
+.ph-zone--c { left: 22%; width: 56%; }
+.ph-zone--r { right: 0; width: 22%; }
+.ph-top { position: absolute; top: 20px; right: 20px; z-index: 4; }
+.ph-bottom { position: absolute; right: 24px; bottom: 28px; z-index: 4; display: flex; gap: 10px; }
+.ph-btn {
+  height: var(--tap); min-width: var(--tap); padding: 0 17px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(0, 0, 0, .38); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  font-size: 17px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  transition: background .2s, transform .15s var(--spring);
+}
+.ph-btn:active { transform: scale(.92); }
+.ph-btn--fav { padding: 0 24px 0 20px; }
+.ph-btn--fav.is-on { background: #E4007C; }
+.ph-btn--fav.is-on .i { fill: currentColor; }
