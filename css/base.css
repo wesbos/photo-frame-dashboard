@@ -298,3 +298,13 @@ button.card:active, .h-hero:active, .h-photo:active { transform: scale(.985); }
   filter: invert(1) hue-rotate(180deg) grayscale(1) sepia(1) saturate(5) hue-rotate(-38deg) brightness(.62);
 }
 .stage[data-mode="nightdash"] { background: #000; }
+
+/* ---------------------------------------------------------------- diagnostics overlay (?diag) */
+.diag {
+  position: absolute; right: 8px; bottom: 8px; z-index: 100; pointer-events: none;
+  max-width: 520px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(0, 0, 0, .82); color: #7CFC9A;
+  font: 13px/1.35 ui-monospace, Menlo, monospace;
+}
+.diag b { color: #fff; }
+.diag u { text-decoration: none; color: #aaa; }
