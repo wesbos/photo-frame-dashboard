@@ -114,7 +114,7 @@
     return '<div class="label">Shopping</div>' +
       '<div class="h-stat"><span class="num">' + open.length + '</span><small>items to get</small></div>' +
       '<ul class="h-recent">' + recent.map(function (g) {
-        return '<li style="' + App.pstyle(g.by) + '"><i></i>' + App.esc(g.name) + '</li>';
+        return '<li><i></i>' + App.esc(g.name) + '</li>';
       }).join('') + '</ul>';
   }
 

@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var D = window.DATA;
-  var V = { el: null, store: 'all', adder: 'jordan', query: '', drawer: false, pending: {}, flash: null };
+  var V = { el: null, store: 'all', query: '', drawer: false, pending: {}, flash: null };
 
   function open() { return D.groceries.filter(function (g) { return !g.done && (V.store === 'all' || g.store === V.store); }); }
   function done() { return D.groceries.filter(function (g) { return g.done && (V.store === 'all' || g.store === V.store); }); }
@@ -20,14 +20,11 @@
   }
 
   function row(g) {
-    var p = App.person(g.by);
-    return '<div class="s-row' + (V.pending[g.id] ? ' is-checking' : '') + (V.flash === g.id ? ' is-flash' : '') + '" data-id="' + g.id + '" style="' + App.pstyle(p) + '">' +
+    return '<div class="s-row' + (V.pending[g.id] ? ' is-checking' : '') + (V.flash === g.id ? ' is-flash' : '') + '" data-id="' + g.id + '">' +
       '<button class="s-hit" data-check="' + g.id + '">' +
-      '<span class="s-who" title="Added by ' + p.name + '"></span>' +
       '<span class="s-box">' + App.icon('check', 22) + '</span>' +
       '<span class="s-name"><b>' + App.esc(g.name) + '</b>' + (g.note ? '<small>' + App.esc(g.note) + '</small>' : '') + '</span>' +
       (V.store === 'all' && g.store === 'costco' ? '<span class="s-store">Costco</span>' : '') +
-      '<span class="s-by">' + p.name + '</span>' +
       '</button>' +
       '<div class="s-qty"><button data-qty="-1" data-id="' + g.id + '" aria-label="Less">' + App.icon('minus', 22) + '</button><span class="num">' + g.qty + '</span><button data-qty="1" data-id="' + g.id + '" aria-label="More">' + App.icon('plus', 22) + '</button></div>' +
       '</div>';
@@ -61,7 +58,7 @@
     }
     return '<div class="label">Usuals · tap to add</div><div class="s-usuals">' + D.usuals.map(function (name) {
       var on = find(name, false);
-      return '<button class="s-tile' + (on ? ' is-on' : '') + '" data-add="' + App.esc(name) + '"' + (on ? ' style="' + App.pstyle(on.by) + '"' : '') + '>' +
+      return '<button class="s-tile' + (on ? ' is-on' : '') + '" data-add="' + App.esc(name) + '">' +
         '<b>' + App.esc(name) + '</b><span>' + (on ? App.icon('check', 16) + 'On list' + (on.qty > 1 ? ' ×' + on.qty : '') : categorize(name)) + '</span></button>';
     }).join('') + '</div>';
   }
@@ -76,12 +73,6 @@
       return '<button class="' + (V.store === s[0] ? 'is-on' : '') + '" data-store="' + s[0] + '">' + s[1] + ' <span class="num">' + n + '</span></button>';
     }).join('');
   }
-  function paintAdder() {
-    V.el.querySelector('.s-adder-row').innerHTML = D.people.map(function (p) {
-      return '<button class="s-adder-btn' + (V.adder === p.id ? ' is-on' : '') + '" data-adder="' + p.id + '" style="' + App.pstyle(p) + '">' + App.avatar(p, 44) + '</button>';
-    }).join('');
-  }
-
   function render() {
     V.el.innerHTML = '<div class="shop">' +
       '<header class="s-head"><div><div class="label">Shared list</div><h1 class="serif">Groceries</h1></div><div class="s-count"></div><div class="seg s-stores"></div></header>' +
@@ -89,7 +80,6 @@
       '<aside class="s-side">' +
       '  <div class="s-add">' +
       '    <label class="s-input-wrap">' + App.icon('plus', 30) + '<input class="s-input" placeholder="Add an item…" autocomplete="off" enterkeyhint="done"></label>' +
-      '    <div class="s-adder"><span class="label label--light">Adding as</span><div class="s-adder-row"></div></div>' +
       '  </div>' +
       '  <div class="s-suggest"></div>' +
       '</aside></div>';
@@ -97,17 +87,17 @@
     input.value = V.query;
     input.addEventListener('input', function () { V.query = input.value; paintSuggest(); });
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && input.value.trim()) { add(input.value); } });
-    paintList(); paintSuggest(); paintAdder();
+    paintList(); paintSuggest();
   }
 
   function add(name) {
     name = name.trim();
     var g = find(name, false), msg;
     if (g) { g.qty++; msg = 'Already on the list · now <b>×' + g.qty + '</b> ' + App.esc(g.name); }
-    else if ((g = find(name, true))) { g.done = false; g.qty = 1; g.by = V.adder; msg = 'Added back <b>' + App.esc(g.name) + '</b>'; }
+    else if ((g = find(name, true))) { g.done = false; g.qty = 1; msg = 'Added back <b>' + App.esc(g.name) + '</b>'; }
     else {
       var cat = D.catalog.filter(function (c) { return c[0].toLowerCase() === name.toLowerCase(); })[0];
-      g = { id: D._gid(), name: cat ? cat[0] : name.charAt(0).toUpperCase() + name.slice(1), cat: categorize(name), qty: 1, by: V.adder, store: V.store === 'all' ? 'grocer' : V.store, done: false, note: '' };
+      g = { id: D._gid(), name: cat ? cat[0] : name.charAt(0).toUpperCase() + name.slice(1), cat: categorize(name), qty: 1, store: V.store === 'all' ? 'grocer' : V.store, done: false, note: '' };
       D.groceries.push(g);
       msg = 'Added <b>' + App.esc(g.name) + '</b> to ' + g.cat;
     }
@@ -165,7 +155,6 @@
     }
     if ((t = e.target.closest('[data-add]'))) return add(t.dataset.add);
     if ((t = e.target.closest('[data-store]'))) { V.store = t.dataset.store; return paintList(); }
-    if ((t = e.target.closest('[data-adder]'))) { V.adder = t.dataset.adder; return paintAdder(); }
     if ((t = e.target.closest('[data-drawer]'))) { V.drawer = !V.drawer; return paintList(); }
     if ((t = e.target.closest('[data-revive]'))) {
       var r = D.groceries.filter(function (x) { return x.id === t.dataset.revive; })[0];

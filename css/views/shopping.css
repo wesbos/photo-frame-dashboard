@@ -15,9 +15,8 @@
   max-height: 120px; overflow: hidden;
 }
 .s-row.is-flash { animation: flash 1.2s var(--ease); }
-@keyframes flash { 0%, 30% { background: rgb(var(--c-rgb) / .22); } 100% { background: transparent; } }
-.s-hit { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 14px; padding-right: 10px; }
-.s-who { width: 6px; align-self: stretch; margin: 10px 0; border-radius: 3px; background: var(--c); flex: none; }
+@keyframes flash { 0%, 30% { background: rgb(var(--warm-rgb) / .45); } 100% { background: transparent; } }
+.s-hit { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 14px; padding: 0 10px 0 4px; }
 .s-box {
   width: 40px; height: 40px; border-radius: 12px; flex: none;
   display: grid; place-items: center; color: transparent;
@@ -28,8 +27,6 @@
 .s-name b { font-size: 23px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
 .s-name small { font-size: 16px; color: var(--mute); }
 .s-store { font-size: 13px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 5px 9px; border-radius: 6px; background: var(--ink); color: var(--paper); }
-.s-by { font-size: var(--fs-min); font-weight: 700; color: var(--c); min-width: 52px; text-align: right; }
-.s-row[style*="#FFB000"] .s-by { color: #B07A00; }
 .s-qty { display: flex; align-items: center; background: var(--paper-2); border-radius: 999px; margin-left: 4px; }
 .s-qty button { width: 60px; height: 60px; display: grid; place-items: center; border-radius: 50%; }
 .s-qty button:active { background: var(--line); }
@@ -56,11 +53,6 @@
 .s-input-wrap { display: flex; align-items: center; gap: 12px; height: 80px; padding: 0 20px; border-radius: 14px; background: #fff; color: var(--ink); }
 .s-input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; font-size: 28px; font-weight: 600; }
 .s-input::placeholder { color: #AAA59B; font-weight: 500; }
-.s-adder { display: flex; align-items: center; justify-content: space-between; }
-.s-adder-row { display: flex; gap: 6px; }
-.s-adder-btn { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; opacity: .45; transition: opacity .2s, transform .2s var(--spring); }
-.s-adder-btn.is-on { opacity: 1; transform: scale(1.08); }
-.s-adder-btn.is-on .avatar { box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px #fff; }
 
 .s-suggest { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .s-usuals { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 8px; flex: 1; min-height: 0; }
@@ -73,7 +65,7 @@
 .s-tile:active { transform: scale(.94); }
 .s-tile b { font-size: 19px; font-weight: 800; font-stretch: 75%; line-height: 1.05; text-transform: uppercase; letter-spacing: .01em; }
 .s-tile span { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: .06em; }
-.s-tile.is-on { background: var(--c); color: var(--c-ink); }
+.s-tile.is-on { background: var(--ink); color: var(--paper); }
 .s-tile.is-on span { color: inherit; opacity: .85; }
 .s-ac { display: flex; flex-direction: column; gap: 8px; }
 .s-ac-row { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 0 18px 0 22px; border-radius: 14px; background: var(--card); }

@@ -165,34 +165,34 @@ window.DATA = (function () {
     costco: ['Household', 'Pantry', 'Snacks', 'Dairy & Eggs', 'Meat & Fish', 'Frozen', 'Produce', 'Bakery']
   };
   var gid = 0;
-  function g(name, cat, qty, by, store, done, note) {
-    return { id: 'g' + (++gid), name: name, cat: cat, qty: qty, by: by, store: store, done: !!done, note: note || '' };
+  function g(name, cat, qty, store, done, note) {
+    return { id: 'g' + (++gid), name: name, cat: cat, qty: qty, store: store, done: !!done, note: note || '' };
   }
   var groceries = [
-    g('Bananas', 'Produce', 1, 'jordan', 'grocer', false, 'Bunch, not too ripe'),
-    g('Baby spinach', 'Produce', 1, 'jordan', 'grocer'),
-    g('Avocados', 'Produce', 3, 'alex', 'grocer'),
-    g('Honeycrisp apples', 'Produce', 6, 'maya', 'grocer'),
-    g('Sourdough loaf', 'Bakery', 1, 'alex', 'grocer'),
-    g('Bagels', 'Bakery', 2, 'otto', 'costco', false, 'Everything'),
-    g('Chicken thighs', 'Meat & Fish', 1, 'jordan', 'grocer', false, 'Boneless'),
-    g('Salmon fillets', 'Meat & Fish', 2, 'jordan', 'grocer'),
-    g('Milk 2%', 'Dairy & Eggs', 2, 'jordan', 'costco'),
-    g('Eggs', 'Dairy & Eggs', 1, 'alex', 'costco', false, '2 dozen'),
-    g('Greek yogurt', 'Dairy & Eggs', 1, 'maya', 'grocer'),
-    g('Aged cheddar', 'Dairy & Eggs', 1, 'alex', 'grocer'),
-    g('Rigatoni', 'Pantry', 2, 'otto', 'grocer'),
-    g('Olive oil', 'Pantry', 1, 'alex', 'costco'),
-    g('Coffee beans', 'Pantry', 1, 'alex', 'grocer', false, 'Dark roast'),
-    g('Frozen peas', 'Frozen', 1, 'jordan', 'grocer'),
-    g('Waffles', 'Frozen', 1, 'otto', 'grocer'),
-    g('Goldfish crackers', 'Snacks', 1, 'otto', 'costco'),
-    g('Granola bars', 'Snacks', 1, 'maya', 'grocer'),
-    g('Paper towels', 'Household', 1, 'jordan', 'costco'),
-    g('Dish soap', 'Household', 1, 'alex', 'grocer'),
-    g('Lemons', 'Produce', 2, 'jordan', 'grocer', true),
-    g('Butter', 'Dairy & Eggs', 1, 'alex', 'grocer', true),
-    g('Tortillas', 'Bakery', 1, 'maya', 'grocer', true)
+    g('Bananas', 'Produce', 1, 'grocer', false, 'Bunch, not too ripe'),
+    g('Baby spinach', 'Produce', 1, 'grocer'),
+    g('Avocados', 'Produce', 3, 'grocer'),
+    g('Honeycrisp apples', 'Produce', 6, 'grocer'),
+    g('Sourdough loaf', 'Bakery', 1, 'grocer'),
+    g('Bagels', 'Bakery', 2, 'costco', false, 'Everything'),
+    g('Chicken thighs', 'Meat & Fish', 1, 'grocer', false, 'Boneless'),
+    g('Salmon fillets', 'Meat & Fish', 2, 'grocer'),
+    g('Milk 2%', 'Dairy & Eggs', 2, 'costco'),
+    g('Eggs', 'Dairy & Eggs', 1, 'costco', false, '2 dozen'),
+    g('Greek yogurt', 'Dairy & Eggs', 1, 'grocer'),
+    g('Aged cheddar', 'Dairy & Eggs', 1, 'grocer'),
+    g('Rigatoni', 'Pantry', 2, 'grocer'),
+    g('Olive oil', 'Pantry', 1, 'costco'),
+    g('Coffee beans', 'Pantry', 1, 'grocer', false, 'Dark roast'),
+    g('Frozen peas', 'Frozen', 1, 'grocer'),
+    g('Waffles', 'Frozen', 1, 'grocer'),
+    g('Goldfish crackers', 'Snacks', 1, 'costco'),
+    g('Granola bars', 'Snacks', 1, 'grocer'),
+    g('Paper towels', 'Household', 1, 'costco'),
+    g('Dish soap', 'Household', 1, 'grocer'),
+    g('Lemons', 'Produce', 2, 'grocer', true),
+    g('Butter', 'Dairy & Eggs', 1, 'grocer', true),
+    g('Tortillas', 'Bakery', 1, 'grocer', true)
   ];
   var catalog = [
     ['Apples', 'Produce'], ['Avocados', 'Produce'], ['Bananas', 'Produce'], ['Baby spinach', 'Produce'], ['Blueberries', 'Produce'],

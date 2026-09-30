@@ -102,7 +102,7 @@
 .h-stat .num { font-size: 56px; line-height: .9; }
 .h-stat small { font-size: 16px; color: var(--mute); }
 .h-recent li { font-size: 16px; display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; line-height: 1.35; }
-.h-recent i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.h-recent i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); flex: none; }
 .h-st-row { display: flex; align-items: center; gap: 8px; font-size: 17px; min-height: 30px; }
 .h-st-row b { font-size: 24px; }
 .h-st-row span { color: var(--ink-2); }
