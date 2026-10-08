@@ -1,5 +1,9 @@
 # Taking over Android photo frames
 
+[![The family dashboard running on the BIUFRAME 10.1" photo frame](docs/images/dashboard-on-frame.jpg)](https://youtu.be/ZLycoUMltNI)
+
+▶️ **Watch the video: [https://youtu.be/ZLycoUMltNI](https://youtu.be/ZLycoUMltNI)**
+
 Notes and scripts from getting full control of two locked-down Android displays: getting ADB,
 backing up the firmware, getting root, removing the vendor app, and running our own launcher,
 browser and kiosk app.
