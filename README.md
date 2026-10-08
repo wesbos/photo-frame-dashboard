@@ -14,6 +14,11 @@ browser and kiosk app.
 | Root | Added `/force_debuggable` to the boot ramdisk, then `adb root` | Ships with SuperSU `su` |
 | End result | Lawnchair launcher, USB Wi-Fi dongle (onboard radio is dead) | Firefox, launcher, WebView 106, custom kiosk app |
 
+[`dashboard/`](dashboard) is the family dashboard we run on the BIUFRAME (it uses mock data).
+It is a Vite web app deployed to Cloudflare Workers, plus `dashboard/kiosk/`: a small full-screen
+WebView Android app, built without Gradle, that shows it. Hold two fingers still for 1.5 s to
+exit to the launcher.
+
 Each is a record of **one unit**. Frames sold under the same name can have different boards
 and firmware. These are not universal flashing guides.
 
@@ -50,7 +55,7 @@ section unless the identity checks match exactly.
 | **3. Loader mode** | Skylight: hold Volume − while connecting power. BIUFRAME: reset button at power-on (unconfirmed). Building `rkdeveloptool` on Apple silicon: [research-log.md](docs/research-log.md#loader-mode--successful). |
 | **4. Back up** | If loader reads past 32 MiB return `0xCC` filler, they are not a backup: [loader-research.md](docs/loader-research.md). Patched helper and full capture: `scripts/patch-usb-reader.py`, `scripts/load-usb-reader.py`, `scripts/probe-reader.py`, `scripts/backup-flash.py`, `scripts/inspect-backup.py`. With root, back up over ADB instead: `scripts/biuframe-setup.sh backup`. |
 | **5. Root** | First check for a shipped `su` (`adb shell su -c id`). On Android 10+ user builds, try the debug-ramdisk route: [debug-ramdisk-research.md](docs/debug-ramdisk-research.md), `scripts/build-debug-boot.py`. Fastboot write failures: [ram-boot-research.md](docs/ram-boot-research.md). |
-| **6. Make it useful** | Launcher: [android-launcher.md](docs/android-launcher.md). Old Android (6.x) with a browser, WebView swap, CA roots, swap, nav bar and disabling vendor apps: [biuframe-setup-guide.md](docs/biuframe-setup-guide.md). Kiosk app and launcher database edits: [biuframe.md](docs/biuframe.md#custom-webview-kiosk-app-2026-09-30). |
+| **6. Make it useful** | Launcher: [android-launcher.md](docs/android-launcher.md). Old Android (6.x) with a browser, WebView swap, CA roots, swap, nav bar and disabling vendor apps: [biuframe-setup-guide.md](docs/biuframe-setup-guide.md). Kiosk app and launcher database edits: [biuframe.md](docs/biuframe.md#custom-webview-kiosk-app-2026-09-30). A working example of a kiosk app and dashboard is in [`dashboard/`](dashboard). Build with `dashboard/kiosk/build.sh`, change `DEFAULT_URL` in `MainActivity.java` to your own URL, and target the device's WebView version (see `dashboard/vite.config.js`). |
 | **7. Networking** | USB reverse tethering with gnirehtet: [usb-internet-sharing.md](docs/usb-internet-sharing.md). An app that requires Wi-Fi specifically: [onboarding-network-gate.md](docs/onboarding-network-gate.md). Dead onboard Wi-Fi and a USB dongle: [usb-wifi-dongle.md](docs/usb-wifi-dongle.md). |
 | **8. Vendor updates** | Connecting the stock app to the internet can auto-install APK updates: [app-updates.md](docs/app-updates.md). Disable vendor updaters (FOTA etc.) before going online. |
 | **9. Security hand-off** | Tell the owner what they now have: [biuframe-setup-guide.md](docs/biuframe-setup-guide.md#read-this-first). |
