@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "home-dashboard",
+  "compatibility_date": "2026-09-30",
+  "assets": {
+    "directory": "./dist"
+  }
+}

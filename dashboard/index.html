@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1280, initial-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#F2EEE6">
+  <title>Home HQ</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/views/home.css">
+  <link rel="stylesheet" href="css/views/calendar.css">
+  <link rel="stylesheet" href="css/views/tasks.css">
+  <link rel="stylesheet" href="css/views/shopping.css">
+  <link rel="stylesheet" href="css/views/photos.css">
+  <link rel="stylesheet" href="css/views/control.css">
+  <link rel="stylesheet" href="css/views/agents.css">
+  <link rel="stylesheet" href="css/views/ambient.css">
+</head>
+<body>
+  <div class="stage" id="stage" data-mode="day">
+    <nav class="rail" id="rail" aria-label="Sections">
+      <button class="rail-item" data-go="home"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Today</span></button>
+      <button class="rail-item" data-go="calendar"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
+      <button class="rail-item" data-go="tasks"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7.5 12l3 3 6-6"/></svg><span>Chores</span></button>
+      <button class="rail-item" data-go="shopping"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.2l2.3 11h10.8L21 8H6.5"/><circle cx="10" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg><span>Shopping</span></button>
+      <button class="rail-item" data-go="photos"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span>Photos</span></button>
+      <button class="rail-item" data-go="control"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span>Home</span></button>
+      <button class="rail-item" data-go="agents"><svg class="i" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9.5 13v1.5M14.5 13v1.5M2 13v3M22 13v3"/></svg><span>Agents</span></button>
+      <button class="rail-clock" id="railClock" aria-label="Clock — press and hold for demo controls"></button>
+    </nav>
+
+    <main class="views">
+      <section class="view" id="view-home" data-view="home"></section>
+      <section class="view" id="view-calendar" data-view="calendar"></section>
+      <section class="view" id="view-tasks" data-view="tasks"></section>
+      <section class="view" id="view-shopping" data-view="shopping"></section>
+      <section class="view view--bleed" id="view-photos" data-view="photos"></section>
+      <section class="view" id="view-control" data-view="control"></section>
+      <section class="view" id="view-agents" data-view="agents"></section>
+      <div class="banners" id="banners"></div>
+    </main>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <div class="sheet-layer" id="sheetLayer"></div>
+    <div class="takeover" id="takeover" role="alertdialog"></div>
+    <div class="ambient" id="ambient"></div>
+    <div class="night" id="night"></div>
+    <div class="demo" id="demo"></div>
+  </div>
+
+  <script>
+    // Wall-display self-healing: if the app bundle failed to load (e.g. a stale page right after a
+    // deploy, or a network blip), reload until it starts.
+    setTimeout(function () { if (!window.App) location.reload(); }, 10000);
+  </script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

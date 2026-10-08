@@ -1,0 +1,48 @@
+/* Design tokens. Target: Android WebView 106 — no nesting, no color-mix(), no oklch(), no dvh. */
+:root {
+  /* paper + ink */
+  --paper: #F2EEE6;
+  --paper-2: #E8E2D5;
+  --card: #FBF9F4;
+  --ink: #111111;
+  --ink-rgb: 17 17 17;
+  --ink-2: #3B3934;
+  --mute: #7A756B;
+  --line: #D6CFC0;
+
+  /* signal colours */
+  --alert: #E5261E;
+  --alert-rgb: 229 38 30;
+  --amber: #FF9500;
+  --amber-rgb: 255 149 0;
+  --ok: #00A36C;
+  --warm: #FFC45C;
+  --warm-rgb: 255 196 92;
+  --night: #D8321F;
+
+  /* person colour defaults (overridden inline per element) */
+  --c: var(--ink);
+  --c-rgb: var(--ink-rgb);
+  --c-ink: #FFFFFF;
+
+  /* type */
+  --sans: 'Archivo', 'Roboto Condensed', 'Roboto', system-ui, sans-serif;
+  --serif: 'Instrument Serif', 'Noto Serif', Georgia, serif;
+  --fs-clock: 150px;
+  --fs-hero: 76px;
+  --fs-xl: 56px;
+  --fs-l: 34px;
+  --fs-m: 24px;
+  --fs-body: 20px;
+  --fs-label: 15px;
+  --fs-min: 14px;
+
+  /* shape + space */
+  --r: 18px;
+  --r-s: 12px;
+  --gap: 16px;
+  --pad: 24px;
+  --tap: 64px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+}
