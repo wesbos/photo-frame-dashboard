@@ -1,0 +1,15 @@
+# Device dumps, personal identifiers, downloaded tools, and local diagnostics.
+/backups/
+/diagnostics/
+/log/
+/loader-*.txt
+/.claude/
+.DS_Store
+__pycache__/
+*.pyc
+*.img
+*.bin
+*.img.gz
+*.partial
+*.HEIC
+*.heic

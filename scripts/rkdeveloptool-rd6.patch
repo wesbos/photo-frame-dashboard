@@ -1,0 +1,11 @@
+--- a/main.cpp
++++ b/main.cpp
+@@ -3176,7 +3176,7 @@
+ 				if (*pszEnd)
+ 					printf("Subcode is invalid, please check!\r\n");
+ 				else {
+-					if (uiSubCode <= 5)
++					if (uiSubCode <= 6)
+ 						bSuccess = reset_device(dev, uiSubCode);
+ 					else
+ 						printf("Subcode is invalid, please check!\r\n");

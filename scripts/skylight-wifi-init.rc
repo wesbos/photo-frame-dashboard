@@ -1,0 +1,18 @@
+# Preserve the stock Android 12 boot-script entry points and their order.
+import /system/etc/init/hw/init.rc
+import /system/etc/init
+import /system_ext/etc/init
+import /vendor/etc/init
+import /odm/etc/init
+import /product/etc/init
+
+service skylight_usb_wifi /system/bin/sh /metadata/skylight-wifi/start.sh
+    class late_start
+    user root
+    group root wifi inet net_admin net_raw
+    seclabel u:r:su:s0
+    disabled
+    oneshot
+
+on property:sys.boot_completed=1
+    start skylight_usb_wifi
