@@ -4,7 +4,7 @@
 
 ▶️ **Watch the video: [https://youtu.be/ZLycoUMltNI](https://youtu.be/ZLycoUMltNI)**
 
-If you are coming from reddit or youtube, you can purcahse almost any photo frame from amazon. This is the one, I used: [https://amzn.to/4zneGNM](https://amzn.to/4zneGNM) (amazon aff link)
+If you are coming from reddit or youtube, you can purchase almost any photo frame from amazon. This is the one, I used: [https://amzn.to/4zneGNM](https://amzn.to/4zneGNM) (amazon aff link)
 
 Notes and scripts from getting full control of two locked-down Android displays: getting ADB,
 backing up the firmware, getting root, removing the vendor app, and running our own launcher,
