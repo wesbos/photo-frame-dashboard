@@ -28,6 +28,12 @@ exit to the launcher.
 Each is a record of **one unit**. Frames sold under the same name can have different boards
 and firmware. These are not universal flashing guides.
 
+An additional BIUFRAME-branded **PF1007L** was found with an **Allwinner A33**,
+Android 6.0.1 and AiMOR, rather than the Rockchip board above. See the
+[Allwinner PF1007L recovery and setup guide](docs/allwinner-a33-pf1007l.md) and
+[boot access notes](docs/allwinner-a33-boot-access.md). Identify the SoC before
+choosing tools: the Rockchip setup script does not apply to that unit.
+
 ## For agents: start here
 
 You are probably helping someone with a similar device plugged into a Mac over USB. Read this
@@ -77,6 +83,12 @@ section unless the identity checks match exactly.
   [app-analysis.md](docs/app-analysis.md) for the hidden menu. The manufacturer code is
   intentionally not published here. The doc describes where it is checked in the app, so you can
   find it in your own unit's APK.
+- **PF1007L / AiMOR (Allwinner A33, Android 6.0.1):** start with
+  [allwinner-a33-pf1007l.md](docs/allwinner-a33-pf1007l.md). It covers hardware
+  identification, stable FEL through an SD card, and setup after root ADB is
+  available. The custom root-stage storage helper is not included; the
+  [boot access notes](docs/allwinner-a33-boot-access.md) explain the verified
+  patch and its limits. Do not run the Rockchip `apply` script on this board.
 - **Something else:** work through the phase map. Expect the hidden-menu, root and backup routes
   to differ. Create `docs/<device>.md` and record everything.
 

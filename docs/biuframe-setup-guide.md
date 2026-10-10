@@ -6,6 +6,10 @@ a normal launcher, WebView 106, a larger swap, and a navigation bar, and it swit
 Tested on one unit (2026-09-30). The research log behind every step is [biuframe.md](biuframe.md).
 Automation: [`scripts/biuframe-setup.sh`](../scripts/biuframe-setup.sh).
 
+**Check the SoC, not just the brand.** A BIUFRAME-branded PF1007L was also found
+with an Allwinner A33 / AiMOR board. This RK3126 guide and its `apply` script do
+not apply to it; use the [Allwinner PF1007L guide](allwinner-a33-pf1007l.md).
+
 **For agents:** follow the steps in order. Stop at the first failed check and report it; do not
 improvise around a mismatch. Every command runs from the repository root on a Mac with the frame
 connected over USB.
