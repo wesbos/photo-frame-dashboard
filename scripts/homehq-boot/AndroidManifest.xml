@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Starts the dashboard at boot without touching /system.
+
+     This frame's vendor firmware runs a BackgroundManagerService that refuses both
+     background services and the BOOT_COMPLETED broadcast for packages outside its built-in
+     whitelist, so the usual boot-receiver approach never runs. Android starts the HOME
+     activity directly at boot rather than broadcasting to it, so registering as HOME is a
+     code path the vendor service does not intercept. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.homehq.boot">
+
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <application
+      android:label="Home HQ"
+      android:allowBackup="false">
+
+    <activity
+        android:name=".MainActivity"
+        android:label="Home HQ"
+        android:launchMode="singleTask"
+        android:stateNotNeeded="true"
+        android:excludeFromRecents="true"
+        android:screenOrientation="landscape">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.HOME" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+
+    <!-- Kept as a free fallback: harmless while the vendor blocks it, and it would start
+         working on its own if this package ever landed on the whitelist. -->
+    <receiver android:name=".BootReceiver" android:enabled="true" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>
