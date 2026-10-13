@@ -53,7 +53,7 @@ is loader `0x14000` and `mmcblk0p5` start 90112 (`0x16000`); the two reads have 
 - It then appeared in Rockchip loader mode (`2207:310d`). Exactly what triggered loader mode
   is unconfirmed (it happened around the cable swap; the reset-button-at-power-on method had been suggested).
   On a Uhale 102KZ, the same SoC, holding the reset pinhole while plugging in USB-C and for 6 to 8
-  seconds after entered loader mode each time: see [uhale-102kz.md](uhale-102kz.md#1-loader-mode).
+  seconds after entering loader mode each time: see [uhale-102kz.md](uhale-102kz.md#1-loader-mode).
 
 ## Stock recovery
 
