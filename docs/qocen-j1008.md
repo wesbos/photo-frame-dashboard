@@ -193,7 +193,8 @@ scripted tap at a fixed coordinate lands on a dashboard card and opens a detail 
 
 This is **not** committed to `dashboard/` here: the gate would also appear for the WebView
 kiosk route, which is not in Fullscreen API state, so it would need to be opt-in before it
-could ship for everyone. The shape of it:
+could ship for everyone. The local version used on this frame is opt-in behind
+`?fullscreen=1`, which is the URL `homehq-start.sh` opens. The shape of it:
 
 ```js
 var gate = document.getElementById('fs-gate');
@@ -204,6 +205,16 @@ gate.addEventListener('touchend', function (e) { e.preventDefault(); req.call(el
 document.addEventListener('fullscreenchange', sync);
 sync();
 ```
+
+### `busybox httpd` sends no cache headers, so the frame can boot into a stale page
+
+Hashed asset filenames mean the JS and CSS are safe to cache, but `index.html` is not, and
+with no `Cache-Control` Firefox caches it heuristically. After pushing a dashboard update the
+frame kept rendering the previous `index.html` until the URL changed — which first showed up
+as a change that "did not take", and cost a confusing round of debugging.
+
+`homehq-start.sh` therefore opens `…/?fullscreen=1&cb=$(date +%s)`, so every boot fetches
+fresh HTML.
 
 ### The firmware blocks every normal way to start something at boot
 

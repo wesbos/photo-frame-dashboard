@@ -20,10 +20,14 @@ fi
 
 $BB sleep 2
 /system/bin/am start -a android.intent.action.VIEW \
-  -d http://localhost:8080 org.mozilla.firefox >/dev/null 2>&1 && log "browser started" || log "browser FAILED"
+  -d "http://localhost:8080/?fullscreen=1&cb=$(/system/bin/date +%s)" org.mozilla.firefox >/dev/null 2>&1 && log "browser started" || log "browser FAILED"
 
+# cb= is a cache-buster: busybox httpd sends no cache headers, so Firefox will otherwise
+# serve a heuristically cached index.html and the frame boots into a stale dashboard.
+# Hashed asset filenames make caching everything else safe.
+#
 # Firefox cold start plus first paint runs ~25s here; the tap lands on the dashboard's
-# full-screen gate, which exists so this cannot hit a card and open something.
+# full-screen gate (enabled by ?fullscreen=1), which exists so this cannot hit a card.
 $BB sleep 35
 /system/bin/input tap 640 400 && log "fullscreen tap sent" || log "tap FAILED"
 log "done"
