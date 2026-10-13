@@ -201,7 +201,7 @@ A legacy ARM64 multi-image containing the exact factory kernel, exact AP6256 dia
 
 ## Exact raw legacy test and USB hang
 
-The guarded raw fastboot uploader sent the verified 48,423,072-byte legacy image unchanged. The device responded OKAY to the size query, DATA02e2e0a0 to the download request, then OKAY after payload and boot. Recovery ADB did not appear. USB continued listing its previous fastboot identity, but subsequent fastboot max-download-size timed out after20seconds and a raw libusb query timed out on bulkOUT. Descriptor presence alone was insufficient evidence of responsiveness. The exact hang stage remains unknown; normal power-cycle and pstore capture are needed. No flash/erase/unlock operation was sent.
+The guarded raw fastboot uploader sent the verified 48,423,072-byte legacy image unchanged. The device responded OKAY to the size query, DATA02e2e0a0 to the download request, then OKAY after payload and boot. Recovery ADB did not appear. USB continued listing its previous fastboot identity, but subsequent fastboot max-download-size timed out after 20 seconds and a raw libusb query timed out on bulkOUT. Descriptor presence alone was insufficient evidence of responsiveness. The exact hang stage remains unknown; normal power-cycle and pstore capture are needed. No flash/erase/unlock operation was sent.
 
 ## Normal operation restored after full disconnect
 
