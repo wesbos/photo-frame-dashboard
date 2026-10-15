@@ -122,13 +122,32 @@ screen. The error page would print the full URL, including any token in it.
 - **No Wi-Fi:** "Connect to Wi-Fi?" with an **Open Wi-Fi settings** button.
 - **Wi-Fi is up but the dashboard is unreachable:** "Can't reach the dashboard".
 
-Home HQ keeps retrying every 5 seconds, and the screen disappears once a load
-succeeds. Wi-Fi settings open only when tapped, because Wi-Fi is often still
-connecting for the first minute after boot.
+- **Certificate error:** never bypassed. If the error is about the date, the screen says
+  "Setting the clock…". Frames with no clock battery start with an old date after a power cut
+  (a Runxion SSA ZN-DP1002 came up on May 14, 2021), so every HTTPS certificate fails until
+  network time arrives, about 20 seconds after Wi-Fi joins.
+
+Home HQ keeps retrying every 5 seconds, and retries at once when Wi-Fi connects or the clock
+changes. The screen disappears once a load succeeds. Wi-Fi settings open only when tapped,
+because Wi-Fi is often still connecting for the first minute after boot.
 
 On frames without a navigation bar (most PF1007L units), set up the navigation service in
 [Frames without Home or Back buttons](#frames-without-home-or-back-buttons) first. Otherwise
 **Open Wi-Fi settings** leaves no way back to the dashboard.
+
+## Time zone
+
+After changing the frame's time zone over ADB (`setprop persist.sys.timezone <zone>` and
+`service call alarm 3 s16 <zone>`), restart the kiosk. Until then the page keeps the old zone,
+while `date` on the frame already shows the new one:
+
+```sh
+adb shell am force-stop com.wesbos.homehq
+adb shell am start -n com.wesbos.homehq/.MainActivity
+```
+
+Seen on an Android 6 Runxion (WebView 107). Changing the zone in Android Settings has not been
+compared.
 
 ## Build and install
 
