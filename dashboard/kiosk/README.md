@@ -1,6 +1,8 @@
 # Home HQ kiosk navigation
 
-Hold two fingers still on the dashboard for 1.5 seconds to open the native controls:
+Hold two fingers still on the dashboard for 1.5 seconds to open the native controls. Keep the
+fingers at least an inch (about 2.5 cm) apart: on PF1007L frames the `gslX680` touchscreen reads
+closer fingers as one touch.
 
 - **Open launcher** opens another installed Home app, such as Rootless Launcher.
   If none is available, it opens Android Settings.
