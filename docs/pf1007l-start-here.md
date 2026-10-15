@@ -25,6 +25,7 @@ Detailed guides behind this page:
 
 Unit reports with more detail: [unit A's custom tool](allwinner-a33-boot-access.md),
 [January on Windows](pf1007l-windows-20260113-usb-adb-report.md),
+[January, smaller eMMC, on macOS](pf1007l-macos-20260113-smaller-emmc-report.md),
 [`OS-PF1009` units E and F](pf1007l-pf1009-20260417.md),
 [May `20260519` on Windows + WSL](pf1007l-windows-wsl-20260519-report.md),
 [May `20260519` on Linux](pf1007l-20260519-linux-report.md),
@@ -42,7 +43,7 @@ differ in eMMC size and in whether ADB ships on.
 
 | Firmware string ends with | Reports | eMMC sectors | Boot SHA-256, first 8 (sector 172032, 31,028 sectors) | Stock ADB | What worked |
 | --- | --- | --- | --- | --- | --- |
-| `321-OS-AIMOR.0.20260113` | units A, B, C; #6, #12, #18, #19, #61, #97, #99, [Windows report](pf1007l-windows-20260113-usb-adb-report.md), [macOS report](pf1007l-macos-20260113-report.md) | 30,535,680 or 30,777,344 | `d71c313d` | No | Route U; Route S (at 12 MHz on the larger eMMC, #61; at 1-bit 25 MHz with legacy timing on a smaller Samsung eMMC, #97, local build); a guarded one-sector edit on one unit. #99: the eMMC never initialised in either route's U-Boot (**Unsolved**). On a larger-eMMC unit, Route U needed the warm-up SPL (now in the repository build) and the no-HS patch ([macOS report](pf1007l-macos-20260113-report.md)) |
+| `321-OS-AIMOR.0.20260113` | units A, B, C; #6, #12, #18, #19, #61, #97, #99, [Windows report](pf1007l-windows-20260113-usb-adb-report.md), [macOS report](pf1007l-macos-20260113-report.md), [macOS smaller-eMMC report](pf1007l-macos-20260113-smaller-emmc-report.md) | 30,535,680 or 30,777,344 | `d71c313d` | No | Route U; Route S (at 12 MHz on the larger eMMC, #61; at 1-bit 25 MHz with legacy timing on a smaller Samsung eMMC, #97, local build); a guarded one-sector edit on one unit. #99: the eMMC never initialised in either route's U-Boot (**Unsolved**). On a larger-eMMC unit, Route U needed the warm-up SPL (now in the repository build) and the no-HS patch ([macOS report](pf1007l-macos-20260113-report.md)) |
 | `321-OS-AIMOR.0.20260410` | unit D (#13), #17, #20, #27, #69, #8 comment, [unit G](allwinner-a33-sdcard-adb-wifi.md#14-april-20260410-firmware), [Linkdaze PF1007BK](pf1007l-linkdaze-20260410-report.md) (#83) | 30,777,344 | `8ffc2a7d` | Usually no; **on** in one unit | Route U; [T3c](#t3c-temporary-adb-through-the-aimor-connection) with no write, then `persist.sys.usb.config` for persistent USB ADB (#83, one unit); [one-sector edit](pf1007l-sector-edit-sdcard.md); Route S with an April patch builder that is not in this repo (unit G) |
 | `321-OS-AIMOR.0.20260416` | #16 comment, #102, #119 | 30,777,344 | `fc4d22d2` over 31,032 sectors (#16 comment, #119); `bef19d67` over 31,028 sectors (#102, #119) | No (#16 comment, #119); **on** in #102 (`1f3a:1002`, root, survives reboot) | Route U with a 12 MHz low-power U-Boot, then a guarded one-sector `build.prop` edit (#119; unlike #16's unit it had no `/data` override, so one sector was enough — the published one-sector guide is `20260410`-only); an unpublished `build.prop` edit; nothing needed (#102) |
 | `OS-PF1009.0.20260417` | units E and F ([report](pf1007l-pf1009-20260417.md)) | 30,777,344 | `3f0dc9d5` | No | Route U with [U-Boot fixes](#u-boot-settings-that-fixed-ums-problems) |
@@ -345,7 +346,7 @@ so each one is a local change to the U-Boot source, and its reports are the refe
 | Symptom | What fixed it | Reports |
 | --- | --- | --- |
 | Read errors, `ums` drops, slow or failing backup, or no USB device at all after U-Boot starts while an SD-only `ums 0 mmc 0` script enumerates | eMMC **4-bit at 26 MHz** ([patch](patches/pf1007l-v2025.10-emmc-4bit-26mhz.patch)), or 8-bit at 25 MHz | #16, #18, #24, #27, #29, #6 (8-bit high speed hung), #81 (8-bit dropped 42–172 MB in; 4-bit at 26 MHz with START STOP finished two passes), #96 (Pastigio ZC002, no USB device at 8-bit: [report](pastigio-zc002.md#second-pastigio-unit)) |
-| The disk disappears when the computer sends "eject" or "stop" | Ignore START STOP UNIT unless it is a real unload: [patch](patches/pf1007l-v2025.10-start-stop.patch) | #28, #16, #24, #81 |
+| The disk disappears when the computer sends "eject" or "stop" | Ignore START STOP UNIT unless it is a real unload: [patch](patches/pf1007l-v2025.10-start-stop.patch) | #28, #16, #24, #81, [January smaller eMMC](pf1007l-macos-20260113-smaller-emmc-report.md#the-ums-drops) |
 | Drops through a bus-powered hub | Direct port or powered hub; low-power build (`CONFIG_SUNXI_NO_PMIC=y`, CPU at 408 MHz) | #16, #24, #29 |
 | Single read errors | Retry each read up to 8 times | #24 |
 | Route S dump fails | eMMC at 12 MHz. On May `20260519` a 12 MHz dump could still reset about a minute in | #24 comment, #61 (January), #62, #68 |
