@@ -215,8 +215,11 @@ unit, the write ran with an earlier version of `recovery-patch.sh` (differences 
 - Any firmware other than May `20260529` and `20260519` (the second was confirmed by another owner on a
   30,777,344-sector unit, in the PR #65 thread), including April units with recovery ADB (#49).
   `recovery-patch-build.py` refuses other boot images.
-- The larger 30,777,344-sector eMMC.
-- `recovery-patch.sh` as published, on a real frame (the write used an earlier version).
+- ~~The larger 30,777,344-sector eMMC.~~ Confirmed on 2026-10-14 with the published scripts on a
+  30,777,344-sector Humblestead unit from macOS ([report](pf1007l-macos-20260529-humblestead-report.md)):
+  window about 18 s, pushes in 5 s, read-back matched, root on the next boot.
+- `recovery-patch.sh` as published, on a real frame: the write in this guide used an earlier version;
+  the Humblestead report above used the published one.
 - A write interrupted mid-push, and the undo in section 7 on a real frame.
 - Windows and Linux hosts.
 
