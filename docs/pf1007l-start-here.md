@@ -28,6 +28,7 @@ Unit reports with more detail: [unit A's custom tool](allwinner-a33-boot-access.
 [`OS-PF1009` units E and F](pf1007l-pf1009-20260417.md),
 [May `20260519` on Windows + WSL](pf1007l-windows-wsl-20260519-report.md),
 [May `20260519` on Linux](pf1007l-20260519-linux-report.md),
+[May `20260519` T3c on macOS](pf1007l-macos-20260519-t3c-report.md),
 [May `20260529` on macOS](pf1007l-macos-20260529-report.md),
 [May `20260529` on Windows + WSL](pf1007l-windows-20260529-report.md).
 
@@ -46,7 +47,7 @@ differ in eMMC size and in whether ADB ships on.
 | `321-OS-AIMOR.0.20260410` | unit D (#13), #17, #20, #27, #69, #8 comment, [unit G](allwinner-a33-sdcard-adb-wifi.md#14-april-20260410-firmware), [Linkdaze PF1007BK](pf1007l-linkdaze-20260410-report.md) (#83) | 30,777,344 | `8ffc2a7d` | Usually no; **on** in one unit | Route U; [T3c](#t3c-temporary-adb-through-the-aimor-connection) with no write, then `persist.sys.usb.config` for persistent USB ADB (#83, one unit); [one-sector edit](pf1007l-sector-edit-sdcard.md); Route S with an April patch builder that is not in this repo (unit G) |
 | `321-OS-AIMOR.0.20260416` | #16 comment, #102, #119 | 30,777,344 | `fc4d22d2` over 31,032 sectors (#16 comment, #119); `bef19d67` over 31,028 sectors (#102, #119) | No (#16 comment, #119); **on** in #102 (`1f3a:1002`, root, survives reboot) | Route U with a 12 MHz low-power U-Boot, then a guarded one-sector `build.prop` edit (#119; unlike #16's unit it had no `/data` override, so one sector was enough — the published one-sector guide is `20260410`-only); an unpublished `build.prop` edit; nothing needed (#102) |
 | `OS-PF1009.0.20260417` | units E and F ([report](pf1007l-pf1009-20260417.md)) | 30,777,344 | `3f0dc9d5` | No | Route U with [U-Boot fixes](#u-boot-settings-that-fixed-ums-problems) |
-| `FL-AIMOR-OS.0.20260519` | #24, #36, #62, #65 comment, #98, [Windows report](pf1007l-windows-wsl-20260519-report.md), [Linux report](pf1007l-20260519-linux-report.md), [macOS Route S](pf1007l-macos-20260519-route-s-report.md) | 30,777,344 | `9a6e2456`, **different ramdisk slot** | No | Route U with U-Boot fixes; Route U patch carried on the SD card with a 12 MHz FEL U-Boot (#62, #68); [recovery-window write](pf1007l-macos-20260529-recovery-boot-write.md) (#65 comment). Route S only by editing its hash guard (do not); one unit: Route S dump at 12 MHz + Route U `boot-patch.py` when `ums` resets. #98: the base build **and** the no-HS patch both showed only the SD card (**Unsolved**) |
+| `FL-AIMOR-OS.0.20260519` | #24, #36, #62, #65 comment, #98, [Windows report](pf1007l-windows-wsl-20260519-report.md), [Linux report](pf1007l-20260519-linux-report.md), [macOS Route S](pf1007l-macos-20260519-route-s-report.md), [macOS T3c](pf1007l-macos-20260519-t3c-report.md) | 30,777,344 | `9a6e2456`, **different ramdisk slot** | No | [T3c](#t3c-temporary-adb-through-the-aimor-connection) through a router local-DNS entry, then `persist.sys.usb.config` for persistent USB ADB, no boot patch ([macOS T3c](pf1007l-macos-20260519-t3c-report.md), one unit); Route U with U-Boot fixes; Route U patch carried on the SD card with a 12 MHz FEL U-Boot (#62, #68); [recovery-window write](pf1007l-macos-20260529-recovery-boot-write.md) (#65 comment). Route S only by editing its hash guard (do not); one unit: Route S dump at 12 MHz + Route U `boot-patch.py` when `ums` resets. #98: the base build **and** the no-HS patch both showed only the SD card (**Unsolved**) |
 | `V10-1680.0.20260529` (also `321-OS-AIMOR.0.20260529`, #81) | #8, #16, [#41](pf1007l-windows-20260529-report.md), [#28](pf1007l-macos-20260529-report.md), [recovery write](pf1007l-macos-20260529-recovery-boot-write.md), [no-HS report](pf1007l-macos-20260529-no-mmc-hs-report.md), #81, [#103](pf1007l-macos-20260529-report.md#second-unit-larger-emmc-2026-10-13-access-only-no-backup), #116, #117 | 30,777,344 or 30,535,680 | `6c118dc1` | **On** in #8; off in #16, #28, #81, #103, #116, #117, the no-HS unit and the recovery-write unit; not established in #41 | Nothing needed (#8); [T3c](#t3c-temporary-adb-through-the-aimor-connection) on Windows, then `persist.sys.usb.config` for persistent USB ADB across a power cut, no boot patch (#117, one unit); Route U; Route U with the [no-HS U-Boot patch](patches/pf1007l-v2025.10-no-mmc-hs.patch) (no-HS report); Route U with a 12 MHz low-power build on Linux, larger eMMC, even on a direct port (#116); Route U with the boot patch aimed at the `ptp` USB action, because that unit's saved USB setting was `ptp` (#81, local edit, not in the repo); recovery-window write, also reachable from AiMOR's on-screen Recovery Mode button (#116); a 1-bit 25 MHz read-only `ums` backup, then a userdata `persist.sys.usb.config` edit (#41, record only, not a published route). The patched boot-image hash depends on the host's zlib, so a different patched hash is expected (#116) |
 
 Numbers are GitHub issues and pull requests. Units A to C are from the first three guides:
@@ -227,14 +228,16 @@ Other firmware variants remain untested for this route. January `20260113` runs 
 network.** Run it on a network you control, finish the T8 lock-down in the same session, then
 reboot to close it, or move to a key-authenticated setup.
 
-**Making it persistent without flashing (April `20260410` #83; May `20260529` #117):** on these
+**Making it persistent without flashing (April `20260410` #83; May `20260519` [macOS T3c](pf1007l-macos-20260519-t3c-report.md); May `20260529` #117):** on these
 debuggable builds, `setprop persist.sys.usb.config mass_storage,adb` kept USB ADB after a reboot —
 in #117 it survived a 15-second power cut. It writes `/data/property`, so ask the owner first.
 Undo: `setprop persist.sys.usb.config mass_storage`. Check USB ADB after a reboot before you count
 it as persistent ADB in T8. Don't use the Wi-Fi equivalent (`persist.adb.tcp.port`) except briefly
 on a network you control: it opens root ADB with no key check at every boot. See the
 [report](pf1007l-linkdaze-20260410-report.md). T3c itself is also confirmed on `20260529` from
-Windows (#117), using a local DNS record instead of `dns.py`, which cannot run on Windows.
+Windows (#117), using a local DNS record instead of `dns.py`, which cannot run on Windows, and on
+`20260519` from macOS, using a local-DNS entry on the router because the frame's Wi-Fi screen had no
+DNS setting ([report](pf1007l-macos-20260519-t3c-report.md)).
 
 ### T4. Route U: FEL test (non-destructive to the frame)
 
