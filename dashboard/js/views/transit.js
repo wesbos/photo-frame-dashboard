@@ -8,8 +8,9 @@
   function bufferFor(st) { return st.fallbackFor ? BUFFER_ALT : BUFFER_HOME; }
 
   // Time to a station (home -> park -> walk), Mapbox via /api/station-time. One state per station code.
-  var X = {}, X_STALE = 5 * 60 * 1000;
-  function xs(code) { return X[code] || (X[code] = { data: null, busy: false, error: '', off: false, tried: 0 }); }
+  // Only fetched when the refresh button is tapped (never on opening the tab), so it doesn't spend Mapbox calls.
+  var X = {};
+  function xs(code) { return X[code] || (X[code] = { data: null, busy: false, error: '', off: false }); }
   function homeStation() { var s = T.schedule; return s && s.stations.filter(function (x) { return x.lat && !x.fallbackFor; })[0]; }
   function altStation() {
     var home = homeStation();
@@ -50,11 +51,10 @@
       '<div class="tr-leave">' + (next ? 'Leave by <b>' + leaveBy(st, next) + '</b> for the ' + App.fmt.time(new Date(next.ts)) : 'No more trains to catch') + '</div>';
   }
   function repaintNow() { if (App.current === 'transit' && V.el) render(); }
-  function loadTts(st, force) {
+  function loadTts(st) {
     var x = st && xs(st.code);
     if (!st || x.busy || x.off) return;
-    if (!force && ((x.data && Date.now() - x.data.at < X_STALE) || Date.now() - x.tried < X_STALE)) return; // after a try, wait before the next unless tapped
-    x.tried = Date.now(); x.busy = true; x.error = ''; repaintNow();
+    x.busy = true; x.error = ''; repaintNow();
     fetch('/api/station-time?code=' + st.code + (st.fallbackFor ? '' : '&home=1') + '&lat=' + st.lat + '&lon=' + st.lon).then(function (r) { return r.json(); }).then(function (d) {
       if (d.configured === false) { x.off = true; x.missing = d.missing; return; }
       if (d.error) { x.error = d.error; return; }
@@ -138,19 +138,18 @@
     V.el.innerHTML = '<div class="transit"><header class="tr-head"><div><div class="label">GO Transit</div><h1 class="serif">Trains</h1></div>' + head + '</header>' + inner + '</div>';
   }
 
-  function loadAll(force) { loadTts(homeStation(), force); if (V.altOpen && alternate()) loadTts(altStation(), force); }
   function onClick(e) {
     var t = e.target.closest('[data-tts]');
     if (t) { // refresh a travel time (inside the open alternate tile the refresh button must not also close it)
       var st = T.schedule.stations.filter(function (x) { return x.code === t.dataset.tts; })[0];
-      loadTts(st, true); e.stopPropagation(); return;
+      loadTts(st); e.stopPropagation(); return;
     }
     // closed: tap anywhere on the tile to open it; open: tap its title bar to close it again
     if (e.target.closest(V.altOpen ? '.tr-alt-h' : '[data-alt]')) {
-      V.altOpen = !V.altOpen; render(); loadAll(false);
+      V.altOpen = !V.altOpen; render();
     }
   }
-  function repaint() { if (App.current === 'transit' && V.el) { render(); loadAll(false); } }
+  function repaint() { if (App.current === 'transit' && V.el) render(); }
   App.on('data', repaint);
   App.on('minute', repaint);
 
@@ -158,9 +157,9 @@
     minutely: true, // minutes-away counters
     show: function (el) {
       if (!V.wired) { V.wired = true; el.addEventListener('click', onClick); }
-      V.el = el; render(); T.watch(true); loadAll(false);
+      V.el = el; render(); T.watch(true);
     },
-    resume: function () { T.watch(true); loadAll(false); },
+    resume: function () { T.watch(true); },
     hide: function () { T.watch(false); }
   });
 })();
