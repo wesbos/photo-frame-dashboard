@@ -120,8 +120,63 @@ after a normal reboot the frame came up on the dashboard (owner observation; net
 reconnected for that boot). Rootless Pixel Launcher stays reachable from the kiosk's two-finger
 hold → **Open launcher**, which skips the kiosk's own HOME entry.
 
+## Second unit: Dxmart ZN-DP1002 (2026-10-15, macOS)
+
+A second owner's frame, sold as **Dxmart** ZN-DP1002 10.1", has the same board. Host: macOS on
+Apple silicon, USB ADB only.
+
+- **Identity:** every field in the [identity table](#identity-from-adb) matched, including the
+  fingerprint, `SSA_Frame_20260420`, the NAND size and the 128 MiB recovery.
+- **Firmware:** the 32 MiB boot partition SHA-256 is the same `4ed777af…891b` as above.
+- **Frameo:** v1.30.13, still the copy in `/system/priv-app`; it had not updated itself into
+  `/data/app` yet.
+- **Cables:** a USB-A to USB-C path through a hub gave power and data. USB-C to USB-C straight
+  into the Mac gave neither.
+- **Root:** `adb root` works (adbd runs as `u:r:su:s0`), and `su 0 <cmd>` works too.
+- **Backup:** the same `adb exec-out "su 0 dd"` method over USB ran at about 11.5 MiB/s, about
+  6 minutes for the 3.4 GB capture, checks included. Every check passed: chunk lengths, gzip
+  readback, no `0xCC` blocks and on-device SHA-256 of all 16 regions.
+- **Wi-Fi with the screen off:** the driver rejects scheduled scans (`wificond:
+  NL80211_CMD_START_SCHED_SCAN failed`). With the screen asleep, Wi-Fi was enabled but stayed
+  disconnected. `input keyevent KEYCODE_WAKEUP` brought the connection back within seconds. Prefer
+  low brightness to sleeping the screen if the dashboard must stay online.
+- **Screen turning off:** while Frameo was enabled, its sleep schedule
+  (`net.frameo.frame/.feature.sleep_schedule.AScreenOffOverlay`) put the screen to sleep, even
+  over the kiosk. This stopped once Frameo was disabled.
+- **Kiosk as HOME without a rebuild:** the current kiosk has a `.Home` alias.
+  `am start -n com.wesbos.homehq/.MainActivity --ez home true`, then
+  `cmd package set-home-activity --user 0 com.wesbos.homehq/.Home`, made it HOME. ActivityManager
+  reported the activity displayed after 5.3 s. The screen was asleep then; when it was woken about
+  a minute later, the page had rendered.
+- **Navigation:** the kiosk's own **Home HQ navigation** accessibility service gave the Back and
+  Dashboard buttons. The owner enabled it on the panel and went to Settings → Apps and back before
+  Frameo was disabled. Frame Home was not installed. The two-finger hold works, but only with
+  both fingers completely still. The first few tries failed.
+- **Pitfall, Frameo came back:** `pm disable-user` read back `enabled=3`, but after an
+  `adb reboot` within about 20 seconds Frameo was `enabled=0` and running again. In
+  `/data/system/users/0/package-restrictions.xml` its entry had no `enabled` attribute, while the
+  updaters disabled earlier kept `enabled="3"`. The second try worked: disable, wait 30 s, check
+  the file, `sync`, then `adb reboot`. Before you reboot, check the file:
+  `adb shell "su 0 grep 'net.frameo.frame' /data/system/users/0/package-restrictions.xml"` must
+  show `enabled="3"`. `svc power reboot` from the shell did nothing on this unit.
+- **After a normal reboot:** Frameo and both updaters stayed `enabled=3` with no process. The
+  kiosk was HOME and focused, the navigation service stayed on, and USB ADB stayed on. No TCP port
+  was listening. The only outbound connections were the kiosk and Gboard
+  (`com.google.android.inputmethod.latin`, to a Google address).
+- **Hardware seen:** touchscreen `gslX680-d708`, accelerometer `sc7a30`, and a PIR motion
+  sensor. The kernel log prints `pir_gpio_status`.
+- **Boot animation:** `/system/media/bootanimation.zip` holds four PNG parts at 870×432 on
+  white. `/oem` is a separate ext4 partition with no `media/` folder. `/system` mounts straight
+  from `rknand0p11`, with no dm-verity device, although `ro.boot.veritymode` reads `enforcing`.
+
 ## Guesses, not confirmed
 
+- Android probably writes `package-restrictions.xml` a few seconds after `pm disable-user`, and
+  `adb reboot` does not wait for that write. That would explain the lost Frameo state above.
+- AOSP 8.1 looks for `/oem/media/bootanimation.zip` before the `/system` one. Placing a custom
+  animation there would then replace the boot graphic without editing `/system`. Not tried.
+- The PIR sensor probably wakes the screen for Frameo's motion feature;
+  which Android component reads it is not checked.
 - The board is probably the same SSA RK3326 frame as the Runxion 10.1" in
   [PR #58](https://github.com/wesbos/photo-frame-dashboard/pull/58), which also uses `su 0 <cmd>`.
 - The USB-C port probably lacks the CC pull-down resistors a USB-C host needs before supplying
@@ -131,6 +186,5 @@ hold → **Open launcher**, which skips the kiosk's own HOME entry.
 
 ## Not yet checked
 
-- `adb root`, which should work given `ro.debuggable=1`; not needed so far.
 - Other factory apps' network behaviour. Keep the frame on an isolated network: Android 8.1 with
   a 2020 security patch and shipped root.
