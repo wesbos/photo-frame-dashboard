@@ -76,6 +76,31 @@ keeps the service enabled across reboots. It requests no accessibility events or
 screen-content access and does not require root. Disable **Home HQ navigation**
 in Accessibility settings to remove the buttons.
 
+### Photo screensaver integration
+
+The buttons also hide while **iPhoto Frame Saver** is actively dreaming, and return
+when its screensaver exits. This does not disable the accessibility service or change
+the launcher, and the buttons remain available in the photo app's settings.
+
+Home HQ observes the read-only
+`content://io.github.martinwoodward.iphotoframesaver.playback/dream` provider, requesting
+only its integer `active` column (`1` while dreaming, otherwise `0`). The provider
+must belong to `io.github.martinwoodward.iphotoframesaver`. No album URLs, photos,
+settings, or screen contents are read. Provider notifications update visibility;
+a five-second recheck recovers from a stopped provider or missed notification.
+Queries run off the UI thread. Missing, invalid, denied, or unresponsive state
+keeps navigation available, including a two-second query timeout.
+
+The screensaver must reset its process-local flag on stop/detach and notify this
+URI on each transition. Process restart defaults to inactive. Home HQ does not
+accept exported hide/show broadcasts or write to the provider.
+
+Removing iPhoto Frame Saver restores the original visibility behavior; to undo the
+Home HQ code change itself, reinstall your previous Home HQ APK with the same signing key.
+
+Run the host integration regressions from `dashboard/` with
+`python3 kiosk/test-dream-navigation.py`.
+
 On a PF1007L (`20260519` firmware), the vendor `BackgroundManagerService` dropped the
 service from the enabled list after every `adb install -r` or force stop of Home HQ, so the
 buttons silently disappeared. To have Home HQ put the service back each time it starts, grant
