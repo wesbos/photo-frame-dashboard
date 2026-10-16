@@ -38,6 +38,11 @@ welcome. Missing yours? See the README's
 | <a href="https://amzn.to/4B38DQ0"><img src="images/devices/B0FSZ86HTM.jpg" width="120" alt="Runxion 10.1 inch Frameo frame"></a><br>Runxion 10.1" (Frameo) | Rockchip RK3326, Android 8.1 | Frameo ADB Access toggle, USB. Showed `unauthorized` at first; toggling ADB Access off and on with USB plugged in brought up the authorize prompt | Shipped `su` (`su 0 <cmd>`) and `adb root` | No write-up yet | [Runxion 10.1" Frameo, 32 GB](https://amzn.to/4B38DQ0) |
 | <a href="https://amzn.to/4zwU6e0"><img src="images/devices/B0GCCFPHZ4.jpg" width="120" alt="15.6 inch Frameo frame"></a><br>15.6" Frameo | Not documented yet | Not documented yet | Not documented yet | Confirmed working; no write-up yet | [15.6" Frameo, 1920x1080](https://amzn.to/4zwU6e0) |
 
+Additional PF1007L success report:
+[May firmware, TF-card FEL to a standalone Home Assistant panel](pf1007l-tf-card-20260529-home-assistant-report.md).
+This unit used the card to enter FEL, then Route U over USB; it did not boot a
+replacement Android system from the card.
+
 ## Details: the first three frames
 
 |                    | Skylight Calendar 15" (150-CAL)                                | BIUFRAME 10.1" picture frame (in the video)      | PF1007L 10.1" picture frame (BIUFRAME and others)                                   |

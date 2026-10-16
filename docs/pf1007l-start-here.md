@@ -54,6 +54,12 @@ Numbers are GitHub issues and pull requests. Units A to C are from the first thr
 tool), [allwinner-a33-sdcard-adb-wifi.md](allwinner-a33-sdcard-adb-wifi.md) (B) and
 [allwinner-a33-mainline-uboot.md](allwinner-a33-mainline-uboot.md) (C).
 
+Another May `V10-1680.0.20260529` unit completed
+[TF-card FEL / Route U and a standalone Home Assistant setup](pf1007l-tf-card-20260529-home-assistant-report.md).
+It had stock ADB off and 30,777,344 eMMC sectors. A 256 GB card entered FEL;
+the successful RAM build used 408 MHz/no-PMIC and 4-bit, 26 MHz eMMC. This was
+not an SD-only Android installation or a Route S result.
+
 What this tells you:
 
 - **Test ADB first** (T3, T3b). Some units ship with root ADB on (#8, #102), even with the same
