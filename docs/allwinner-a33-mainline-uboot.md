@@ -199,6 +199,30 @@ preserving their private permissions:
 sudo chown "$USER" backups/a33-emmc-full.{img,img.gz,sha256}
 ```
 
+### 4b. Deterministic, stable UMS build (Linux host, January firmware)
+
+Apply [`patches/pf1007l-v2025.10-ums-stable.patch`](../patches/pf1007l-v2025.10-ums-stable.patch)
+after `pf1007l-uboot.patch`. Three changes, one Linux-host validation:
+
+1. `CONFIG_BOOTCOMMAND="ums 0 mmc 0,1"` — with `BOOTDELAY=-2` the UMS command
+   is the boot command itself. On one Linux-hosted unit the `fel_scriptaddr`
+   hook did not run: the first FEL boot fell through to the fastboot gadget,
+   and a retry hung in eMMC reads. Hard-coding the command removes the hook
+   from the critical path.
+2. `do_start_stop()` only ejects on a real unload (`cmnd[4] & 0x03 == 0x02`).
+   Ordinary START STOP UNIT from the host ejected both LUNs after ~30 s on a
+   Linux host too (Arch, direct USB-A port) — the macOS report's finding was
+   not macOS-specific. Validated stable through a full-device verified backup.
+3. `max-frequency = <25000000>` on `&mmc2` — same rationale as the 12 MHz
+   rows below; 25 MHz 8-bit held for a complete, twice-read, SHA-verified
+   15,758,000,128-byte backup (30,777,344-sector eMMC, January 20260113).
+
+Linux-host notes: new USB devices arrive `authorized=0` when USBGuard runs
+(`usbguard allow-device` or a permanent rule for the vendor), and the host adb
+server sometimes loses the frame after reboots (`adb kill-server &&
+adb start-server`). Deployed sites should also disable runtime PM on USB
+(`power/control` → `on`) for the duration of long backups.
+
 ## 5. Build the boot patch from your own backup
 
 ```sh
