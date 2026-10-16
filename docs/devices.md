@@ -37,6 +37,7 @@ welcome. Missing yours? See the README's
 | Uhale SI006 | Spreadtrum `sp7731g_1h10`, Android 6.0 | No. Hidden Settings, then `unauthorized` | Terminal app `su`, then host key added to `adb_keys` | [si006-uhale.md](si006-uhale.md) | Not recorded |
 | <a href="https://amzn.to/4B38DQ0"><img src="images/devices/B0FSZ86HTM.jpg" width="120" alt="Runxion 10.1 inch Frameo frame"></a><br>Runxion 10.1" (Frameo) | Rockchip RK3326, Android 8.1 | Frameo ADB Access toggle, USB. Showed `unauthorized` at first; toggling ADB Access off and on with USB plugged in brought up the authorize prompt | Shipped `su` (`su 0 <cmd>`) and `adb root` | No write-up yet | [Runxion 10.1" Frameo, 32 GB](https://amzn.to/4B38DQ0) |
 | <a href="https://amzn.to/4zwU6e0"><img src="images/devices/B0GCCFPHZ4.jpg" width="120" alt="15.6 inch Frameo frame"></a><br>15.6" Frameo | Not documented yet | Not documented yet | Not documented yet | Confirmed working; no write-up yet | [15.6" Frameo, 1920x1080](https://amzn.to/4zwU6e0) |
+| ARZOPA P156W (Frameo, `rk3326_mid`, firmware `rf001e_user_20231007`) | Rockchip RK3326, Android 8.1 | Yes, USB, after accepting the frame's authorization. **Needs a USB-A to USB-C cable**: a USB-C to USB-C cable that works with a phone never enumerated, not even in loader mode | Shipped SuperSU `su`, no prompt | [arzopa-p156w.md](arzopa-p156w.md) | Not recorded |
 
 ## Details: the first three frames
 
