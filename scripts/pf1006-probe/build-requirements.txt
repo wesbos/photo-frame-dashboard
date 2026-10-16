@@ -1,0 +1,4 @@
+# Install this U-Boot host dependency. Install setuptools separately.
+pyelftools==0.31 \
+    --hash=sha256:c774416b10310156879443b81187d182d8d9ee499660380e645918b50bc88f99 \
+    --hash=sha256:f52de7b3c7e8c64c8abc04a79a1cf37ac5fb0b8a49809827130b858944840607
