@@ -44,7 +44,9 @@ tested on the frame.
 **HTML/CSS (observed working in the sample dashboard, or Chrome ≤ 106):**
 - Flexbox, CSS Grid, `gap`, `aspect-ratio`, custom properties (`var()`), `clamp()/min()/max()`,
   `:is()`/`:where()`, `@media`, `@font-face`, `@supports`, CSS transitions and simple keyframe
-  animations of `transform`/`opacity`.
+  animations of `transform`/`opacity` that run once and stop. On one PF1007L the kiosk was idle
+  again after a one-second animation had finished (1 tick in the next 4.4 s). A loop that never
+  ends is in **Heavy content**.
 - Colours in `#rgb`, `#rrggbb`, `rgb()/rgba()`, `hsl()`.
 - Self-hosted fonts (`woff2`) and SVG icons.
 
@@ -101,6 +103,20 @@ does **not** add these functions; avoid them, or add a polyfill.
   Prefer JPEG/WebP. Avoid AVIF.
 - Video, WebGL scenes, big canvas animations, `backdrop-filter`/large blurs, long box-shadow
   animations, and dozens of simultaneous animations. The GPU is OpenGL ES 2.0 and the CPU is slow.
+- An animation that never ends. Serve a static SVG.
+  - On a Frameo 114K, one SMIL icon held the kiosk at about 1.8 of 4 cores, and the same
+    page with that icon static sat at about 0.05. The renderer thread and the GPU thread
+    split that cost. Seven animated icons cost the same as one
+    ([#143](https://github.com/wesbos/photo-frame-dashboard/issues/143)).
+  - On one PF1007L (firmware `20260410`, WebView 106, the `com.wesbos.homehq` kiosk, an
+    otherwise empty page) the same kind of sample read about 2.1 cores for one SMIL icon
+    and about 1.1 cores for one infinite CSS animation of `transform` and `opacity`.
+    The static page and a CSS animation that had already finished both sat at about 0.
+    SMIL time was spread across the renderer, the GPU thread, and the compositor. The CSS
+    loop stayed off the renderer and still kept the compositor busy. All 4 CPUs were online
+    during either loop. This unit had been down to CPU 0 while idle. Animated GIFs were
+    not measured. A clock text change once a minute, or an image swapped every few seconds,
+    is a separate cost.
 - Very large frameworks or bundles. Aim for a JS bundle in the low hundreds of KB.
 - Re-rendering the whole page every second. Update only what changes (the clock text, for
   example).
