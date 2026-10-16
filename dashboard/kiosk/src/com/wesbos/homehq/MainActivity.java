@@ -17,10 +17,12 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -53,6 +55,7 @@ public class MainActivity extends Activity {
   static final String PREFS = "kiosk";
   static final String PREF_URL = "url";
   static final long EXIT_HOLD_MS = 1500;
+  static final int CANCEL_POINTER_IDS = 10; // touch ids 0-9
   static final long RETRY_MS = 5000;
   static final long STALL_MS = 15000;
   static final long NAV_CHECK_MS = 5000;
@@ -112,6 +115,7 @@ public class MainActivity extends Activity {
     public void run() {
       exitArmed = false;
       Log.i(TAG, "Two-finger hold: opening controls");
+      cancelPageTouches();
       new AlertDialog.Builder(MainActivity.this)
           .setTitle("Home HQ")
           .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings", "Reload dashboard"},
@@ -412,10 +416,16 @@ public class MainActivity extends Activity {
     Log.i(TAG, "Home alias " + (home ? "on" : "off"));
   }
 
-  /** Watches for the two-finger exit hold; all touches still go to the page. */
+  /** Watches for the two-finger exit hold; all touches still go to the page (after a stale-touch reset). */
   @Override
   public boolean dispatchTouchEvent(MotionEvent e) {
     switch (e.getActionMasked()) {
+      case MotionEvent.ACTION_DOWN:
+        // Android sends DOWN only when every earlier finger has lifted. If the page still holds a
+        // touch from before (see cancelPageTouches), clear it first so this tap is not read as a
+        // second finger. With no stale touch the cancel is a no-op.
+        cancelPageTouches();
+        break;
       case MotionEvent.ACTION_POINTER_DOWN:
         if (e.getPointerCount() == 2) {
           for (int i = 0; i < 2; i++) {
@@ -458,10 +468,37 @@ public class MainActivity extends Activity {
     handler.removeCallbacks(showControls);
   }
 
+  /**
+   * Ends any touch the page thinks is still down. On a PF1007L (2026-10-16) the WebView sometimes
+   * kept one touch "down" for good after the two-finger controls opened (not every time), while
+   * Android reported no touch at all. Every later tap then arrived as a second finger and the page
+   * ignored it (no pointerdown). A cancel resets the page's touch state; with no touch active it
+   * does nothing.
+   */
+  private void cancelPageTouches() {
+    if (web == null) return;
+    // The stuck touch was pointer id 1 (the second finger of the hold), so a single-pointer cancel
+    // (id 0) left it in place. Name every id the panel can use; the page ignores ids it isn't holding.
+    MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[CANCEL_POINTER_IDS];
+    MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[CANCEL_POINTER_IDS];
+    for (int i = 0; i < CANCEL_POINTER_IDS; i++) {
+      props[i] = new MotionEvent.PointerProperties();
+      props[i].id = i;
+      props[i].toolType = MotionEvent.TOOL_TYPE_FINGER;
+      coords[i] = new MotionEvent.PointerCoords();
+    }
+    long now = SystemClock.uptimeMillis();
+    MotionEvent cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, CANCEL_POINTER_IDS,
+        props, coords, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0);
+    web.dispatchTouchEvent(cancel);
+    cancel.recycle();
+  }
+
   @Override
   public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
     if (hasFocus) hideSystemUi();
+    else cancelPageTouches(); // a dialog or another app took over mid-touch
   }
 
   private void hideSystemUi() {
