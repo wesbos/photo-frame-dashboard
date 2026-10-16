@@ -14,6 +14,10 @@ Rockchip RK3326 [Frameo "Digital Photo Frame 102k" (KJM)](frameo-rk3326-s101.md)
 model name and is sold under the same 102k name. Check the fingerprint before you follow either
 page.
 
+**Also sold as 112K.** A second unit, sold as a "112K", reports the same `102K` product, firmware
+and fingerprint and has a byte-identical boot partition. It differs in eMMC size. See
+[Second unit, sold as 112K](#second-unit-sold-as-112k).
+
 ## Identity
 
 | Item | Observed value |
@@ -220,3 +224,80 @@ Nothing was written to `/system` or the boot partition.
 - A USB-C to USB-C cable, and why the first plug-in enumerated nothing.
 - Remounting `/system` with `su 0`, and whether `su` from an app keeps full capabilities.
 - Whether other units from the same listing ship this board or the RK3326 one.
+
+## Second unit, sold as 112K
+
+A different unit, sold as a Frameo "112K", read on 2026-10-16. Host: Windows 11 with Android
+platform-tools. The listing was not recorded. As above, the serial, MAC addresses, eMMC CID and
+Wi-Fi details are left out.
+
+**Short version:** it is the same build as the unit above, on a smaller eMMC. USB ADB, `su 0`, the
+kiosk build and the kiosk as Home all worked the same way, from a Windows host this time.
+
+### Same as the first unit
+
+- `adb devices -l`: `product:102K model:Digital_Photo_Frame device:102K`, not 112K. USB
+  `1f3a:1001`.
+- Firmware `102K-MS33-HK9365-frameo_V1.29.13_NOPMU_20260113` and fingerprint
+  `Allwinner/astar_xr819/astar-xr819:6.0.1/MOB30R/20260113:eng/test-keys`, with
+  `ro.build.type=user`.
+- Boot partition SHA-256 `c7e99c1d2f41c37320c1ab04baf2784ce398ece39e500faa6b48ee7e2826d5bc`
+  (MD5 `a87ed8b311a24e5dee5f7894ca954ac0`), the same as in [Boot image](#boot-image). `/sbin/adbd`
+  in its ramdisk has MD5 `5b6d9f41e579e0ad068c7a1b21824139` and SHA-256
+  `aad459e841ce03e7eae0add799ac24089c06d786c20fec1fe9148cc2f61b38e3`, the same as the first unit's.
+- 1280x800, density 160, `ro.sf.rotation=90`, about 1 GB RAM. SELinux permissive. WebView
+  106.0.5249.126, Frameo v1.29.13 (60080), Adups FOTA 5.28. SystemUI disabled out of the box. No
+  battery (`present: false`, AC powered).
+- USB ADB was on out of the box: `device` at once, no prompt, and no `adb_keys` on file. This is a
+  second computer and a second unit with no key check, not the same unit with a fresh key.
+- `su 0 <cmd>` gives UID 0 with only `CAP_SETUID`/`CAP_SETGID`, as in [Root](#root). `su 1000`
+  read the partitions `su 0` could not.
+- No TCP 5555 listener.
+
+### Different from the first unit
+
+- **Smaller eMMC:** 60,620,800 sectors, against 61,079,552. Every partition start and size in the
+  [partition table](#partition-table) is the same except UDISK (`/data`), which is
+  56,352,768 sectors from 4268032 and still ends at the end of the eMMC.
+- `/system/build.prop` has `ro.config.low_ram=true`. There is no
+  `/system/etc/lowmem_package_filter.xml`. The first unit's write-up does not mention this
+  property; guess, not verified: with the same firmware string it is there too. Unlike the
+  [Denver PFF-1015](denver-pff-1015.md), the kiosk process survived 15 s in Android Settings and
+  Home returned to it.
+
+### Backup
+
+Every partition except userdata and cache was read with `su 0 dd`, and `su 1000 dd` for the
+partitions `su 0` can't open (see [Root](#root)). MD5 matched between the frame and the PC for
+every partition, and 1 MiB of `system` at offset 512 MiB was read again and matched.
+
+### What was set up (approved writes, all in `/data`)
+
+1. Before any change, the owner completed Frameo's first-run setup and joined Wi-Fi with Adups and
+   Frameo still enabled, then removed the network about 40 minutes later. No update had been
+   downloaded: Adups showed `isupgrade=1` with an empty download path, and Frameo's update folder
+   was empty.
+2. `su 0 pm disable com.adups.fota`.
+3. Built `dashboard/kiosk` with `build.ps1` on Windows 11 (Microsoft OpenJDK 17, build-tools 34,
+   platform 34; debug-signed). It built and installed with no changes. The default URL was the
+   hosted demo, `https://home-dashboard.wesbos.workers.dev/`.
+4. Kiosk set as Home with `--ez home true`, then `su 0 pm disable net.frameo.frame`. After a
+   reboot the frame started in the kiosk (`mFocusedActivity=com.wesbos.homehq/.Home`), and
+   `package-restrictions.xml` had `enabled=2` for Frameo. Both disables held across the reboot.
+5. With no navigation bar (SystemUI disabled), the kiosk's **Home HQ navigation** accessibility
+   service was enabled. The setting survived a reboot; the owner had not yet confirmed the floating
+   Back/Dashboard buttons appear outside the kiosk.
+6. `settings put global stay_on_while_plugged_in 7` (it was `0`).
+
+The frame then went back on Wi-Fi. The owner opened Wi-Fi settings from the kiosk's two-finger
+menu by hand. Opening Android Settings from the menu was not separately checked.
+
+Undo is as in [Undo](#undo), plus, for the accessibility service,
+`adb shell settings put secure enabled_accessibility_services null` and
+`adb shell settings put secure accessibility_enabled 0` (both were unset before).
+
+### Not tested on this unit
+
+- What Frameo or Adups do online with updates disabled over a longer period.
+- Whether the floating navigation buttons show outside the kiosk.
+- Network ADB, and which USB cable types enumerate (the cable used was not recorded).
