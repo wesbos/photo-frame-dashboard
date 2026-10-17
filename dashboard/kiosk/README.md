@@ -23,6 +23,27 @@ URL when run without one.
 Every later launch, including after a reboot, opens the saved URL. Links that other apps open
 in the kiosk, such as a sign-in page, are shown but not saved.
 
+## A page bundled in the APK (no server)
+
+A static page can ship inside the APK instead of being hosted. Build with `KIOSK_SITE` set to a
+folder that has an `index.html` (from `dashboard/`):
+
+```sh
+KIOSK_SITE=/path/to/site ANDROID_HOME=/path/to/android-sdk bash kiosk/build.sh
+adb install -r kiosk/build/homehq.apk
+adb shell am start -n com.wesbos.homehq/.MainActivity --es url 'http://127.0.0.1:8765/'
+```
+
+On Windows, set `$env:KIOSK_SITE` before `.\build.ps1`.
+
+Home HQ answers `http://127.0.0.1:8765/` from those files itself. Nothing listens on the port, no
+other machine is needed, and the page loads without Wi-Fi. Every other URL, including the page's
+own API calls, goes to the network as usual. ES modules work, which a `file://` page can't do, and
+`localStorage` belongs to the `http://127.0.0.1:8765` origin. A query string such as API keys
+(`http://127.0.0.1:8765/?key=...`) reaches the page unchanged; quote the URL in `adb shell`.
+To change the page, rebuild and `adb install -r`. Without `KIOSK_SITE` the APK bundles nothing
+and the address answers 404.
+
 ## Start at boot
 
 To have the frame boot into the dashboard, make the kiosk its Home app. Installing the kiosk

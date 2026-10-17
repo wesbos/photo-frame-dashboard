@@ -21,9 +21,19 @@ function Run($exe, [string[]]$a) {
   if ($LASTEXITCODE -ne 0) { throw "$exe failed ($LASTEXITCODE)" }
 }
 
+# Optional: $env:KIOSK_SITE = <dir> bundles a static site, served at http://127.0.0.1:8765/ (README).
+$assets = @()
+if ($env:KIOSK_SITE) {
+  if (-not (Test-Path (Join-Path $env:KIOSK_SITE 'index.html'))) { throw "KIOSK_SITE has no index.html: $env:KIOSK_SITE" }
+  New-Item -ItemType Directory build\assets\site | Out-Null
+  Copy-Item -Recurse -Path (Join-Path $env:KIOSK_SITE '*') -Destination build\assets\site
+  $assets = @('-A', 'build\assets')
+  Write-Output "Bundling $env:KIOSK_SITE as http://127.0.0.1:8765/"
+}
+
 Run "$bt\aapt2.exe" @('compile', '--dir', 'res', '-o', 'build\res.zip')
-Run "$bt\aapt2.exe" @('link', '-o', 'build\base.apk', '-I', $jar, '--manifest', 'AndroidManifest.xml', 'build\res.zip',
-  '--java', 'build\gen', '--min-sdk-version', '23', '--target-sdk-version', '23', '--version-code', '2', '--version-name', '1.1')
+Run "$bt\aapt2.exe" (@('link', '-o', 'build\base.apk', '-I', $jar, '--manifest', 'AndroidManifest.xml') + $assets + @('build\res.zip',
+  '--java', 'build\gen', '--min-sdk-version', '23', '--target-sdk-version', '23', '--version-code', '2', '--version-name', '1.1'))
 
 $src = @(Get-ChildItem src -Recurse -Filter *.java | % FullName) + @('build\gen\com\wesbos\homehq\R.java')
 Run 'javac' (@('-nowarn', '-source', '8', '-target', '8', '-classpath', $jar, '-d', 'build\classes') + $src)

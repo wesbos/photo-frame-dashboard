@@ -3,6 +3,7 @@
 #   brew install --cask android-commandlinetools
 #   sdkmanager --sdk_root=$ANDROID_HOME "build-tools;34.0.0" "platforms;android-34"
 # Install on the tablet: adb install -r kiosk/build/homehq.apk
+# Optional: KIOSK_SITE=<dir> bundles a static site, served at http://127.0.0.1:8765/ (README).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -15,8 +16,17 @@ KS="$HOME/.android/debug.keystore"
 
 rm -rf build && mkdir -p build/gen build/classes
 
+ASSETS=()
+if [ -n "${KIOSK_SITE:-}" ]; then
+  [ -f "$KIOSK_SITE/index.html" ] || { echo "KIOSK_SITE has no index.html: $KIOSK_SITE" >&2; exit 1; }
+  mkdir -p build/assets/site
+  cp -R "$KIOSK_SITE"/. build/assets/site/
+  ASSETS=(-A build/assets)
+  echo "Bundling $KIOSK_SITE as http://127.0.0.1:8765/"
+fi
+
 "$BT/aapt2" compile --dir res -o build/res.zip
-"$BT/aapt2" link -o build/base.apk -I "$JAR" --manifest AndroidManifest.xml build/res.zip \
+"$BT/aapt2" link -o build/base.apk -I "$JAR" --manifest AndroidManifest.xml ${ASSETS[@]+"${ASSETS[@]}"} build/res.zip \
   --java build/gen --min-sdk-version 23 --target-sdk-version 23 --version-code 2 --version-name 1.1
 
 javac -nowarn -source 8 -target 8 -classpath "$JAR" -d build/classes \

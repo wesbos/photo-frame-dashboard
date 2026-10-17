@@ -24,6 +24,8 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -31,6 +33,11 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Full-screen kiosk WebView for the Home HQ wall tablet.
@@ -43,6 +50,8 @@ import android.widget.TextView;
  *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez debug true
  * - Launch with a URL: adb shell am start -a android.intent.action.VIEW -d <url> -n com.wesbos.homehq/.MainActivity
  * - Set the saved URL, used on every later launch: adb shell am start -n com.wesbos.homehq/.MainActivity --es url <url>
+ * - A site bundled at build time (KIOSK_SITE) is answered at http://127.0.0.1:8765/ from the
+ *   APK's assets/site/, with no server; every other URL goes to the network as usual.
  * - Offer the kiosk as a Home app (--ez home false undoes it), then pick it:
  *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
  *     adb shell cmd package set-home-activity com.wesbos.homehq/.Home
@@ -58,6 +67,9 @@ public class MainActivity extends Activity {
   static final long NAV_CHECK_MS = 5000;
   static final long NAV_REBIND_MS = 1000;
   static final float EXIT_SLOP_PX = 60;
+  static final String LOCAL_HOST = "127.0.0.1";
+  static final int LOCAL_PORT = 8765;
+  static final String LOCAL_ASSETS = "site";
 
   private WebView web;
   private final Handler handler = new Handler(Looper.getMainLooper());
@@ -144,6 +156,11 @@ public class MainActivity extends Activity {
     // first load fails and would stay on the error page, so retry failed main-frame loads.
     // The offline screen covers WebView's error page until a load succeeds.
     web.setWebViewClient(new WebViewClient() {
+      @Override
+      public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+        return localAsset(req.getUrl());
+      }
+
       @Override
       public void onPageStarted(WebView view, String url, Bitmap icon) {
         pageFailed = false;
@@ -232,6 +249,47 @@ public class MainActivity extends Activity {
 
   private String savedUrl() {
     return getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_URL, DEFAULT_URL);
+  }
+
+  /**
+   * Answers http://127.0.0.1:8765/<path> from assets/site/<path> (bundled by build.sh from
+   * KIOSK_SITE). Any other URL returns null and goes to the network as usual. Nothing listens on
+   * the port; only this WebView sees these responses. Paths ending in / get index.html.
+   */
+  private WebResourceResponse localAsset(Uri u) {
+    if (u == null || !"http".equalsIgnoreCase(u.getScheme()) || !LOCAL_HOST.equals(u.getHost())
+        || u.getPort() != LOCAL_PORT) return null;
+    String path = u.getPath();
+    if (path == null || path.isEmpty()) path = "/";
+    if (path.endsWith("/")) path += "index.html";
+    Map<String, String> headers = new HashMap<>();
+    headers.put("Cache-Control", "no-cache");
+    if (path.contains("..") || path.contains("//")) {
+      return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, null);
+    }
+    try {
+      InputStream in = getAssets().open(LOCAL_ASSETS + path);
+      return new WebResourceResponse(mimeFor(path), "utf-8", 200, "OK", headers, in);
+    } catch (IOException e) {
+      Log.w(TAG, "No bundled file for " + path);
+      return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, null);
+    }
+  }
+
+  static String mimeFor(String path) {
+    String p = path.toLowerCase(Locale.ROOT);
+    if (p.endsWith(".html") || p.endsWith(".htm")) return "text/html";
+    if (p.endsWith(".js") || p.endsWith(".mjs")) return "text/javascript";
+    if (p.endsWith(".css")) return "text/css";
+    if (p.endsWith(".json")) return "application/json";
+    if (p.endsWith(".svg")) return "image/svg+xml";
+    if (p.endsWith(".png")) return "image/png";
+    if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+    if (p.endsWith(".webp")) return "image/webp";
+    if (p.endsWith(".gif")) return "image/gif";
+    if (p.endsWith(".woff2")) return "font/woff2";
+    if (p.endsWith(".txt")) return "text/plain";
+    return "application/octet-stream";
   }
 
   private int dp(float v) {
