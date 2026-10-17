@@ -114,12 +114,14 @@ public class MainActivity extends Activity {
       Log.i(TAG, "Two-finger hold: opening controls");
       new AlertDialog.Builder(MainActivity.this)
           .setTitle("Home HQ")
-          .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings", "Reload dashboard"},
+          .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings", "Reload dashboard",
+              "Screen and screensaver"},
               (dialog, which) -> {
                 if (which == 0) openLauncher();
                 else if (which == 1) startActivity(new Intent(Settings.ACTION_SETTINGS));
                 else if (which == 2) openWifiSettings();
-                else web.reload();
+                else if (which == 3) web.reload();
+                else ScreenAwakeSettings.show(MainActivity.this);
               })
           .setNegativeButton("Back to dashboard", null).show();
     }
@@ -131,8 +133,8 @@ public class MainActivity extends Activity {
     applyDebugFlag(getIntent());
     applyHomeFlag(getIntent());
     keepNavigationEnabled();
-    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        | WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    ScreenAwakeSettings.apply(this);
 
     web = new WebView(this);
     WebSettings s = web.getSettings();
@@ -206,6 +208,7 @@ public class MainActivity extends Activity {
     setIntent(intent);
     applyDebugFlag(intent);
     applyHomeFlag(intent);
+    ScreenAwakeSettings.onNewIntent(this, intent);
     String url = urlFrom(intent);
     if (url != null) {
       handler.removeCallbacks(retry);

@@ -7,7 +7,36 @@ Hold two fingers still on the dashboard for 1.5 seconds to open the native contr
 - **Android settings** opens the device's Settings app.
 - **Wi-Fi settings** opens Android's Wi-Fi list directly.
 - **Reload dashboard** reloads the current URL.
+- **Screen and screensaver** chooses whether Home HQ keeps the screen awake.
 - **Back to dashboard** dismisses the controls.
+
+## Screen and screensaver
+
+Home HQ keeps the screen awake by default, preserving the existing wall-dashboard
+behavior. To let Android start its native screensaver while the dashboard is open,
+hold two fingers for the controls, choose **Screen and screensaver**, then
+**Allow Android sleep and screensaver**. The preference is saved across launches
+and applies to both the system-WebView and Gecko variants. It changes only Home HQ's
+window flag, not Android's global display or screensaver settings.
+
+The same saved setting can be configured remotely. First open the app, then send
+the setting to the running activity:
+
+```sh
+adb shell am start -n com.wesbos.homehq/.MainActivity
+adb shell am start -n com.wesbos.homehq/.MainActivity --ez keep_awake false
+```
+
+Use `--ez keep_awake true` or **Keep dashboard screen awake** to undo.
+Only a new intent delivered to the running activity updates this preference;
+cold launches read the saved policy and ignore launch extras, so Android replaying
+an old launch intent after process death cannot overwrite a later choice.
+Android must also have a finite display timeout and an enabled/configured screensaver
+with appropriate charging or dock conditions. A device configured to never sleep
+will not start a screensaver automatically just because this flag is cleared.
+Home HQ does not change those global settings or force a screensaver to start.
+
+Host policy regressions: `python3 kiosk/test-screen-awake.py` from `dashboard/`.
 
 ## Dashboard URL
 
