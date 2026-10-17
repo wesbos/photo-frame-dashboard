@@ -165,6 +165,8 @@ lsusb | grep -i 1f3a
 Get-PnpDevice -PresentOnly | Where-Object InstanceId -match 'VID_1F3A'
 # Any OS, with the Android platform tools
 adb devices -l
+# macOS: a timestamped line at each USB ID change; plug the frame in and watch for 90 s
+python3 -I scripts/a33-uboot/usb-watch.py
 ```
 
 | Result | Meaning | Next |

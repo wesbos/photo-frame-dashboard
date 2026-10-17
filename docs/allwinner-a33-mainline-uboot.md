@@ -201,7 +201,14 @@ sudo chown "$USER" backups/a33-emmc-full.{img,img.gz,sha256}
 
 ## 5. Build the boot patch from your own backup
 
+First check the backup offline. `inspect-emmc-backup.sh` touches no device: it reads the image
+read-only, and uses Docker with no network for `debugfs`, because macOS has no ext4 tools. It
+prints the eMMC size, the partition starts, the T6 boot hash and its firmware-table row, the
+`sys.usb.config` triggers in the ramdisk, and the saved USB setting from `/data/property` and
+`build.prop`. That last line is the #81 check below, made before the write rather than after it.
+
 ```sh
+scripts/a33-uboot/inspect-emmc-backup.sh backups/a33-emmc-full.img
 python3 -I scripts/a33-uboot/boot-patch.py backups/a33-emmc-full.img <boot-start-sector>
 ```
 
