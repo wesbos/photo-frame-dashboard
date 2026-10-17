@@ -222,12 +222,25 @@ public class MainActivity extends Activity {
     // The activity is exported, so only save web URLs: never file:, content: or javascript:.
     String scheme = Uri.parse(saved).getScheme();
     if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
-      Log.w(TAG, "Ignoring non-web kiosk URL: " + saved);
+      Log.w(TAG, "Ignoring non-web kiosk URL (scheme " + scheme + ")");
       return null;
     }
     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, saved).apply();
-    Log.i(TAG, "Saved kiosk URL: " + saved);
+    Log.i(TAG, "Saved kiosk URL: " + forLog(saved));
     return saved;
+  }
+
+  /**
+   * The URL without user info, query or fragment, for logcat. Those parts can carry API keys or
+   * tokens, and any app with READ_LOGS (or anyone with ADB) can read the log.
+   */
+  static String forLog(String url) {
+    Uri u = Uri.parse(url);
+    String port = u.getPort() == -1 ? "" : ":" + u.getPort();
+    String path = u.getEncodedPath() == null ? "" : u.getEncodedPath();
+    boolean hidden = u.getEncodedUserInfo() != null || u.getEncodedQuery() != null
+        || u.getEncodedFragment() != null;
+    return u.getScheme() + "://" + u.getHost() + port + path + (hidden ? " (query, fragment or user info not logged)" : "");
   }
 
   private String savedUrl() {
