@@ -22,8 +22,9 @@ function Run($exe, [string[]]$a) {
 }
 
 Run "$bt\aapt2.exe" @('compile', '--dir', 'res', '-o', 'build\res.zip')
+# Target 28: see build.sh.
 Run "$bt\aapt2.exe" @('link', '-o', 'build\base.apk', '-I', $jar, '--manifest', 'AndroidManifest.xml', 'build\res.zip',
-  '--java', 'build\gen', '--min-sdk-version', '23', '--target-sdk-version', '23', '--version-code', '2', '--version-name', '1.1')
+  '--java', 'build\gen', '--min-sdk-version', '23', '--target-sdk-version', '28', '--version-code', '2', '--version-name', '1.1')
 
 $src = @(Get-ChildItem src -Recurse -Filter *.java | % FullName) + @('build\gen\com\wesbos\homehq\R.java')
 Run 'javac' (@('-nowarn', '-source', '8', '-target', '8', '-classpath', $jar, '-d', 'build\classes') + $src)

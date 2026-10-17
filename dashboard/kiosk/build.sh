@@ -16,8 +16,10 @@ KS="$HOME/.android/debug.keystore"
 rm -rf build && mkdir -p build/gen build/classes
 
 "$BT/aapt2" compile --dir res -o build/res.zip
+# Target 28: Android 15 refuses to install below 24, and Android 14+ warns below 28 on the first
+# launch. Targets of 30 and up need manifest changes (package visibility, exported), so stay at 28.
 "$BT/aapt2" link -o build/base.apk -I "$JAR" --manifest AndroidManifest.xml build/res.zip \
-  --java build/gen --min-sdk-version 23 --target-sdk-version 23 --version-code 2 --version-name 1.1
+  --java build/gen --min-sdk-version 23 --target-sdk-version 28 --version-code 2 --version-name 1.1
 
 javac -nowarn -source 8 -target 8 -classpath "$JAR" -d build/classes \
   src/com/wesbos/homehq/*.java build/gen/com/wesbos/homehq/R.java

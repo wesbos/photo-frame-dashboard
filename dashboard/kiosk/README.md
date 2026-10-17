@@ -33,6 +33,11 @@ adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
 adb shell cmd package set-home-activity com.wesbos.homehq/.Home
 ```
 
+Wait about 30 seconds before rebooting. Android saves the Home alias a few seconds later, and on
+a PF1508 (Android 15, #167) a reboot 2 seconds after these commands turned the alias back off, so the
+frame booted into the previous Home app. The same delayed save lost a `pm disable-user` on a
+Pastigio FRAME156 (#139).
+
 Android 6 frames (PF1007L, BIUFRAME) don't have `cmd package set-home-activity`. After the first
 command, open the Home chooser instead, then tap **Home HQ** and **Always** on the frame. Keep
 another launcher installed so **Open launcher** has somewhere to go.
@@ -150,3 +155,8 @@ adb install -r kiosk/build/homehq.apk
 
 The kiosk loads the existing hosted dashboard over the frame's Wi-Fi. A USB
 connection is only needed for installation or diagnostics, not normal use.
+
+The kiosk targets Android 9 (SDK 28); the minimum is still Android 6 (SDK 23). Android 15
+refuses to install targets below 24 (`INSTALL_FAILED_DEPRECATED_SDK_VERSION`), and Android 14
+and later show a "built for an older version of Android" dialog on the first launch for targets
+below 28.
