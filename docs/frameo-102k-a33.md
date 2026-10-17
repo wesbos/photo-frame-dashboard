@@ -219,4 +219,5 @@ Nothing was written to `/system` or the boot partition.
 - Wi-Fi, network ADB, and what Frameo or Adups do once online.
 - A USB-C to USB-C cable, and why the first plug-in enumerated nothing.
 - Remounting `/system` with `su 0`, and whether `su` from an app keeps full capabilities.
-- Whether other units from the same listing ship this board or the RK3326 one.
+- How often this listing ships this board. A unit with the same ASIN from Amazon México was the
+  [KJM RK3326 board](frameo-rk3326-s101.md#second-unit-amazon-méxico).

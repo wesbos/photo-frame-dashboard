@@ -8,7 +8,9 @@ runs Android 8.1 and ships `su` and `adb root`; this one runs Android 11 and has
 the build strings in section 1 before you follow this page.
 
 An Allwinner A33 frame with the same `Digital Photo Frame` model and a `102K` product name is in
-[frameo-102k-a33.md](frameo-102k-a33.md).
+[frameo-102k-a33.md](frameo-102k-a33.md). Both boards have come from listing B088NHSVJN: the A33
+from Amazon.ca, this one from Amazon México. Before ADB is on, the USB vendor ID tells them
+apart: `2207` (Rockchip, manufacturer `KJM`) is this frame; `1f3a` is the Allwinner one.
 
 No exploit is needed. Frameo has an official ADB switch, and every step below runs as the
 normal ADB shell user. This unit has no root.
@@ -61,6 +63,8 @@ Cables, as observed:
 - **USB-C to USB-C from a Mac: nothing.** No USB device appeared on the Mac in either plug
   orientation, and `adb devices` was empty. USB-A to USB-C from the Mac was not tried. The Mac
   had no USB-A port or adapter.
+- **USB-A to USB-C from a Mac's USB-A port: works** ([second unit](#second-unit-amazon-méxico)).
+  It enumerated as `2207:0007` (MTP), then `2207:0006` once ADB access was on.
 - This matches the [PF1007L](pf1007l-start-here.md#the-usb-a-to-usb-c-rule): use a USB-A to
   USB-C cable. On a USB-C-only computer, use a USB-C to USB-A adapter or hub.
 - Before `adb tcpip`, port 5555 was closed on the network. ADB over Wi-Fi needs one USB
@@ -177,10 +181,27 @@ At boot the kiosk can start before DNS works. On this unit the first three loads
 With `org.chromium.webview_shell` disabled, the kiosk is the only app that handles `http(s)`
 links. If another app opens a sign-in page, it appears in the kiosk.
 
+## Second unit (Amazon México)
+
+A second unit, ASIN B088NHSVJN, set up on 2026-10-17 from an Intel Mac (macOS 12.7.6). The
+build ID, both fingerprints, WebView and Frameo versions match section 1, and `su 0 id` fails
+the same way.
+
+- **ADB without Wi-Fi:** Wi-Fi was not connected when ADB access was turned on and the vendor
+  apps and Frameo were removed or disabled.
+- **Adups did not stop at once:** `com.bnd.update` and `com.cghs.stresstest` were still running
+  right after `pm uninstall -k --user 0`, and were gone after the next reboot.
+- **Home app:** `cmd package set-home-activity com.wesbos.homehq/.Home` printed
+  `Error: Failed to set default home.` while Frameo was enabled, and `Success` after
+  `pm disable-user --user 0 net.frameo.frame`. Whether timing played a part is not known.
+- **Network ADB:** `setprop persist.internet_adb_enable 1` (see
+  [Keep network ADB on across reboots](#keep-network-adb-on-across-reboots)) restarted `adbd`
+  and dropped USB ADB for a few seconds. After a reboot, 5555 was listening again.
+
 ## Open questions
 
-- Whether USB-A to USB-C from a Mac, through an adapter, also works. Only USB-C to USB-C was
-  tried on the Mac.
+- Whether a USB-C-only Mac works through a USB-C to USB-A adapter. USB-C to USB-C did not; a
+  Mac's built-in USB-A port did.
 - Whether a Magisk-patched boot image works, and how to back up the `rknand` partitions first.
 - What Adups actually sends when it is left on.
 - Why Wi-Fi lost its network after Frameo was disabled.
