@@ -66,17 +66,30 @@ build: { target: 'chrome106', cssTarget: 'chrome61' }
 `cssTarget: 'chrome61'` stops the minifier from producing 4- and 8-digit hex colours. The frame
 rejected those (observed), even though Chrome 106 should support them.
 
+The same applies to a minifier you do not configure yourself, for example Tailwind v4 through
+Next.js: set `"browserslist": ["chrome >= 61"]` in `package.json`. This was seen on **one** DP101
+(Android 10, WebView 113), where it removed all 91 hex colours with alpha from a built stylesheet.
+That unit also gave `filter: none` for `var(--tw-blur,)`, a variable with an empty fallback that
+Tailwind registers with `@property`, so `blur-*` did nothing there; a literal `filter: blur(12px)`
+worked. Whether `blur-*` works after the `browserslist` change was not tested. Other WebView 113
+devices were not tested either. Test results:
+[veswwe-dp101.md](veswwe-dp101.md#css-compatibility-issues-in-this-webview).
+
 ## Avoid
 
 **CSS that does not work:**
 
+This table is about WebView 106 (the PF1007L). On one DP101 with WebView 113, gradients using
+`color-mix()` did render, so the `oklch()`/`color-mix()` row does not hold there. Details:
+[veswwe-dp101.md](veswwe-dp101.md#css-compatibility-issues-in-this-webview).
+
 | Feature | Status |
 | --- | --- |
 | `oklch()`, `oklab()`, `color-mix()` | Not in Chrome 106 (observed: Tailwind v4 colours break) |
-| **Tailwind CSS v4** | Uses the above for its palette. Use **Tailwind v3**, or plain CSS |
+| **Tailwind CSS v4** | Uses the above for its palette. Use **Tailwind v3**, or plain CSS. On one DP101 with WebView 113, lowering the CSS target fixed transparent backgrounds and missing shadows. `blur-*` did nothing there before that and was not re-tested afterwards. See [veswwe-dp101.md](veswwe-dp101.md#css-compatibility-issues-in-this-webview) |
 | CSS nesting (`.a { .b {} }` without a preprocessor) | Not supported (observed). Sass/PostCSS nesting compiled away is fine |
 | `:has()` | Did not work on these units (observed), although Chrome 105+ supports it. Test before relying on it |
-| 4- and 8-digit hex (`#0008`, `#ffffffbf`) | Rejected (observed), although Chrome 62+ supports them. Use `rgba()` to be safe |
+| 4- and 8-digit hex (`#0008`, `#ffffffbf`) | Rejected (observed), although Chrome 62+ supports them. Use `rgba()` to be safe. Also rejected on one DP101 with WebView 113, see [veswwe-dp101.md](veswwe-dp101.md#css-compatibility-issues-in-this-webview) |
 | `dvh`/`svh`/`lvh` units | Chrome 108+. Use `vh` or `100%`, since the frame has no browser bars |
 | Subgrid, `@starting-style`, `text-wrap: balance`, View Transitions, scroll-driven animations, anchor positioning, Popover API | Chrome 111+ |
 | Container queries (`@container`) | Chrome 105, so (expected) to work, but untested. Test before you depend on them |
