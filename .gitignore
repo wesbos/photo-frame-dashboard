@@ -1,6 +1,6 @@
 # Device dumps, personal identifiers, downloaded tools, and local diagnostics.
-/backups/
-/diagnostics/
+/backups
+/diagnostics
 /log/
 /loader-*.txt
 /.claude/

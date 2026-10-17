@@ -62,7 +62,19 @@ see the [cable observations](pf1007l-macos-20260529-report.md#cable-power-and-us
 
 Follow section 2 of the [PF1007L guide](allwinner-a33-pf1007l.md#2-use-an-sd-card-for-stable-fel-if-adb-is-absent):
 same `sunxi-tools` commit, same stub hash. `sunxi-fel` builds on macOS after
-`brew install libusb dtc pkgconf`, and needs no sudo.
+`brew install libusb dtc pkgconf`, and needs no sudo. Homebrew has no `sunxi-tools` formula, so
+build it from that pinned source. On one Apple-silicon Mac the link failed because a stale x86_64
+`/usr/local/lib/libz.a` shadowed the system zlib. Pointing the linker at the SDK fixed it with no
+source change, and `sunxi-fel` then linked against `/usr/lib/libz.1.dylib`:
+
+```sh
+make -C diagnostics/sunxi-tools sunxi-fel \
+  LDFLAGS="-L$(xcrun --show-sdk-path)/usr/lib -Wl,-search_paths_first"
+```
+
+Create `backups/` as yourself (`mkdir -p backups`) before the first `sudo` command below. If
+`sudo fel-card-macos.py backup` creates it, the folder is owned by root, and later steps that run
+as you can't write there (#110, #172). To fix it afterwards: `sudo chown "$USER" backups`.
 
 The guide's card commands are for Linux. `fel-card-macos.py` is a port with the same
 checks (MBR only, no partition before sector 8192, independent re-read, refuses to
@@ -161,6 +173,12 @@ diskutil list external physical
 diskutil info diskN | grep -E 'Media Name|Disk Size|Read-Only'
 sudo python3 -I scripts/a33-uboot/emmc-macos.py backup diskN <exact-bytes>
 ```
+
+Keep the Mac awake: one whole-disk pass at 8.6 MB/s takes about half an hour, the backup reads
+the disk twice, and slower builds take longer. Put `caffeinate` after `sudo`:
+`sudo caffeinate -dims python3 -I scripts/a33-uboot/emmc-macos.py backup diskN <exact-bytes>`.
+The other order, `caffeinate -dims sudo …`, failed when started without a terminal, for example
+from an agent's shell (#172).
 
 `emmc-macos.py` refuses a writable disk, copies the whole eMMC, re-reads it independently,
 rejects `0xCC` filler, then gzips it and verifies the readback. Here: about 12.6 MB/s,
