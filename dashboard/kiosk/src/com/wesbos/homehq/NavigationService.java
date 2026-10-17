@@ -22,6 +22,8 @@ public class NavigationService extends AccessibilityService {
   private LinearLayout bar;
   private WindowManager.LayoutParams position;
   private boolean attached;
+  private boolean dreaming;
+  private DreamPlaybackMonitor dreamMonitor;
 
   static boolean isConnected() {
     return instance != null;
@@ -87,6 +89,11 @@ public class NavigationService extends AccessibilityService {
     addButton("Dashboard", view -> startActivity(new Intent(this, MainActivity.class)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)));
     updateVisibility();
+    dreamMonitor = new DreamPlaybackMonitor(this, active -> {
+      dreaming = active;
+      updateVisibility();
+    });
+    dreamMonitor.start();
   }
 
   private void addButton(String label, View.OnClickListener click) {
@@ -104,10 +111,11 @@ public class NavigationService extends AccessibilityService {
 
   private void updateVisibility() {
     if (bar == null) return;
-    if (!dashboardVisible && !attached) {
+    boolean visible = !dashboardVisible && !dreaming;
+    if (visible && !attached) {
       windows.addView(bar, position);
       attached = true;
-    } else if (dashboardVisible && attached) {
+    } else if (!visible && attached) {
       windows.removeView(bar);
       attached = false;
     }
@@ -121,6 +129,7 @@ public class NavigationService extends AccessibilityService {
   @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
   @Override public void onInterrupt() { }
   @Override public void onDestroy() {
+    if (dreamMonitor != null) dreamMonitor.stop();
     if (attached) windows.removeView(bar);
     attached = false;
     if (instance == this) instance = null;

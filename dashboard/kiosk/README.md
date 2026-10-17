@@ -7,7 +7,36 @@ Hold two fingers still on the dashboard for 1.5 seconds to open the native contr
 - **Android settings** opens the device's Settings app.
 - **Wi-Fi settings** opens Android's Wi-Fi list directly.
 - **Reload dashboard** reloads the current URL.
+- **Screen and screensaver** chooses whether Home HQ keeps the screen awake.
 - **Back to dashboard** dismisses the controls.
+
+## Screen and screensaver
+
+Home HQ keeps the screen awake by default, preserving the existing wall-dashboard
+behavior. To let Android start its native screensaver while the dashboard is open,
+hold two fingers for the controls, choose **Screen and screensaver**, then
+**Allow Android sleep and screensaver**. The preference is saved across launches
+and applies to both the system-WebView and Gecko variants. It changes only Home HQ's
+window flag, not Android's global display or screensaver settings.
+
+The same saved setting can be configured remotely. First open the app, then send
+the setting to the running activity:
+
+```sh
+adb shell am start -n com.wesbos.homehq/.MainActivity
+adb shell am start -n com.wesbos.homehq/.MainActivity --ez keep_awake false
+```
+
+Use `--ez keep_awake true` or **Keep dashboard screen awake** to undo.
+Only a new intent delivered to the running activity updates this preference;
+cold launches read the saved policy and ignore launch extras, so Android replaying
+an old launch intent after process death cannot overwrite a later choice.
+Android must also have a finite display timeout and an enabled/configured screensaver
+with appropriate charging or dock conditions. A device configured to never sleep
+will not start a screensaver automatically just because this flag is cleared.
+Home HQ does not change those global settings or force a screensaver to start.
+
+Host policy regressions: `python3 kiosk/test-screen-awake.py` from `dashboard/`.
 
 ## Dashboard URL
 
@@ -75,6 +104,31 @@ The buttons hide while Home HQ is active and return when you leave it. Android
 keeps the service enabled across reboots. It requests no accessibility events or
 screen-content access and does not require root. Disable **Home HQ navigation**
 in Accessibility settings to remove the buttons.
+
+### Photo screensaver integration
+
+The buttons also hide while **iPhoto Frame Saver** is actively dreaming, and return
+when its screensaver exits. This does not disable the accessibility service or change
+the launcher, and the buttons remain available in the photo app's settings.
+
+Home HQ observes the read-only
+`content://io.github.martinwoodward.iphotoframesaver.playback/dream` provider, requesting
+only its integer `active` column (`1` while dreaming, otherwise `0`). The provider
+must belong to `io.github.martinwoodward.iphotoframesaver`. No album URLs, photos,
+settings, or screen contents are read. Provider notifications update visibility;
+a five-second recheck recovers from a stopped provider or missed notification.
+Queries run off the UI thread. Missing, invalid, denied, or unresponsive state
+keeps navigation available, including a two-second query timeout.
+
+The screensaver must reset its process-local flag on stop/detach and notify this
+URI on each transition. Process restart defaults to inactive. Home HQ does not
+accept exported hide/show broadcasts or write to the provider.
+
+Removing iPhoto Frame Saver restores the original visibility behavior; to undo the
+Home HQ code change itself, reinstall your previous Home HQ APK with the same signing key.
+
+Run the host integration regressions from `dashboard/` with
+`python3 kiosk/test-dream-navigation.py`.
 
 On a PF1007L (`20260519` firmware), the vendor `BackgroundManagerService` dropped the
 service from the enabled list after every `adb install -r` or force stop of Home HQ, so the
