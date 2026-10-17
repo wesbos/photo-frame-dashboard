@@ -186,3 +186,57 @@ restoring the original policy.
 The ADB repair retained the original bytes for each userdata range as its undo
 record. Live rollback of those key-file edits was not exercised. Backups,
 original ranges and device identifiers remain in private recovery storage.
+
+## Additional unit: FRAME157 with `2211:0006` USB ID (Windows, 2026-10-17)
+
+A second owner's FRAME157 differed from the unit above in USB IDs and firmware,
+but matched its platform, layout and route. Tested from Windows 10 with
+platform-tools 37.0.1 over a USB-A to USB-C data cable. Observations only;
+identifiers (serial, MAC, IP) are omitted.
+
+| Item | Observed value |
+| --- | --- |
+| About model / Android model | `DPF Frame 157` / `FRAME157` |
+| Firmware | `FrameO.DP105F.v2025122915` (newer than the `v2026051219` above) |
+| Fingerprint | `rockchip/rk3326_32bit/rk3326_32bit:8.1.0/OC/150203:user/release-keys` |
+| SoC / Android / patch | Rockchip RK3326 / 8.1.0 / 2020-11-05 |
+| Display | 1920x1080, 170 dpi |
+| WebView | `com.android.webview` 106.0.5249.126 |
+| Storage | `mmcblk2`, 61,063,168 x 512-byte sectors; userdata starts at sector 5612544 (same layout as the FRAME156 table) |
+| USB IDs | ADB `2211:0006` named `FRAME157` (the unit above reports `2222:0006`; `2211:0006` matches the FRAME156 report) |
+| SELinux / boot | Permissive, `ro.boot.veritymode=enforcing`, `ro.boot.flash.locked=1` |
+| Frameo | v1.29.13 system app and HOME activity; `com.android.launcher3` already disabled |
+| Root | Shipped `su` returns uid 0 with no prompt; shell is uid 2000 |
+
+ADB authorized without a loader: Frameo **Settings -> About -> Beta Program ->
+ADB Access** ON, computer photo transfer OFF, then Accept on Frameo's own ADB
+warning and one OFF -> ON toggle with USB connected. The first `adb devices`
+showed `unauthorized`; after the toggle it showed `device` and the key
+persisted across reboots.
+
+Backup over ADB as root (no flash writes): eMMC sectors 0-5612544
+(2,873,622,528 bytes raw, ~585 MB gzipped). Exact byte count, gzip readback,
+no `0xCC` 1 MiB blocks, and 11 independent partition re-reads
+(uboot, trust, misc, resource, kernel, boot, recovery, security, system,
+vendor, frp) all MATCH. Two Windows-specific traps: PowerShell `>` redirection
+writes UTF-16LE (BOM `FF FE`), which corrupts a base64 capture; and an
+unquoted `su -c dd ... | base64` reads the wrong bytes. Capturing `adb
+exec-out` bytes directly from Python, stripping `\r`, and quoting as `su -c
+'dd ... | base64'` gave byte-exact results (1 MiB and 4 MiB probes matched
+device SHA-256 before the full run).
+
+Kiosk from this repo (`com.wesbos.homehq`) installed, set as Home with `cmd
+package set-home-activity`, verified by HOME key focus and a reboot that
+returned to the kiosk with ADB. `com.muxintu.app.mxota`,
+`android.rockchip.update.service` and `net.frameo.frame` disabled with `pm
+disable-user` (each reversible with `pm enable`); Frameo needed one
+`force-stop` after the reboot and did not restart within 20 s. The kiosk's
+two-finger hold to Android Settings was confirmed by hand on the panel before
+Frameo was disabled.
+
+Stability note (unexplained): the frame left the USB bus four times in one
+day, each time with a black screen; each recovered via wall power + power
+button and showed a fresh `uptime`, i.e. reboots, not sleep. Cables were
+untouched for the later events. No crash log was found in pstore/last_kmsg.
+This does not block the route above, but a unit that reboots on its own
+should be watched before being relied on.
