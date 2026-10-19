@@ -57,7 +57,7 @@ differ in eMMC size and in whether ADB ships on.
 | `321-OS-AIMOR.0.20260416` | #16 comment, #102, #119, [macOS report](pf1007l-macos-20260416-report.md) (#190) | 30,777,344 | `fc4d22d2` over 31,032 sectors (#16 comment, #119, #190); `bef19d67` over 31,028 sectors (#102, #119, #190) | No (#16 comment, #119, #190); **on** in #102 (`1f3a:1002`, root, survives reboot) | Route U with a 12 MHz low-power U-Boot, then a guarded one-sector `build.prop` edit (#119; unlike #16's unit it had no `/data` override, so one sector was enough — the published one-sector guide is `20260410`-only); [T3c](#t3c-temporary-adb-through-the-aimor-connection), then `persist.sys.usb.config` for persistent USB ADB across a cold boot, no boot patch ([macOS report](pf1007l-macos-20260416-report.md), one unit; its FEL stub card never produced a FEL device, possibly because of a cable with no data lines); an unpublished `build.prop` edit; nothing needed (#102) |
 | `OS-PF1009.0.20260417` | units E and F ([report](pf1007l-pf1009-20260417.md)) | 30,777,344 | `3f0dc9d5` | No | Route U with [U-Boot fixes](#u-boot-settings-that-fixed-ums-problems) |
 | `FL-AIMOR-OS.0.20260519` (one unit read `FL-AIMOR-SO`, #196) | #24, #36, #62, #65 comment, #98, #148, #189, [Windows report](pf1007l-windows-wsl-20260519-report.md), [Linux report](pf1007l-20260519-linux-report.md), [macOS Route S](pf1007l-macos-20260519-route-s-report.md), [macOS T3c](pf1007l-macos-20260519-t3c-report.md) (#123), [macOS Route U](pf1007l-aimor-20260519-macos-root-report.md) (#196) | 30,777,344 | `9a6e2456`, **different ramdisk slot** (write ranges `[191844, 201324)` and `[172032, 172034)`, #98, #189) | Usually no; **on** in #148 (`1f3a:1002`, root, survives a power cycle) | Nothing needed (#148); [T3c](#t3c-temporary-adb-through-the-aimor-connection) through a router local-DNS entry, then `persist.sys.usb.config` for persistent USB ADB, no boot patch ([macOS T3c](pf1007l-macos-20260519-t3c-report.md), one unit); Route U with U-Boot fixes; Route U on macOS from an SD-card FEL entry ([report](pf1007l-aimor-20260519-macos-root-report.md), #196); Route U with the 12 MHz low-power build: with START STOP, full backup, write and verify on macOS (#189); on #98 the eMMC appeared and a backup was taken after the base build and the no-HS patch both showed only the SD card (write not yet done); Route U patch carried on the SD card with a 12 MHz FEL U-Boot (#62, #68); [recovery-window write](pf1007l-macos-20260529-recovery-boot-write.md) (#65 comment). Route S only by editing its hash guard (do not); one unit: Route S dump at 12 MHz + Route U `boot-patch.py` when `ums` resets |
-| `V10-1680.0.20260529` (also `321-OS-AIMOR.0.20260529`, #81) | #8, #16, [#41](pf1007l-windows-20260529-report.md), [#28](pf1007l-macos-20260529-report.md), [recovery write](pf1007l-macos-20260529-recovery-boot-write.md), [no-HS report](pf1007l-macos-20260529-no-mmc-hs-report.md), #81, [#103](pf1007l-macos-20260529-report.md#second-unit-larger-emmc-2026-10-13-access-only-no-backup), #116, #117, #163, [TF-card report](pf1007l-tf-card-20260529-home-assistant-report.md) (#150) | 30,777,344 or 30,535,680 | `6c118dc1` | **On** in #8; off in #16, #28, #81, #103, #116, #117, #150, #163, the no-HS unit and the recovery-write unit; not established in #41 | Nothing needed (#8); [T3c](#t3c-temporary-adb-through-the-aimor-connection), then `persist.sys.usb.config` for persistent USB ADB, no boot patch, both from Windows (#117, across a power cut; #163, TP-Link Deco DHCP DNS); Route U; Route U with the [no-HS U-Boot patch](patches/pf1007l-v2025.10-no-mmc-hs.patch) (no-HS report); Route U with a 12 MHz low-power build on Linux, larger eMMC, even on a direct port (#116); Route U with the CPU at 408 MHz, no-PMIC and 4-bit 26 MHz on the TF-card unit (#150, where a 256 GB card worked for FEL entry); Route U with the boot patch aimed at the `ptp` USB action, because that unit's saved USB setting was `ptp` (#81, local edit, not in the repo); recovery-window write, also reachable from AiMOR's on-screen Recovery Mode button (#116); a 1-bit 25 MHz read-only `ums` backup, then a userdata `persist.sys.usb.config` edit (#41, record only, not a published route). The patched boot-image hash depends on the host's zlib, so a different patched hash is expected (#116) |
+| `V10-1680.0.20260529` (also `321-OS-AIMOR.0.20260529`, #81) | #8, #16, [#41](pf1007l-windows-20260529-report.md), [#28](pf1007l-macos-20260529-report.md), [recovery write](pf1007l-macos-20260529-recovery-boot-write.md), [no-HS report](pf1007l-macos-20260529-no-mmc-hs-report.md), #81, [#103](pf1007l-macos-20260529-report.md#second-unit-larger-emmc-2026-10-13-access-only-no-backup), #116, #117, #163, [TF-card report](pf1007l-tf-card-20260529-home-assistant-report.md) (#150) | 30,777,344 or 30,535,680 | `6c118dc1` | **On** in #8; off in #16, #28, #81, #103, #116, #117, #150, #163, the no-HS unit and the recovery-write unit; not established in #41 | Nothing needed (#8); on-screen Test App password YHK88888888, then **IS CLOSED** to **is open**, gave persistent root USB ADB with no SD card and no network ([#135](https://github.com/wesbos/photo-frame-dashboard/issues/135)); [T3c](#t3c-temporary-adb-through-the-aimor-connection), then `persist.sys.usb.config` for persistent USB ADB, no boot patch, both from Windows (#117, across a power cut; #163, TP-Link Deco DHCP DNS); Route U; Route U with the [no-HS U-Boot patch](patches/pf1007l-v2025.10-no-mmc-hs.patch) (no-HS report); Route U with a 12 MHz low-power build on Linux, larger eMMC, even on a direct port (#116); Route U with the CPU at 408 MHz, no-PMIC and 4-bit 26 MHz on the TF-card unit (#150, where a 256 GB card worked for FEL entry); Route U with the boot patch aimed at the `ptp` USB action, because that unit's saved USB setting was `ptp` (#81, local edit, not in the repo); recovery-window write, also reachable from AiMOR's on-screen Recovery Mode button (#116); a 1-bit 25 MHz read-only `ums` backup, then a userdata `persist.sys.usb.config` edit (#41, record only, not a published route). The patched boot-image hash depends on the host's zlib, so a different patched hash is expected (#116) |
 | `PF1009-V11-1680.0.20260708` | [PF1009 July report](pf1009-20260708-windows-report.md) (#132) | 30,535,680 | `c0093e7f` | **On** (`1f3a:1002`, root) | Nothing needed |
 
 Numbers are GitHub issues and pull requests. Units A to C are from the first three guides:
@@ -131,11 +131,14 @@ Other things that hid USB data:
 **Try for ADB in this order, and stop at the first that works:**
 
 1. **Stock ADB over USB** ([T3](#t3-usb-data-test)). No changes to the frame.
-2. **Stock ADB over the network** ([T3b](#t3b-network-adb-test)). No changes to the frame.
-3. **Temporary ADB through the AiMOR connection** ([T3c](#t3c-temporary-adb-through-the-aimor-connection)).
+2. **ADB with no additional tools** ([T3d](#t3d-adb-with-no-additional-tools-required)).
+   No SD card, no network, no boot write. The stock Test App switch. Tested from
+   [#135](https://github.com/wesbos/photo-frame-dashboard/issues/135).
+3. **Stock ADB over the network** ([T3b](#t3b-network-adb-test)). No changes to the frame.
+4. **Temporary ADB through the AiMOR connection** ([T3c](#t3c-temporary-adb-through-the-aimor-connection)).
    No write to the frame, but it needs the frame online and gives open root ADB until the next
    reboot. Tested on April `20260410` firmware.
-4. **Boot patch written from an SD card** (T4 onward). Use this only if 1 to 3 fail. It
+5. **Boot patch written from an SD card** (T4 onward). Use this only if 1 to 4 fail. It
    writes to the frame's boot partition. Both patch routes need an SD card. Route U (USB) is
    preferred over Route S (SD card only), because it takes a full backup and verifies it over USB.
 
@@ -195,6 +198,30 @@ Before you decide on "nothing", try each of these:
 2. A USB-A port directly on the computer, and also a USB 2.0 hub.
 3. Unplug and replug the frame (on USB-C-only units the cable is the power switch).
 4. A different computer.
+
+### T3d. ADB with no additional tools required
+
+Use this when T3 finds USB data but `adb devices` is empty. Stay off Wi-Fi.
+Do not insert an SD card. Do not write the boot partition. The password dialog
+in the older notes was skipped because the password was unknown, not because
+the switch fails. Details and the second USB id seen on #135 are in
+[ADB with no additional tools required](allwinner-a33-pf1007l.md#adb-with-no-additional-tools-required).
+
+1. About → tap **Model Number** until **Open test app** asks for a password.
+2. Enter `YHK88888888`.
+3. Tap **IS CLOSED** so it reads **is open**.
+4. Unplug and replug the USB-A to USB-C data cable if the host does not re-enumerate.
+
+```sh
+adb devices -l
+adb shell id
+adb shell getprop persist.sys.usb.config
+adb shell settings get global adb_enabled
+```
+
+**Pass:** `adb devices` shows the frame as `device`, `id` prints `uid=0(root)`, and a reboot leaves both true. On the Windows report in [#135](https://github.com/wesbos/photo-frame-dashboard/issues/135), USB moved from `1f3a:1008` (PTP) to `1f3a:1009` (PTP+ADB), `persist.sys.usb.config` was `mass_storage,adb`, and `adb_enabled` was `1`. A macOS report on the same issue saw `1f3a:1002` after the same switch. Stop. Do not continue to an SD card or a boot patch.
+
+**Fail:** the dialog rejects the password, or USB never exposes ADB. Continue at T3b. Route U and Route S remain for that case.
 
 ### T3b. Network ADB test
 
