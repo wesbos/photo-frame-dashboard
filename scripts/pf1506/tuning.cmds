@@ -1,0 +1,12 @@
+cd /system/etc
+write frame-tuning.sh frame-tuning.sh
+ea_set -f label.bin frame-tuning.sh security.selinux
+sif frame-tuning.sh mode 0100755
+sif frame-tuning.sh uid 0
+sif frame-tuning.sh gid 2000
+cd /system/etc/init
+write frame-tuning.rc frame-tuning.rc
+ea_set -f label.bin frame-tuning.rc security.selinux
+sif frame-tuning.rc mode 0100644
+sif frame-tuning.rc uid 0
+sif frame-tuning.rc gid 0

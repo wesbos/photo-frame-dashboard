@@ -1,0 +1,12 @@
+cd /system/etc
+write frame-adb-wifi.sh frame-adb-wifi.sh
+ea_set -f label.bin frame-adb-wifi.sh security.selinux
+sif frame-adb-wifi.sh mode 0100755
+sif frame-adb-wifi.sh uid 0
+sif frame-adb-wifi.sh gid 2000
+cd /system/etc/init
+write frame-adb-wifi.rc frame-adb-wifi.rc
+ea_set -f label.bin frame-adb-wifi.rc security.selinux
+sif frame-adb-wifi.rc mode 0100644
+sif frame-adb-wifi.rc uid 0
+sif frame-adb-wifi.rc gid 0

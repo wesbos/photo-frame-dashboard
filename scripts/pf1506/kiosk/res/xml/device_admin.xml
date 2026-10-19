@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin>
+    <uses-policies>
+        <!-- lockNow(): turn the screen fully off during quiet hours -->
+        <force-lock />
+    </uses-policies>
+</device-admin>

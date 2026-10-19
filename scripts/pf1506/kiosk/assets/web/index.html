@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080, initial-scale=1, user-scalable=no">
+<title>Calendar</title>
+<style>
+  /* Light theme: the frame is an LCD, so dark pixels save no power. */
+  :root {
+    --bg: #e9edf3; --panel: #ffffff; --panel2: #f3f5f9; --line: #dde2ea;
+    --text: #1b1f27; --muted: #5f6878; --today: #c47a00;
+    --shadow: 0 1px 3px rgba(20, 30, 50, .08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: Roboto, "Noto Sans", system-ui, sans-serif; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; }
+  #app { display: grid; grid-template-columns: 560px 1fr; height: 100%; gap: 20px; padding: 20px; }
+
+  /* Today panel */
+  #today { background: var(--panel); border-radius: 22px; padding: 28px 30px; display: flex; flex-direction: column; min-height: 0; box-shadow: var(--shadow); }
+  #clock { font-size: 112px; font-weight: 300; line-height: 1; letter-spacing: -2px; }
+  #clock small { font-size: 40px; margin-left: 8px; color: var(--muted); letter-spacing: 0; }
+  #date { font-size: 34px; margin-top: 10px; color: var(--today); font-weight: 500; }
+  #wx { display: flex; align-items: center; gap: 18px; margin: 22px 0 18px; padding: 16px 18px; background: var(--panel2); border-radius: 16px; }
+  #wx .icon { font-size: 64px; line-height: 1; }
+  #wx .temp { font-size: 56px; font-weight: 400; }
+  #wx .desc { font-size: 22px; color: var(--muted); line-height: 1.35; }
+  #todayList { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 12px; }
+  .tItem { display: grid; grid-template-columns: 8px 1fr; gap: 14px; padding: 12px 14px; background: var(--panel2); border-radius: 14px; }
+  .tItem .bar { border-radius: 4px; }
+  .tItem .when { font-size: 22px; color: var(--muted); }
+  .tItem .what { font-size: 30px; font-weight: 500; margin-top: 2px; line-height: 1.2; }
+  .tItem .where { font-size: 20px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tItem.past { opacity: .45; }
+  .empty { font-size: 26px; color: var(--muted); padding: 10px 4px; }
+
+  /* Week */
+  #week { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #weekHead { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  #weekTitle { font-size: 36px; font-weight: 500; flex: 1; }
+  .btn { font-size: 26px; padding: 12px 22px; border-radius: 14px; background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+  #legend { display: flex; gap: 18px; font-size: 22px; color: var(--muted); }
+  #legend span::before { content: ""; display: inline-block; width: 16px; height: 16px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; background: var(--c); }
+  #days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; min-height: 0; }
+  .day { background: var(--panel); border-radius: 18px; padding: 12px 10px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; box-shadow: var(--shadow); }
+  .day.isToday { outline: 3px solid var(--today); }
+  .day.isPast { opacity: .55; }
+  .dHead { text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .dName { font-size: 22px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .dNum { font-size: 42px; font-weight: 500; line-height: 1.1; }
+  .isToday .dNum, .isToday .dName { color: var(--today); }
+  .dWx { font-size: 20px; color: var(--muted); margin-top: 2px; }
+  .evs { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .ev { border-radius: 10px; padding: 8px 10px; background: color-mix(in srgb, var(--c) 14%, var(--panel)); border-left: 6px solid var(--c); }
+  .ev .t { font-size: 18px; color: var(--muted); }
+  .ev .n { font-size: 21px; font-weight: 500; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ev.allDay { background: var(--c); border-left: 0; }
+  .ev.allDay .n { color: #fff; }
+  .more { font-size: 20px; color: var(--muted); text-align: center; padding-top: 4px; }
+
+  /* Modal */
+  #modal { position: fixed; inset: 0; background: rgba(20,25,35,.45); display: none; align-items: center; justify-content: center; }
+  #modal.open { display: flex; }
+  #card { width: 1100px; max-height: 900px; overflow: hidden; background: var(--panel); border-radius: 24px; padding: 34px 40px; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(20,30,50,.25); }
+  #card h2 { font-size: 44px; font-weight: 500; margin-bottom: 8px; }
+  #card .sub { font-size: 26px; color: var(--muted); margin-bottom: 18px; }
+  #card .body { font-size: 26px; line-height: 1.45; overflow: hidden; white-space: pre-wrap; }
+  #card .list { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+  #card .close { align-self: flex-end; margin-top: 22px; }
+  .chip { display: inline-block; font-size: 22px; padding: 4px 14px; border-radius: 999px; background: var(--c); color: #fff; margin-right: 10px; vertical-align: 4px; }
+
+  /* Press feedback: instant (no transition) so a tap registers visibly on this slow GPU
+     before the popup is drawn. A day column only shows it when the press isn't on one of
+     its events. */
+  .ev:active { filter: brightness(.88); }
+  .tItem:active, .more:active { background: var(--line); }
+  .day:active:not(:has(.ev:active)) { background: var(--panel2); }
+  .btn:active { background: var(--line); }
+
+  /* Details popup: short fade only (opacity is composited, cheap on the GE8300). */
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  #modal.open { animation: fadeIn 120ms ease-out; }
+
+  /* Full weather view */
+  #wx { cursor: pointer; position: relative; }
+  #wx:active { background: var(--line); }
+  #wx .more-hint { position: absolute; top: 10px; right: 16px; font-size: 18px; color: var(--muted); }
+  #wxView { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; padding: 20px; gap: 20px; }
+  #wxView.open { display: flex; animation: fadeIn 120ms ease-out; }
+  .wxTop { display: flex; gap: 20px; }
+  .wxNow { flex: 1; background: var(--panel); border-radius: 22px; padding: 26px 32px; display: flex; align-items: center; gap: 30px; box-shadow: var(--shadow); }
+  .wxNow .icon { font-size: 120px; line-height: 1; }
+  .wxNow .temp { font-size: 104px; font-weight: 300; line-height: 1; }
+  .wxNow .desc { font-size: 34px; font-weight: 500; }
+  .wxNow .sub { font-size: 24px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .wxNow .stats { margin-left: auto; display: grid; grid-template-columns: auto auto; gap: 8px 26px; font-size: 24px; }
+  .wxNow .stats span:nth-child(odd) { color: var(--muted); }
+  .wxCard { background: var(--panel); border-radius: 22px; padding: 20px 24px; box-shadow: var(--shadow); }
+  .wxCard h3 { font-size: 24px; font-weight: 500; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  #wxHours { display: grid; grid-template-columns: repeat(24, 1fr); text-align: center; }
+  .hr { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0; border-radius: 10px; }
+  .hr.now { background: var(--panel2); outline: 2px solid var(--today); }
+  .hr .h { font-size: 17px; color: var(--muted); }
+  .hr .i { font-size: 30px; }
+  .hr .t { font-size: 22px; font-weight: 500; }
+  .hr .rainbar { width: 14px; height: 70px; background: var(--panel2); border-radius: 7px; display: flex; align-items: flex-end; overflow: hidden; }
+  .hr .rainbar div { width: 100%; background: #3d8bfd; }
+  .hr .p { font-size: 15px; color: #2f6fd6; min-height: 18px; }
+  #wxDays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+  .wd { background: var(--panel2); border-radius: 16px; padding: 16px 10px; text-align: center; cursor: pointer; }
+  .wd:active { background: var(--line); }
+  .wd.today { box-shadow: inset 0 0 0 2px var(--line); }
+  .wd.sel { outline: 3px solid var(--today); background: var(--panel); }
+  .wxNow .temp .lo { font-size: 56px; color: var(--muted); }
+  .wd .n { font-size: 24px; font-weight: 500; }
+  .wd .i { font-size: 56px; margin: 6px 0; }
+  .wd .d { font-size: 19px; color: var(--muted); min-height: 46px; }
+  .wd .hl { font-size: 30px; margin-top: 4px; }
+  .wd .hl span { color: var(--muted); }
+  .wd .r { font-size: 19px; color: #2f6fd6; margin-top: 4px; }
+
+  /* Events in several calendars (merged duplicates): one dot per calendar */
+  .dots { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: 1px; }
+  .dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); display: inline-block; box-shadow: 0 0 0 1.5px var(--panel); }
+  .ev.allDay .dots i { box-shadow: 0 0 0 1.5px rgba(255,255,255,.8); }
+
+  /* Chores card (Today panel) */
+  #choresCard { display: none; margin: -4px 0 18px; padding: 14px 18px; background: var(--panel2); border-radius: 16px; cursor: pointer; }
+  #choresCard.show { display: block; }
+  #choresCard:active { background: var(--line); }
+  #choresCard .head { display: flex; justify-content: space-between; font-size: 22px; color: var(--muted); margin-bottom: 10px; }
+  #choresCard .kids { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px; }
+  .kidPill { display: flex; align-items: center; gap: 10px; font-size: 24px; font-weight: 500; }
+  .kidPill .bar { flex: 1; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+  .kidPill .bar div { height: 100%; background: var(--c); }
+  .kidPill .n { font-size: 20px; color: var(--muted); font-weight: 400; min-width: 42px; text-align: right; }
+  .kidPill.done .n { color: #1d9a50; font-weight: 600; }
+
+  /* Chores view */
+  #choresView { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; padding: 20px; gap: 18px; }
+  #choresView.open { display: flex; animation: fadeIn 120ms ease-out; }
+  /* Shared header for full-screen views: title left, back button top right (same row
+     height as the calendar's week header). */
+  .viewTop { display: flex; align-items: center; gap: 16px; min-height: 56px; }
+  .viewTop h2 { font-size: 36px; font-weight: 500; flex: 1; }
+  #kidCols { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; min-height: 0; }
+  .kidCol { background: var(--panel); border-radius: 22px; box-shadow: var(--shadow); padding: 20px 18px; display: flex; flex-direction: column; min-height: 0; border-top: 10px solid var(--c); }
+  .kidCol h3 { font-size: 40px; font-weight: 600; }
+  .kidCol .prog { font-size: 22px; color: var(--muted); margin: 4px 0 10px; }
+  .kidCol .pbar { height: 12px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+  .kidCol .pbar div { height: 100%; background: var(--c); transition: width 200ms ease-out; }
+  .chores { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overscroll-behavior: contain;
+    margin: 0 -6px; padding: 0 6px 10px; scrollbar-width: none; }
+  .chores::-webkit-scrollbar { display: none; }
+  .chores .sect { font-size: 20px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 12px 4px 2px; }
+  .chores .sect:first-child { margin-top: 0; }
+  .chore { flex: none; display: flex; align-items: center; gap: 14px; min-height: 66px; padding: 10px 14px; background: var(--panel2); border-radius: 14px; font-size: 24px; font-weight: 500; line-height: 1.2; }
+  .chore:active { background: var(--line); }
+  .chore .box { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--c); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff; }
+  .chore.done { color: var(--muted); }
+  .chore.done .t { text-decoration: line-through; }
+  .chore.done .box { background: var(--c); }
+  .chore .when { display: block; font-size: 18px; color: var(--muted); font-weight: 400; }
+  .allDone { font-size: 30px; text-align: center; padding: 24px 0; }
+  .noChores { font-size: 24px; color: var(--muted); text-align: center; padding: 24px 0; }
+
+  /* First-run / setup card */
+  #setup { position: fixed; inset: 0; background: rgba(20,25,35,.45); display: none; align-items: center; justify-content: center; }
+  #setup.open { display: flex; }
+  #setup .card { width: 1100px; background: var(--panel); border-radius: 24px; padding: 40px 48px; box-shadow: 0 20px 60px rgba(20,30,50,.25); }
+  #setup h2 { font-size: 44px; font-weight: 500; margin-bottom: 18px; }
+  #setup p { font-size: 28px; line-height: 1.5; color: var(--muted); }
+  #setup .addr { font-size: 44px; color: var(--text); font-weight: 500; margin: 18px 0; }
+  #setup .pin { font-size: 64px; letter-spacing: 12px; color: var(--today); font-weight: 600; }
+
+  #banner { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 20px; padding: 8px 18px; border-radius: 999px;
+    background: #fff1c7; color: #7a5200; border: 1px solid #f0d58a; display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="today">
+    <div id="clock">--:--</div>
+    <div id="date"></div>
+    <div id="wx" data-wx="1"><div class="icon"></div><div><div class="temp"></div><div class="desc"></div></div><div class="more-hint">More ›</div></div>
+    <div id="choresCard" data-chores="1"></div>
+    <div id="todayList"></div>
+  </section>
+  <section id="week">
+    <div id="weekHead">
+      <div id="weekTitle"></div>
+      <div id="legend"></div>
+      <button class="btn" data-chores="1">✅ Chores</button>
+      <button class="btn" data-nav="-1">&#8249;</button>
+      <button class="btn" data-nav="0">This week</button>
+      <button class="btn" data-nav="1">&#8250;</button>
+    </div>
+    <div id="days"></div>
+  </section>
+</div>
+<div id="modal"><div id="card"></div></div>
+<div id="choresView">
+  <div class="viewTop"><h2 id="choresTitle">Today's chores</h2><button class="btn" data-close-chores="1">‹ Back to calendar</button></div>
+  <div id="kidCols"></div>
+</div>
+<div id="wxView">
+  <div class="viewTop"><h2 id="wxTitle">Weather</h2><button class="btn" data-close-wx="1">‹ Back to calendar</button></div>
+  <div class="wxTop"><div class="wxNow"></div></div>
+  <div class="wxCard"><h3 id="wxHoursTitle">Next 24 hours</h3><div id="wxHours"></div></div>
+  <div class="wxCard"><h3>7-day forecast · tap a day for details</h3><div id="wxDays"></div></div>
+</div>
+<div id="setup"><div class="card"></div></div>
+<div id="banner"></div>
+<script src="ical.min.js"></script>
+<script src="backend.js"></script>
+
+<script>
+"use strict";
+const TZ = undefined;  // the frame's own time zone (Settings → System → Date & time)
+const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WX = { 0: ["☀️", "Clear"], 1: ["🌤️", "Mostly clear"], 2: ["⛅", "Partly cloudy"], 3: ["☁️", "Overcast"],
+  45: ["🌫️", "Fog"], 48: ["🌫️", "Freezing fog"], 51: ["🌦️", "Light drizzle"], 53: ["🌦️", "Drizzle"], 55: ["🌧️", "Heavy drizzle"],
+  56: ["🌧️", "Freezing drizzle"], 57: ["🌧️", "Freezing drizzle"], 61: ["🌦️", "Light rain"], 63: ["🌧️", "Rain"], 65: ["🌧️", "Heavy rain"],
+  66: ["🌧️", "Freezing rain"], 67: ["🌧️", "Freezing rain"], 71: ["🌨️", "Light snow"], 73: ["🌨️", "Snow"], 75: ["❄️", "Heavy snow"],
+  77: ["🌨️", "Snow grains"], 80: ["🌦️", "Showers"], 81: ["🌧️", "Showers"], 82: ["⛈️", "Heavy showers"], 85: ["🌨️", "Snow showers"],
+  86: ["❄️", "Snow showers"], 95: ["⛈️", "Thunderstorm"], 96: ["⛈️", "Thunderstorm, hail"], 99: ["⛈️", "Thunderstorm, hail"] };
+const wx = c => WX[c] || ["🌡️", ""];
+
+let state = { week: 0, data: null, lastTouch: Date.now(), dayKey: "" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (d, o) => new Intl.DateTimeFormat("en-US", { timeZone: TZ, ...o }).format(d);
+// YYYY-MM-DD in local time, so keys sort and compare as strings.
+const ymdFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+const ymd = d => ymdFmt.format(d);
+function time12(d) {
+  const s = fmt(d, { hour: "numeric", minute: "2-digit" }).replace(":00", "").replace(" AM", "a").replace(" PM", "p");
+  return s;
+}
+const color = (cal, data = state.data) => (data.calendars[cal] || {}).color || "#888";
+const range = e => e.allDay ? "All day" : `${time12(new Date(e.start))} – ${time12(new Date(e.end))}`;
+// Merged duplicates carry every calendar they were in.
+const cals = e => e.calendars || [e.calendar];
+const calLabel = e => cals(e).map(esc).join(" + ");
+const dots = (e, data = state.data) => cals(e).length > 1
+  ? `<span class="dots">${cals(e).map(c => `<i style="--c:${color(c, data)}"></i>`).join("")}</span>` : "";
+// An event can carry its own colour.
+const evColor = e => e.color || color(e.calendar);
+const barStyle = (e, data = state.data) => {
+  const cs = e.color ? [e.color] : cals(e).map(c => color(c, data)), n = cs.length;
+  return n === 1 ? `background:${cs[0]}`
+    : `background:linear-gradient(${cs.map((c, i) => `${c} ${i * 100 / n}% ${(i + 1) * 100 / n}%`).join(",")})`;
+};
+
+// An event belongs to every local day it overlaps (all-day end is exclusive).
+function eventsOn(dayDate, data = state.data) {
+  const key = ymd(dayDate);
+  return data.events.filter(e => {
+    const s = new Date(e.start), en = new Date(e.end);
+    const sk = ymd(s), ek = en > s ? ymd(new Date(en.getTime() - 1)) : sk;
+    return sk <= key && key <= ek;
+  });
+}
+
+function weekDays() {
+  const [y, m, d] = state.data.weekStart.split("-").map(Number);
+  return [...Array(7)].map((_, i) => new Date(y, m - 1, d + i, 12));  // local noon, safe across DST
+}
+
+function renderClock() {
+  const now = new Date();
+  const t = fmt(now, { hour: "numeric", minute: "2-digit" });
+  $("#clock").innerHTML = `${t.replace(/ (AM|PM)/, "")}<small>${t.slice(-2)}</small>`;
+  $("#date").textContent = fmt(now, { weekday: "long", month: "long", day: "numeric" });
+  const k = ymd(now);
+  if (state.dayKey && k !== state.dayKey) { state.week = 0; load(); }
+  state.dayKey = k;
+}
+
+function renderToday() {
+  const d = state.todayData;
+  if (!d) return;
+  const w = d.weather;
+  $("#wx").style.display = w && w.current ? "" : "none";
+  if (w && w.current) {
+    const [icon, desc] = wx(w.current.weather_code);
+    const hi = Math.round(w.daily.temperature_2m_max[0]), lo = Math.round(w.daily.temperature_2m_min[0]);
+    const rain = w.daily.precipitation_probability_max[0];
+    $("#wx .icon").textContent = icon;
+    $("#wx .temp").textContent = `${Math.round(w.current.temperature_2m)}°`;
+    $("#wx .desc").innerHTML = `${esc(desc)} · feels ${Math.round(w.current.apparent_temperature)}°<br>H ${hi}° · L ${lo}° · ${rain ?? 0}% rain · ${esc(d.place)}`;
+  }
+  const now = new Date();
+  const list = eventsOn(now, d);
+  $("#todayList").innerHTML = list.length ? list.slice(0, 7).map((e, i) => `
+    <div class="tItem ${!e.allDay && new Date(e.end) < now ? "past" : ""}" data-ev="${d.events.indexOf(e)}" data-source="today">
+      <div class="bar" style="${barStyle(e, d)}"></div>
+      <div><div class="when">${range(e)} · ${calLabel(e)}</div>
+      <div class="what">${esc(e.title)}</div>
+      ${e.location ? `<div class="where">📍 ${esc(e.location)}</div>` : ""}</div>
+    </div>`).join("") + (list.length > 7 ? `<div class="more" data-day="${ymd(now)}" data-source="today">+${list.length - 7} more — tap</div>` : "")
+    : `<div class="empty">Nothing scheduled today.</div>`;
+  fitTodayList(list.length);
+}
+
+// Show only the Today items that fit (the chores card takes room), then "+N more".
+function fitTodayList(total) {
+  const box = $("#todayList"), items = () => box.querySelectorAll(".tItem");
+  box.querySelector(".more")?.remove();
+  let shown = items().length;
+  const more = () => `<div class="more" data-day="${ymd(new Date())}" data-source="today">+${total - shown} more — tap</div>`;
+  while (shown > 1 && box.scrollHeight > box.clientHeight + 1) {
+    items()[shown - 1].remove();
+    shown--;
+    box.querySelector(".more")?.remove();
+    box.insertAdjacentHTML("beforeend", more());
+  }
+  if (shown < total && !box.querySelector(".more")) box.insertAdjacentHTML("beforeend", more());
+}
+
+function renderWeek() {
+  const d = state.data, days = weekDays(), todayKey = ymd(new Date());
+  $("#weekTitle").textContent = `${fmt(days[0], { month: "short", day: "numeric" })} – ${fmt(days[6], { month: "short", day: "numeric", year: "numeric" })}`;
+  $("#legend").innerHTML = Object.entries(d.calendars).map(([n, c]) => `<span style="--c:${c.color}">${esc(n)}</span>`).join("");
+  $("#days").innerHTML = days.map((day, i) => {
+    const key = ymd(day), evs = eventsOn(day);
+    let dwx = "";
+    if (d.weather && d.weather.daily) {
+      const j = d.weather.daily.time.indexOf(key);
+      if (j >= 0) dwx = `${wx(d.weather.daily.weather_code[j])[0]} ${Math.round(d.weather.daily.temperature_2m_max[j])}° / ${Math.round(d.weather.daily.temperature_2m_min[j])}°`;
+    }
+    const shown = evs.slice(0, 9);
+    return `<div class="day ${key === todayKey ? "isToday" : key < todayKey ? "isPast" : ""}" data-day="${key}">
+      <div class="dHead"><div class="dName">${DAY[i]}</div><div class="dNum">${fmt(day, { day: "numeric" })}</div><div class="dWx">${dwx || "&nbsp;"}</div></div>
+      <div class="evs">${shown.map(e => `<div class="ev ${e.allDay ? "allDay" : ""}" style="--c:${evColor(e)}" data-ev="${d.events.indexOf(e)}">
+        ${e.allDay ? "" : `<div class="t">${time12(new Date(e.start))}${dots(e)}</div>`}<div class="n">${esc(e.title)}${e.allDay ? dots(e) : ""}</div></div>`).join("")}
+      ${evs.length > shown.length ? `<div class="more">+${evs.length - shown.length} more</div>` : ""}</div></div>`;
+  }).join("");
+  const b = $("#banner"), s = d.setup;
+  b.style.display = s || d.sample || d.errors.length ? "block" : "none";
+  b.textContent = [
+    d.sample ? "Sample events — no calendars set up yet" : "",
+    d.errors.length ? `Calendar problem: ${d.errors.join("; ")}` : "",
+    s && !d.sample ? `Settings: open ${s.address} on a phone on this Wi-Fi · PIN ${s.pin}` : "",
+  ].filter(Boolean).join(" · ");
+  renderSetup();
+}
+
+// First run: no calendars yet, so show how to reach the settings page.
+function renderSetup() {
+  const d = state.data, s = d.setup, box = $("#setup");
+  box.classList.toggle("open", !!(d.sample && s));
+  if (!d.sample || !s) return;
+  box.querySelector(".card").innerHTML = `<h2>Set up this calendar</h2>
+    <p>On a phone or computer on the same Wi-Fi, open</p><div class="addr">${esc(s.address)}</div>
+    <p>and enter this PIN:</p><div class="pin">${esc(s.pin)}</div>
+    <p>Add each calendar's secret iCal address, the weather location and (optionally) a chores calendar.</p>`;
+}
+
+// ---- Full weather view ----
+const hourKey = d => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit",
+    day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(d).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
+};
+const wxIcon = (code, isDay) => (isDay === 0 && code <= 2) ? (code === 0 ? "🌙" : "☁️") : wx(code)[0];
+const clock12 = iso => time12(new Date(iso + ":00"));  // Open-Meteo times are local, no offset
+
+// sel = index into the 7-day forecast: 0 (today) shows "now" and the next 24 hours; any
+// other day shows that day's summary and its hours from midnight.
+function renderWeatherView(sel = state.wxDay || 0) {
+  const w = (state.todayData || state.data).weather;
+  if (!w || !w.current) return false;
+  const c = w.current, dl = w.daily, h = w.hourly;
+  const dayName = fmt(new Date(dl.time[sel] + "T12:00:00"), { weekday: "long", month: "long", day: "numeric" });
+  $("#wxTitle").textContent = sel === 0 ? `Weather · ${state.data.place}` : `Weather · ${dayName}`;
+  const stats = (extra) => `<div class="stats">
+      <span>Rain chance</span><span>${dl.precipitation_probability_max[sel] ?? 0}%</span>
+      ${extra}
+      <span>UV index</span><span>${Math.round(dl.uv_index_max?.[sel] ?? 0)}</span>
+      <span>Sunrise</span><span>${clock12(dl.sunrise[sel])}</span>
+      <span>Sunset</span><span>${clock12(dl.sunset[sel])}</span>
+    </div>`;
+  if (sel === 0) {
+    const [, desc] = wx(c.weather_code);
+    $(".wxNow").innerHTML = `
+      <div class="icon">${wxIcon(c.weather_code, c.is_day)}</div>
+      <div><div class="temp">${Math.round(c.temperature_2m)}°</div></div>
+      <div><div class="desc">${esc(desc)}</div>
+        <div class="sub">Feels like ${Math.round(c.apparent_temperature)}° · H ${Math.round(dl.temperature_2m_max[0])}° · L ${Math.round(dl.temperature_2m_min[0])}°<br>${esc(state.data.place)}</div></div>
+      ${stats(`<span>Humidity</span><span>${c.relative_humidity_2m ?? "–"}%</span>
+               <span>Wind</span><span>${Math.round(c.wind_speed_10m)} ${state.data.windUnit}</span>`)}`;
+  } else {
+    const [icon, desc] = wx(dl.weather_code[sel]);
+    $(".wxNow").innerHTML = `
+      <div class="icon">${icon}</div>
+      <div><div class="temp">${Math.round(dl.temperature_2m_max[sel])}°<span class="lo"> / ${Math.round(dl.temperature_2m_min[sel])}°</span></div></div>
+      <div><div class="desc">${esc(desc)}</div>
+        <div class="sub">${esc(dayName)}<br>${esc(state.data.place)}</div></div>
+      ${stats(`<span>Max wind</span><span>${Math.round(dl.wind_speed_10m_max?.[sel] ?? 0)} ${state.data.windUnit}</span>`)}`;
+  }
+  // Hourly strip: from now (today) or from midnight of the chosen day.
+  const startKey = sel === 0 ? hourKey(new Date()) : `${dl.time[sel]}T00:00`;
+  const start = Math.max(0, h.time.indexOf(startKey));
+  $("#wxHoursTitle").textContent = sel === 0 ? "Next 24 hours" : `${dayName.split(",")[0]}, hour by hour`;
+  $("#wxHours").innerHTML = h.time.slice(start, start + 24).map((t, k) => {
+    const i = start + k, p = h.precipitation_probability[i] ?? 0;
+    return `<div class="hr ${sel === 0 && k === 0 ? "now" : ""}">
+      <div class="h">${sel === 0 && k === 0 ? "Now" : clock12(t)}</div>
+      <div class="i">${wxIcon(h.weather_code[i], h.is_day[i])}</div>
+      <div class="t">${Math.round(h.temperature_2m[i])}°</div>
+      <div class="rainbar"><div style="height:${p}%"></div></div>
+      <div class="p">${p >= 10 ? p + "%" : ""}</div></div>`;
+  }).join("");
+  $("#wxDays").innerHTML = dl.time.map((d, i) => {
+    const date = new Date(d + "T12:00:00");
+    return `<div class="wd ${i === 0 ? "today" : ""} ${i === sel ? "sel" : ""}" data-wxday="${i}">
+      <div class="n">${i === 0 ? "Today" : fmt(date, { weekday: "short", month: "numeric", day: "numeric" })}</div>
+      <div class="i">${wx(dl.weather_code[i])[0]}</div>
+      <div class="d">${esc(wx(dl.weather_code[i])[1])}</div>
+      <div class="hl">${Math.round(dl.temperature_2m_max[i])}° <span>${Math.round(dl.temperature_2m_min[i])}°</span></div>
+      <div class="r">💧 ${dl.precipitation_probability_max[i] ?? 0}%</div></div>`;
+  }).join("");
+  return true;
+}
+function openWeather() { state.wxDay = 0; if (renderWeatherView()) $("#wxView").classList.add("open"); }
+function closeWeather() { $("#wxView").classList.remove("open"); }
+
+// ---- Chores ----
+// From the chores calendar; ticks are kept on the frame (see backend.js).
+const kidCount = k => [k.chores.filter(c => c.done).length, k.chores.length];
+
+function renderChoresCard() {
+  const ch = state.chores, card = $("#choresCard");
+  const total = ch ? ch.kids.reduce((n, k) => n + k.chores.length, 0) : 0;
+  card.classList.toggle("show", total > 0);
+  if (!total) return;
+  const done = ch.kids.reduce((n, k) => n + kidCount(k)[0], 0);
+  card.innerHTML = `<div class="head"><span>✅ Today's chores</span><span>${done} of ${total} done ›</span></div>
+    <div class="kids">${ch.kids.filter(k => k.chores.length).map(k => {
+      const [d, n] = kidCount(k);
+      return `<div class="kidPill ${d === n ? "done" : ""}" style="--c:${k.color}">${esc(k.name)}
+        <div class="bar"><div style="width:${100 * d / n}%"></div></div><span class="n">${d === n ? "✓" : `${d}/${n}`}</span></div>`;
+    }).join("")}</div>`;
+}
+
+function renderChoresView() {
+  const ch = state.chores;
+  if (!ch) return;
+  $("#choresTitle").textContent = `Today's chores · ${fmt(new Date(), { weekday: "long", month: "long", day: "numeric" })}`;
+  $("#kidCols").style.gridTemplateColumns = `repeat(${Math.max(ch.kids.length, 1)}, 1fr)`;
+  $("#kidCols").innerHTML = ch.kids.map(k => {
+    const [d, n] = kidCount(k);
+    const row = c => `<div class="chore ${c.done ? "done" : ""}" data-chore="${esc(c.id)}" data-kid="${esc(k.name)}">
+          <div class="box">${c.done ? "✓" : ""}</div>
+          <div><span class="t">${esc(c.title)}</span>${c.time ? `<span class="when">by ${time12(new Date(c.time))}</span>` : ""}</div></div>`;
+    const daily = k.chores.filter(c => !c.weekly), wk = k.chores.filter(c => c.weekly);
+    const list = n
+      ? (d === n ? `<div class="allDone">All done! 🎉</div>` : "")
+        + (daily.length && wk.length ? `<div class="sect">Today</div>` : "") + daily.map(row).join("")
+        + (wk.length ? `<div class="sect">Weekly</div>` + wk.map(row).join("") : "")
+      : `<div class="noChores">No chores today 🙌</div>`;
+    return `<div class="kidCol" style="--c:${k.color}"><h3>${esc(k.name)}</h3>
+      <div class="prog">${n ? `${d} of ${n} done` : "&nbsp;"}</div>
+      <div class="pbar"><div style="width:${n ? 100 * d / n : 0}%"></div></div>
+      <div class="chores">${list}</div></div>`;
+  }).join("");
+}
+
+function openChores() { renderChoresView(); $("#choresView").classList.add("open"); }
+function closeChores() { $("#choresView").classList.remove("open"); }
+
+async function toggleChore(id, kid) {
+  const k = state.chores.kids.find(x => x.name === kid), c = k && k.chores.find(x => x.id === id);
+  if (!c) return;
+  c.done = !c.done;                    // show it straight away...
+  renderChoresView(); renderChoresCard();
+  try {                                // ...then save; the saved list is the truth
+    state.chores = await backend.tick(id, kid, c.done);
+  } catch (e) { /* keep the optimistic tick; the next refresh corrects it */ }
+  renderChoresView(); renderChoresCard();
+}
+
+// Back to the default view: this week, nothing open. Runs when the screen dims
+// (the app pauses the page) and after a minute untouched.
+function resetView() {
+  closeModal();
+  closeWeather();
+  closeChores();
+  if (state.week !== 0) { state.week = 0; load(); }
+}
+
+function openModal(html) { $("#card").innerHTML = html + `<button class="btn close">Close</button>`; $("#modal").classList.add("open"); }
+function closeModal() { $("#modal").classList.remove("open"); }
+function showEvent(e, data = state.data) {
+  if (!e) return;
+  openModal(`<h2>${esc(e.title)}</h2>
+    <div class="sub">${cals(e).map(c => `<span class="chip" style="--c:${color(c, data)}">${esc(c)}</span>`).join("")}
+    ${fmt(new Date(e.start), { weekday: "long", month: "long", day: "numeric" })} · ${range(e)}</div>
+    ${e.location ? `<div class="body">📍 ${esc(e.location)}</div><br>` : ""}
+    ${e.description ? `<div class="body">${esc(e.description)}</div>` : ""}`);
+}
+function showDay(key, data = state.data) {
+  const [y, m, d] = key.split("-").map(Number);
+  const day = new Date(y, m - 1, d, 12);
+  const evs = eventsOn(day, data);
+  state.modalData = data;
+  openModal(`<h2>${fmt(day, { weekday: "long", month: "long", day: "numeric" })}</h2>
+    <div class="list">${evs.length ? evs.map(e => `<div class="tItem" data-ev="${data.events.indexOf(e)}" data-source="modal">
+      <div class="bar" style="${barStyle(e, data)}"></div>
+      <div><div class="when">${range(e)} · ${calLabel(e)}</div><div class="what">${esc(e.title)}</div>
+      ${e.location ? `<div class="where">📍 ${esc(e.location)}</div>` : ""}</div></div>`).join("") : `<div class="empty">Nothing scheduled.</div>`}</div>`);
+}
+
+function eventData(el) {
+  return el.dataset.source === "today" ? state.todayData : el.dataset.source === "modal" ? state.modalData : state.data;
+}
+
+// A (passive) touchstart listener makes :active apply as soon as a finger lands; any
+// touch (including scrolling a chore list) also counts as activity for the idle reset.
+document.addEventListener("touchstart", () => { state.lastTouch = Date.now(); }, { passive: true });
+
+document.addEventListener("click", ev => {
+  state.lastTouch = Date.now();
+  const t = ev.target;
+  if (t.closest(".close") || t.id === "modal") return closeModal();
+  if (t.closest("[data-close-wx]")) return closeWeather();
+  if ($("#wxView").classList.contains("open")) {
+    const d = t.closest("[data-wxday]");
+    if (d) { state.wxDay = +d.dataset.wxday; renderWeatherView(); }
+    return;
+  }
+  if (t.closest("[data-close-chores]")) return closeChores();
+  if ($("#choresView").classList.contains("open")) {
+    const ch = t.closest("[data-chore]");
+    if (ch) toggleChore(ch.dataset.chore, ch.dataset.kid);
+    return;
+  }
+  if (t.closest("[data-chores]")) return openChores();
+  if (t.closest("[data-wx]")) return openWeather();
+  const evEl = t.closest("[data-ev]");
+  if (evEl) {
+    const data = eventData(evEl);
+    return showEvent(data.events[+evEl.dataset.ev], data);
+  }
+  const nav = t.closest("[data-nav]");
+  if (nav) { const n = +nav.dataset.nav; state.week = n === 0 ? 0 : state.week + n; return load(); }
+  const dayEl = t.closest("[data-day]");
+  if (dayEl) return showDay(dayEl.dataset.day, eventData(dayEl));
+});
+
+const backend = FrameBackend.create({
+  getConfig: () => fetch("/config.json", { cache: "no-store" }).then(r => r.json()),
+  fetchFeed: async k => {
+    const r = await fetch(`/feed/${encodeURIComponent(k)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
+    return { text: await r.text(), stale: r.headers.get("X-Stale") === "1" };
+  },
+  fetchJson: u => fetch(u, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+  store: {
+    get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not saved */ } },
+  },
+});
+
+let loadId = 0;
+async function load() {
+  const request = ++loadId, week = state.week;
+  try {
+    const selected = backend.data(week);
+    const current = week === 0 ? selected : backend.data(0);
+    const [data, todayData] = await Promise.all([selected, current]);
+    if (request !== loadId || week !== state.week) return;
+    state.todayData = todayData;
+    if (todayData.chores) state.chores = todayData.chores;
+    $("[data-chores].btn").style.display = todayData.hasChores ? "" : "none";
+    state.data = data;
+    renderWeek();
+    renderChoresCard();                // before renderToday: the card's height decides what fits
+    renderToday();
+    if ($("#choresView").classList.contains("open")) renderChoresView();
+  } catch (e) {
+    if (request !== loadId || week !== state.week) return;
+    const b = $("#banner"); b.style.display = "block"; b.textContent = `Calendar problem: ${e.message || e} — retrying`;
+  }
+}
+
+// Back to the default view once untouched for a minute (when the screen dims), and
+// whenever the app hides the page.
+setInterval(() => { if (Date.now() - state.lastTouch > 55000) resetView(); }, 5000);
+document.addEventListener("visibilitychange", () => { if (document.hidden) resetView(); });
+setInterval(renderClock, 1000);
+setInterval(load, 5 * 60 * 1000);
+// Start fresh once a day (04:00).
+setInterval(() => { if (fmt(new Date(), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) === "04:00") location.reload(); }, 60000);
+renderClock();
+load();
+</script>
+</body>
+</html>

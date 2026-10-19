@@ -1,0 +1,12 @@
+cd /system/bin
+write entropy_seed entropy_seed
+ea_set -f label.bin entropy_seed security.selinux
+sif entropy_seed mode 0100755
+sif entropy_seed uid 0
+sif entropy_seed gid 2000
+cd /system/etc/init
+write entropy_seed.rc entropy_seed.rc
+ea_set -f label.bin entropy_seed.rc security.selinux
+sif entropy_seed.rc mode 0100644
+sif entropy_seed.rc uid 0
+sif entropy_seed.rc gid 0

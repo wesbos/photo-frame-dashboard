@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frame settings</title>
+<style>
+  :root { --bg: #f3f5f9; --panel: #fff; --line: #dde2ea; --text: #1b1f27; --muted: #5f6878; --accent: #2f6fd6; --bad: #b3261e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 24px; margin: 8px 0 4px; }
+  h2 { font-size: 18px; margin: 0 0 6px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 14px 0; }
+  p.hint { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 4px; }
+  input, select, button { font: inherit; }
+  input[type=text], input[type=url], input[type=password], input[type=search], select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--text); }
+  input[type=color] { width: 48px; height: 44px; padding: 2px; border: 1px solid var(--line); border-radius: 10px; background: #fff; flex: none; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .row > input[type=text] { flex: 1; min-width: 0; }
+  .item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+  button { padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.remove { color: var(--bad); flex: none; }
+  .places button { display: block; width: 100%; text-align: left; margin: 6px 0; }
+  #status { margin: 12px 0; min-height: 1.4em; }
+  #status.bad { color: var(--bad); }
+  #form { display: none; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Frame settings</h1>
+  <p class="hint">This page is served by the photo frame on your home network.</p>
+
+  <section id="login">
+    <label for="pin">PIN shown on the frame</label>
+    <div class="row"><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="6">
+      <button class="primary" id="unlock">Open</button></div>
+  </section>
+
+  <div id="form">
+    <section>
+      <h2>Calendars</h2>
+      <p class="hint">For each Google Calendar, on a computer: Settings → the calendar → Integrate calendar →
+        <b>Secret address in iCal format</b>. Anyone with that address can read the calendar, so share it only here.
+        Other services' iCal (<code>.ics</code>) addresses work too.</p>
+      <div id="cals"></div>
+      <button id="addCal">+ Add calendar</button>
+    </section>
+
+    <section>
+      <h2>Weather</h2>
+      <label for="placeQ">Town or city</label>
+      <div class="row"><input id="placeQ" type="search" placeholder="e.g. Springfield"><button id="findPlace">Find</button></div>
+      <div class="places" id="places"></div>
+      <p class="hint" id="placeNow"></p>
+      <label for="units">Units</label>
+      <select id="units"><option value="us">°F and mph</option><option value="metric">°C and km/h</option></select>
+    </section>
+
+    <section>
+      <h2>Chores (optional)</h2>
+      <p class="hint">Make a separate calendar for chores and paste its secret iCal address. Title each event with who
+        it's for: <code>Ana: Make bed</code>, <code>Ana, Ben: Feed the dog</code>, or no name for everyone.
+        A chore that repeats weekly stays on the list all week.</p>
+      <label for="choresUrl">Chores calendar address</label>
+      <input id="choresUrl" type="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+      <div id="kids"></div>
+      <button id="addKid">+ Add person</button>
+    </section>
+
+    <button class="primary" id="save">Save to the frame</button>
+  </div>
+  <div id="status" role="status" aria-live="polite"></div>
+</main>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const COLORS = ["#2f7bf5", "#22a861", "#9b5de5", "#e8577e", "#f08c2e", "#14a3b8", "#c2a400", "#d93025"];
+let pin = "", weather = null;
+
+function status(msg, bad) { const s = $("#status"); s.textContent = msg; s.className = bad ? "bad" : ""; }
+
+async function api(method, body) {
+  const r = await fetch("/api/config", { method, headers: { "X-Pin": pin, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined });
+  const text = await r.text();
+  if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+  return JSON.parse(text);
+}
+
+function input(type, value, placeholder) {
+  const i = document.createElement("input");
+  i.type = type; i.value = value || ""; if (placeholder) i.placeholder = placeholder;
+  return i;
+}
+function removeButton(el) {
+  const b = document.createElement("button"); b.className = "remove"; b.textContent = "Remove";
+  b.onclick = () => el.remove(); return b;
+}
+
+function addCal(c = {}) {
+  const n = $("#cals").children.length, el = document.createElement("div");
+  el.className = "item cal";
+  const top = document.createElement("div"); top.className = "row";
+  top.append(input("text", c.name, "Name, e.g. Family"), input("color", c.color || COLORS[n % COLORS.length]), removeButton(el));
+  el.append(top, input("url", c.url, "https://calendar.google.com/calendar/ical/.../basic.ics"));
+  $("#cals").append(el);
+}
+
+function addKid(k = {}) {
+  const n = $("#kids").children.length, el = document.createElement("div");
+  el.className = "item kid";
+  const top = document.createElement("div"); top.className = "row";
+  top.append(input("text", k.name, "Name as used in chore titles"), input("color", k.color || COLORS[(n + 3) % COLORS.length]), removeButton(el));
+  el.append(top, input("text", (k.aliases || []).join(", "), "Other names that mean this person (optional, comma-separated)"));
+  $("#kids").append(el);
+}
+
+function showPlace() {
+  $("#placeNow").textContent = weather ? `Using ${weather.place} (${(+weather.latitude).toFixed(2)}, ${(+weather.longitude).toFixed(2)})`
+    : "No weather location set.";
+}
+
+async function findPlace() {
+  const q = $("#placeQ").value.trim();
+  if (!q) return;
+  $("#places").textContent = "Searching…";
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=5&language=en&format=json&name=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    $("#places").textContent = "";
+    for (const p of d.results || []) {
+      const b = document.createElement("button");
+      const label = [p.name, p.admin1, p.country].filter(Boolean).join(", ");
+      b.textContent = label;
+      b.onclick = () => { weather = { place: p.name, latitude: p.latitude, longitude: p.longitude }; $("#places").textContent = ""; showPlace(); };
+      $("#places").append(b);
+    }
+    if (!(d.results || []).length) $("#places").textContent = "No matches.";
+  } catch (e) {
+    $("#places").textContent = "Search failed: the phone needs internet for this.";
+  }
+}
+
+function fill(cfg) {
+  $("#cals").textContent = ""; $("#kids").textContent = "";
+  (cfg.calendars && cfg.calendars.length ? cfg.calendars : [{}]).forEach(addCal);
+  (cfg.kids || []).forEach(addKid);
+  $("#choresUrl").value = cfg.choresUrl || "";
+  $("#units").value = cfg.units === "metric" ? "metric" : "us";
+  weather = cfg.weather || null; showPlace();
+}
+
+function collect() {
+  return {
+    calendars: [...document.querySelectorAll(".cal")].map(el => {
+      const [name, color, url] = el.querySelectorAll("input");
+      return { name: name.value, color: color.value, url: url.value };
+    }).filter(c => c.url.trim()),
+    choresUrl: $("#choresUrl").value,
+    kids: [...document.querySelectorAll(".kid")].map(el => {
+      const [name, color, aliases] = el.querySelectorAll("input");
+      return { name: name.value, color: color.value, aliases: aliases.value.split(",").map(s => s.trim()).filter(Boolean) };
+    }).filter(k => k.name.trim()),
+    weather, units: $("#units").value,
+  };
+}
+
+$("#unlock").onclick = async () => {
+  pin = $("#pin").value.trim();
+  try {
+    fill(await api("GET"));
+    $("#login").style.display = "none"; $("#form").style.display = "block"; status("");
+  } catch (e) { status(e.message, true); }
+};
+$("#pin").addEventListener("keydown", e => { if (e.key === "Enter") $("#unlock").click(); });
+$("#addCal").onclick = () => addCal();
+$("#addKid").onclick = () => addKid();
+$("#findPlace").onclick = findPlace;
+$("#placeQ").addEventListener("keydown", e => { if (e.key === "Enter") findPlace(); });
+$("#save").onclick = async () => {
+  status("Saving…");
+  try { fill(await api("POST", collect())); status("Saved. The frame reloads in a moment."); }
+  catch (e) { status(`Not saved: ${e.message}`, true); }
+};
+</script>
+</body>
+</html>

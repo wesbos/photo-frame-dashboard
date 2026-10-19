@@ -1,0 +1,9 @@
+# idc.cmds runs first: it reads the SELinux label of qwerty.idc into label.bin,
+# which the other .cmds files reuse.
+cd /system/usr/idc
+ea_get -f label.bin qwerty.idc security.selinux
+write gslX680.idc gslX680.idc
+ea_set -f label.bin gslX680.idc security.selinux
+sif gslX680.idc mode 0100644
+sif gslX680.idc uid 0
+sif gslX680.idc gid 0

@@ -1,0 +1,3 @@
+# PF1506 kiosk tuning (eMMC wear); see /system/etc/frame-tuning.sh.
+on property:sys.boot_completed=1
+    exec_background u:r:su:s0 root root -- /system/bin/sh /system/etc/frame-tuning.sh

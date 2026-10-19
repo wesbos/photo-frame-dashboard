@@ -1,0 +1,11 @@
+# PF1506 frame: credit the RNG seed saved on the previous boot before
+# boringssl_self_test32 runs ("on init"); without it boot stalls ~67 s waiting
+# for the 4.9 kernel's CRNG. See /system/bin/entropy_seed.
+on early-init
+    exec u:r:su:s0 root root -- /system/bin/entropy_seed load /metadata/entropy_seed
+    # Kiosk: skip the boot animation; it only competes for CPU/GPU while the
+    # framework starts, and the bootloader logo is already on screen.
+    setprop debug.sf.nobootanimation 1
+
+on property:sys.boot_completed=1
+    exec_background u:r:su:s0 root root -- /system/bin/entropy_seed save /metadata/entropy_seed

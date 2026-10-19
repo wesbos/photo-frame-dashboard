@@ -1,0 +1,24 @@
+# Keep runtime TCP disabled before adbd can fall back to a persisted TCP port.
+# This assumes no other init service/rule enables TCP independently; verify on frame.
+on early-init
+    setprop service.adb.tcp.port -1
+
+service frame-adb-wifi /system/bin/sh /system/etc/frame-adb-wifi.sh
+    user root
+    group root
+    seclabel u:r:su:s0
+    disabled
+    oneshot
+
+on property:ro.persistent_properties.ready=true
+    start frame-adb-wifi
+
+on property:sys.boot_completed=1
+    start frame-adb-wifi
+
+# Reapply after settings changes. init will not run a second instance concurrently.
+on property:persist.frame.adb_wifi=*
+    start frame-adb-wifi
+
+on property:persist.frame.adb_allow=*
+    start frame-adb-wifi
