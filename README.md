@@ -163,6 +163,7 @@ trusting it, and remember that a past approval is not permission for a new write
 
 ## Other docs
 
+- [Recovery catalog](docs/recovery/README.md): model/variant records, contribution template and backup prompt
 - Skylight Wi-Fi investigation: [live-diagnostics.md](docs/live-diagnostics.md),
   [native-wifi-root-tests.md](docs/native-wifi-root-tests.md),
   [wifi-firmware-candidate.md](docs/wifi-firmware-candidate.md),
