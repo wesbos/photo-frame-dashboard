@@ -50,15 +50,15 @@
     var midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
     var liveRows = (T.live.stops[st.code] && T.live.stops[st.code].departures) || [];
     var liveBy = {};
-    liveRows.forEach(function (l) { liveBy[l.trip] = l; });
+    liveRows.forEach(function (l) { liveBy[l.trip + '|' + parse(l.sched)] = l; }); // trip numbers repeat daily, so match the scheduled time too
     var out = [], seen = {};
     function add(planned, line, head, num) {
-      var l = liveBy[num], ts = planned, late = 0, status = '', platform = '';
+      var l = liveBy[num + '|' + planned], ts = planned, late = 0, status = '', platform = '';
       if (l) {
         var p = parse(l.live);
         if (p) { ts = p; late = Math.round((p - planned) / 60000); }
         status = l.status; platform = l.platform;
-        seen[num] = true;
+        seen[num + '|' + planned] = true;
       }
       if (ts < t - 60000) return;
       out.push({ ts: ts, planned: planned, line: line, head: head, num: num, late: late, status: status, platform: platform, live: !!l });
@@ -76,12 +76,14 @@
       var key2 = dayKey(tm), start = new Date(tm.getFullYear(), tm.getMonth(), tm.getDate()).getTime();
       st.patterns.forEach(function (p) { if (p.dates.indexOf(key2) > -1) p.deps.forEach(function (d) { add(start + d[0] * 1000, d[1], d[2], d[3]); }); });
     }
-    // Live trains the timetable doesn't know about (e.g. an added service)
-    var lineOk = {}; (T.schedule.lines || []).forEach(function (l) { lineOk[l.code] = true; });
+    // Live trains the timetable doesn't know about (e.g. an added service): only this station's lines, and only
+    // trains heading to its chosen destination (the feed names it like "ST - Union Station")
     liveRows.forEach(function (l) {
-      if (seen[l.trip] || !lineOk[l.line]) return;
+      if (seen[l.trip + '|' + parse(l.sched)] || (st.lines && st.lines.length && st.lines.indexOf(l.line) < 0)) return;
+      var head = l.dir.replace(/^[A-Z0-9]+ - /, '');
+      if (st.toName && head.indexOf(st.toName) < 0) return;
       var p = parse(l.live) || parse(l.sched);
-      if (p >= t - 60000) out.push({ ts: p, planned: parse(l.sched) || p, line: l.line, head: l.dir, num: l.trip, late: 0, status: l.status, platform: l.platform, live: true });
+      if (p >= t - 60000) out.push({ ts: p, planned: parse(l.sched) || p, line: l.line, head: head, num: l.trip, late: 0, status: l.status, platform: l.platform, live: true });
     });
     out.sort(function (a, b) { return a.ts - b.ts; });
     return out.slice(0, max);

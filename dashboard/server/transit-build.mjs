@@ -111,7 +111,7 @@ try {
     built: new Date().toISOString(), publisher: 'Metrolinx (Open Government Licence – Ontario)',
     lines: [...routes.values()].filter((r) => r.rail && (!lines.size || lines.has(r.code.toUpperCase()))).map((r) => ({ code: r.code, name: r.name, color: '#' + r.color })),
     stations: stations.map((s) => {
-      s = { code: s.code, name: s.name, ...where.get(s.code), to: s.to, fallbackFor: s.fallbackFor, toName: s.to ? stops.get(s.to).replace(/ GO$/, '') : '' };
+      s = { code: s.code, name: s.name, ...where.get(s.code), to: s.to, fallbackFor: s.fallbackFor, lines: [...s.lines], toName: s.to ? stops.get(s.to).replace(/ GO$/, '') : '' };
       const days = byStation[s.code] || {}, pat = new Map();
       Object.keys(days).sort().forEach((d) => {
         const deps = days[d].sort((a, b) => a[0] - b[0]), key = JSON.stringify(deps);
