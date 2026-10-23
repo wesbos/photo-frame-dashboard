@@ -201,6 +201,47 @@ Measured with a small set of browser test pages loaded in the kiosk:
 
 The frame runs Cotidiano; see [Community Builds](community-builds.md).
 
+## Second unit (2026-10-23, macOS)
+
+A second Runxion from the same listing, set up the same day from a Mac over USB. It matched the
+first unit exactly: firmware `SSA_Frame_20250928`, the same fingerprint (`OC/101841`), 1280×800 at
+160 dpi, the same boot partition SHA-256 (`f484bce9…020a`) and the same stock WebView tree,
+including the `webview.odex` hash (`73b1246e…a1b0`). Frameo was `v1.32.12_-_OTA_test`. The setup
+above applied unchanged: updaters disabled, the same WebView 106 swap, Rootless Pixel Launcher,
+Home HQ as HOME with its navigation service, then Frameo disabled, each disable checked for
+`enabled="3"` before the reboot. All of it survived the reboot.
+
+### No `iotv` on this unit
+
+- `/system/bin/iotv` and `/system/bin/run_iotv.sh` do not exist, and no init `.rc` file mentions
+  `iotv`.
+- `/proc/net/tcp` and `tcp6`, read while Frameo was still running, showed established connections
+  only from Frameo and the Gboard keyboard. No connection belonged to uid 0.
+
+One unit, one check. It does not prove that every RK3326 build is free of it.
+
+### Backup: a USB stream that stopped
+
+The backup used the same per-partition method, with the shipped `su` and no base64 (no CR was
+added, as on the first unit). The 1.9 GB `system` stream stopped after about 380 MB compressed and
+made no progress for 8 minutes, with `dd` on the frame blocked on its pipe. The frame stayed on ADB.
+Re-reading `system`, `uboot` and `vendor` in 64 MiB pieces (`dd bs=1M skip=… count=64`), each piece
+checked against an on-device SHA-256 and retried on a timeout, worked without a retry. The whole
+partition was then checked again against a fresh on-device read. 15 regions, 579 MB compressed,
+every one verified. A whole-partition read with no `count` also avoided the `frp` pitfall above.
+
+### Other observations
+
+- **The frame restarted once on its own** within a few minutes of ADB being authorized (uptime
+  showed it). The cause was not established.
+- **SystemUI was found disabled after the setup**: `package-restrictions.xml` had `enabled="2"`
+  with `enabledCaller="shell:0"` for `com.android.systemui`. It was not in `pm list packages -d` at
+  the first check, and nothing in this setup disables SystemUI (only `pm disable-user`, which gives
+  `enabled="3"`). No file in `/system/bin`, `/system/etc`, `/vendor` or the init `.rc` files mentions
+  it. Cause not established. Home HQ works without it; its navigation service covers Back and Home.
+- The [bundled page](../dashboard/kiosk/README.md#a-page-bundled-in-the-apk-no-server)
+  (`KIOSK_SITE`) worked as the dashboard at `http://127.0.0.1:8765/`.
+
 ## Guesses, not confirmed
 
 - The USB-C port probably lacks the CC resistors a USB-C host needs before it supplies power. That
@@ -212,6 +253,6 @@ The frame runs Cotidiano; see [Community Builds](community-builds.md).
 
 - Whether a vendor OTA would restore WebView 61 (both updaters are disabled).
 - Restoring from the backup.
-- `/system/bin/iotv` (the hidden root agent on the [RK3126 Runxion](runxion-zn-dp1002-rk3126.md#hidden-root-agent-iotv)).
-  Not checked on this unit. Keep the frame on an isolated network: Android 8.1, a 2020 security
-  patch and shipped root.
+- `/system/bin/iotv` (the hidden root agent on the [RK3126 Runxion](runxion-zn-dp1002-rk3126.md#hidden-root-agent-iotv))
+  on the first unit. It was absent on the [second unit](#no-iotv-on-this-unit). Keep the frame on an
+  isolated network either way: Android 8.1, a 2020 security patch and shipped root.
