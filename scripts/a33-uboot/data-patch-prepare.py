@@ -6,14 +6,21 @@ original bytes. Uses this repo's existing READ-ONLY U-Boot build
 (build-uboot.sh) — it never exposes the eMMC as a writable host disk.
 
 Usage (from the repository root):
-  python3 -I scripts/a33-uboot/data-patch-prepare.py \
+  python3 -I scripts/a33-uboot/data-patch-prepare.py [--nulldev] \
       <orig-data-partition.img> <edited-data-partition.img> <data-partition-start-sector>
 
 The two images are copies of the SAME /data partition extracted from your own
 verified eMMC backup: one untouched, one with your intended edit (made with
 e.g. `debugfs -w` on the edited copy only, never on the backup itself).
 <data-partition-start-sector> is that partition's start sector within the full
-eMMC, from your own parsed partition table.
+eMMC, from your own parsed partition table. The full backup and an edited clone
+of it, with start sector 0, give the same plan without extracting /data.
+
+--nulldev runs both generated scripts only after `setenv stdin nulldev`
+succeeds, as the null-console U-Boot builds' ums-readonly.cmd does, so floating
+serial input can't look like Ctrl-C and stop a script partway. If that command
+fails, nothing in the script runs. Use it only with a U-Boot built with
+CONFIG_SYS_DEVICE_NULLDEV=y; on other builds the guard stops every run.
 
 This only reads the two local images and writes payloads + guarded scripts to
 diagnostics/a33-data-patch/. Nothing here touches a device. Re-derive your own
@@ -49,6 +56,17 @@ OUT = REPO / "diagnostics/a33-data-patch"
 # above regardless of how many ranges a given plan has.
 BASE_ADDR = 0x58000000
 SLOT = 0x10000
+
+def with_nulldev(script):
+    """--nulldev: the whole script sits in the `then` branch of `setenv stdin nulldev`, the
+    same shape as the null-console ums-readonly.cmd, so nothing in it can run if that fails."""
+    return ("# Ignore floating serial input (it can look like Ctrl-C); the script runs only if that works.\n"
+            "if setenv stdin nulldev; then\n"
+            + script
+            + "else\n"
+            "  echo STOP: could not disable serial input, nothing written\n"
+            "  while true; do sleep 1; done\n"
+            "fi\n")
 
 
 def fail(message):
@@ -187,11 +205,15 @@ def guarded_script(writes, title, expect, write):
 
 
 def main():
-    if len(sys.argv) != 4:
+    args = sys.argv[1:]
+    nulldev = "--nulldev" in args
+    if nulldev:
+        args.remove("--nulldev")
+    if len(args) != 3:
         sys.exit(__doc__)
-    orig_path = Path(sys.argv[1]).resolve(strict=True)
-    edited_path = Path(sys.argv[2]).resolve(strict=True)
-    partition_start_sector = int(sys.argv[3])
+    orig_path = Path(args[0]).resolve(strict=True)
+    edited_path = Path(args[1]).resolve(strict=True)
+    partition_start_sector = int(args[2])
     partition_start_byte = partition_start_sector * SECTOR
 
     size = orig_path.stat().st_size
@@ -249,6 +271,7 @@ def main():
         "partition_start_sector": partition_start_sector,
         "source_orig_image": str(orig_path),
         "source_edited_image": str(edited_path),
+        "nulldev": nulldev,
         "writes": writes,
     }
     (OUT / "plan.json").write_text(json.dumps(plan, indent=2) + "\n")
@@ -257,6 +280,8 @@ def main():
         ("write-data", guarded_script(writes, "Userdata patch", "orig", "new")),
         ("restore-data", restore_script(writes)),
     ):
+        if nulldev:
+            script = with_nulldev(script)
         (OUT / f"{name}.cmd").write_text(script)
         (OUT / f"{name}.scr").write_bytes(script_image(script.encode()))
 
@@ -269,6 +294,8 @@ def main():
     print("over FEL. It checks every range first and writes nothing unless all of them hold")
     print("the original bytes; then it writes them in order and stops at the first write that")
     print("does not read back correctly. Undo the same way with restore-data.scr.")
+    print("Before and after, check the ranges over the read-only UMS disk with")
+    print("`emmc-macos.py verify-data diskN <exact-bytes>`.")
 
 
 if __name__ == "__main__":

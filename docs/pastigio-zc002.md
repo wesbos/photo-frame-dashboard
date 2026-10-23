@@ -407,9 +407,14 @@ table, not the first Pastigio unit (`/data` at sector 4268032).
   [second unit](#su-0-from-adb-has-no-capabilities).
 - Home HQ works as Home with Frameo disabled (`pm disable-user`), and survived a reboot.
 
-Gaps it found, not yet fixed in the repo: the generated `write-data.cmd` and `restore-data.cmd`
-have no `nulldev` guard (this unit's build needed one; it was added by hand), and
-`emmc-macos.py verify` can't check a data plan (a one-off read-only check was used).
+Two gaps it found are now in the [guarded writer](#guarded-userdata-key-writer): the generated
+`write-data.cmd` and `restore-data.cmd` had no `nulldev` guard (this unit's build needed one; it
+was added by hand), now `data-patch-prepare.py --nulldev`; and `emmc-macos.py verify` can't check
+a data plan (a one-off read-only check was used), now `emmc-macos.py verify-data`.
+
+The U-Boot patch that needed `git apply --unidiff-zero` was START STOP
+(`pf1007l-v2025.10-start-stop.patch`, which has no context lines). The no-HS patch applies with a
+plain `git apply` after the base patch.
 
 ## What remains untested or unpublished
 
@@ -485,6 +490,23 @@ your recorded bytes stops it with nothing written. Undo with `restore-data.scr` 
 same payloads. Restore also works after a write that stopped partway: ranges that already hold the
 original bytes are left alone, and it writes nothing if any range holds bytes this plan didn't make. Both scripts end in `ums 0 mmc 1`, so the eMMC is available
 read-only afterward for a whole-partition reread.
+
+If your U-Boot was built with the null console (`CONFIG_SYS_DEVICE_NULLDEV=y` and an
+`ums-readonly.cmd` starting with `setenv stdin nulldev`, as this ZC002 unit needed), prepare with
+`data-patch-prepare.py --nulldev ...`. Both scripts then run only inside a successful
+`setenv stdin nulldev`, so floating serial input can't look like Ctrl-C and stop a script partway.
+If that command fails, they write nothing and wait. Leave the option out for a build without the null console.
+
+Check the ranges over the read-only UMS disk before the write (every range must say `original`)
+and after it (every range must say `new`):
+
+```sh
+sudo python3 -I scripts/a33-uboot/emmc-macos.py verify-data diskN <exact-bytes>
+```
+
+It reads only the planned sectors, checks the payload files against `plan.json`, and stops on a
+mix of new and original ranges or on bytes the plan didn't make. After `restore-data.scr`, every
+range must say `original` again.
 
 ## Offline helper for the historical boot patch
 
