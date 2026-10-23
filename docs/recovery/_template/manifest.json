@@ -1,0 +1,45 @@
+{
+  "format_version": 1,
+  "brand": null,
+  "model": null,
+  "variant": {
+    "id": null,
+    "soc": null,
+    "board_revision": null,
+    "firmware": null,
+    "android": null,
+    "sector_size_bytes": null,
+    "disk_sectors": null,
+    "userdata_start_lba": null
+  },
+  "device_guide": null,
+  "source_issue": null,
+  "provenance": null,
+  "verification": {
+    "capture_verified": null,
+    "candidate_integrity_verified": null,
+    "privacy_review": "not_reviewed",
+    "restore_tested": false,
+    "cross_unit_restore_tested": false
+  },
+  "publication": {
+    "status": "maintainer_decision_required",
+    "project_release_url": null
+  },
+  "artifacts": [
+    {
+      "filename": null,
+      "purpose": null,
+      "compression": null,
+      "file_bytes": null,
+      "sha256": null,
+      "expanded_bytes": null,
+      "expanded_sha256": null,
+      "start_lba": null,
+      "sector_count": null,
+      "download_url": null
+    }
+  ],
+  "privacy_exclusions": [],
+  "limitations": []
+}
