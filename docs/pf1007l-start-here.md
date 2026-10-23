@@ -247,6 +247,8 @@ every boot (#187). If neither the router nor the frame lets you change DNS, a
 Linux computer can run its own isolated Wi-Fi hotspot whose DHCP hands out its own DNS: no
 internet and no change to the home network are needed
 ([Linux hotspot report](pf1007l-linux-20260416-hotspot-report.md#t3c-on-the-computers-hotspot)).
+On a Mac, Internet Sharing and a `pf` redirect of TCP 7806 do the same with no DNS change at all
+([macOS Internet Sharing guide](t3c-macos-internet-sharing.md), `20260519`).
 
 **While this access is active, port 5555 is root ADB with no key check, open to your whole
 network.** Run it on a network you control, finish the T8 lock-down in the same session, then
