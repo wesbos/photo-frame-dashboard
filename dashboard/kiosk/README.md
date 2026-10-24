@@ -77,6 +77,9 @@ adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
 adb shell cmd package set-home-activity com.wesbos.homehq/.Home
 ```
 
+If `set-home-activity` answers "Failed to set default home", wait a few seconds for the Home alias
+to register and run it again (seen on a Skylight 150-CAL).
+
 Wait about 30 seconds before rebooting. Android saves the Home alias a few seconds later, and on
 a PF1508 (Android 15, #167) a reboot 2 seconds after these commands turned the alias back off, so the
 frame booted into the previous Home app. The same delayed save lost a `pm disable-user` on a
@@ -192,6 +195,35 @@ because Wi-Fi is often still connecting for the first minute after boot.
 On frames without a navigation bar (most PF1007L units), set up the navigation service in
 [Frames without Home or Back buttons](#frames-without-home-or-back-buttons) first. Otherwise
 **Open Wi-Fi settings** leaves no way back to the dashboard.
+
+## Networks without internet access
+
+A frame on a LAN-only network (an isolated VLAN that reaches only the dashboard server) needs two
+settings. Without them it can't rejoin the network on its own, and its clock drifts.
+
+- **Stay joined.** Android checks each Wi-Fi network for internet access. On a Skylight 150-CAL
+  (Android 12), a network that failed the check was marked `NETWORK_SELECTION_DISABLED_NO_INTERNET_PERMANENT`
+  in `adb shell dumpsys wifi`. After Wi-Fi was turned off and on, the frame didn't rejoin it
+  (a reboot would leave it in the same state). This command turns the check off:
+
+  ```sh
+  adb shell settings put global captive_portal_mode 0
+  ```
+
+  Then join the network once by hand on the frame; that clears the flag. To undo:
+  `adb shell settings delete global captive_portal_mode`. This turns off Android's sign-in-page
+  detection everywhere. The kiosk's own check above still runs when the dashboard can't load.
+  Alternatively, `captive_portal_http_url` and `captive_portal_https_url` can point at a LAN server
+  that answers HTTP 204; that hasn't been tried on a frame.
+- **Network time.** Android gets the time from `time.android.com`. Point it at an NTP server on the
+  LAN that the frame's network is allowed to reach (UDP 123), and keep automatic time on:
+
+  ```sh
+  adb shell settings put global ntp_server <lan-ntp-server>
+  adb shell settings put global auto_time 1
+  ```
+
+  Android only asks again when its last result is more than a day old; a reboot asks at once.
 
 ## Time zone
 
