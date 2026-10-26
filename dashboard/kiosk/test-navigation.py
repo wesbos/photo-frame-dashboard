@@ -19,8 +19,14 @@ HARNESS = r'''
 package com.wesbos.homehq;
 import java.util.Objects;
 
-class NavigationService { static boolean isConnected() { return true; } }
-class Handler { void postDelayed(Runnable r, long delayMillis) {} }
+class NavigationService {
+  static boolean connected = true;
+  static boolean isConnected() { return connected; }
+}
+class Handler {
+  static boolean runNow;
+  void postDelayed(Runnable r, long delayMillis) { if (runNow) r.run(); }
+}
 class PackageManager { static final int PERMISSION_GRANTED = 0; }
 class Log {
   static void i(String tag, String msg) {}
@@ -114,6 +120,16 @@ __METHOD__
     check("not granted or revoked before check", OWN, 0, -1, false, OWN, 0, 0, 0);
     check("permission lost before master write", OWN, 0, 0, true, OWN, 0, 0, 0);
     check("permission lost before list write", OTHER, 0, 0, true, OTHER, 0, 0, 0);
+    // The delayed check runs and the service isn't bound: take it off the list, then put it back.
+    // PF1508 (Android 15): after boot the switch alone doesn't bind it, so this must follow too.
+    NavigationService.connected = false;
+    Handler.runNow = true;
+    check("selected, master off, still unbound: rebind", OWN, 0, 0, false, OWN, 1, 2, 1);
+    check("selected, master on, unbound: rebind", OWN, 1, 0, false, OWN, 1, 2, 0);
+    check("other services kept through a rebind", OTHER + ":" + OWN, 0, 0, false, OTHER + ":" + OWN, 1, 2, 1);
+    NavigationService.connected = true;
+    check("selected, master off, bound by then: no rebind", OWN, 0, 0, false, OWN, 1, 0, 1);
+    Handler.runNow = false;
   }
 }
 '''

@@ -189,6 +189,32 @@ Its **Back** and **Dashboard** buttons showed over KISS and Android Settings, an
 returned to the kiosk. By hand on the panel: the two-finger hold → **Android settings** → **Apps**,
 then **Dashboard** back (README rule 9).
 
+### The navigation service after a reboot
+
+On a second unit (same firmware, Windows 11 host, 2026-10-25), the buttons were gone after a
+reboot. The service stayed in `enabled_accessibility_services`, but `accessibility_enabled` was
+back to `0` and nothing was bound. Logcat during boot:
+
+```text
+AccessibilityManagerService: Ignoring non-encryption-aware service ComponentInfo{com.wesbos.homehq/com.wesbos.homehq.NavigationService}
+```
+
+Android binds only direct-boot-aware services while the user is still locked, and then records the
+switch as off. Setting `accessibility_enabled` back to `1` alone did not bind the service. Taking
+it off the list and putting it back did.
+
+With the optional grant from the [kiosk README](../dashboard/kiosk/README.md#frames-without-home-or-back-buttons),
+Home HQ now does that itself about 5 seconds after it starts:
+
+```sh
+adb shell pm grant com.wesbos.homehq android.permission.WRITE_SECURE_SETTINGS
+# undo: adb shell pm revoke com.wesbos.homehq android.permission.WRITE_SECURE_SETTINGS
+```
+
+Checked on that unit after an `adb install -r` (which also unbinds the service) and after a
+reboot: logcat showed `Navigation service listed but not running, rebinding`, the service was
+bound, and the buttons showed over Android Settings.
+
 ## Not tested
 
 - The hosted dashboard over Wi-Fi.
