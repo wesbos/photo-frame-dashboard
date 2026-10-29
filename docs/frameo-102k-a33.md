@@ -524,10 +524,12 @@ Undo is as in [unit 3's table](#undo-this-unit), plus `adb uninstall com.wesbos.
 `su 1000 service call alarm 3 s16 America/New_York` for the time zone. Nothing was written to
 `/system` or the boot partition.
 
-### Not checked yet on this unit
+### The way back, checked by hand
 
-- By hand on the panel: the floating Back and Dashboard buttons outside the kiosk, and the
-  two-finger menu reaching Android Settings → Apps. Until then, the way back is USB ADB with
-  `su 0`.
+The owner checked on the panel that the floating Back and Dashboard buttons show over Android's
+Wi-Fi settings, and that the kiosk's two-finger menu reaches Android Settings → Apps.
+
+### Not tested on this unit
+
 - USB-C to USB-C with DC unplugged, and a measurement of VBUS on the frame's port with DC in.
 - What Frameo or Adups do online over a longer period.
