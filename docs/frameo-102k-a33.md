@@ -18,6 +18,10 @@ page.
 and fingerprint and has a byte-identical boot partition. It differs in eMMC size. See
 [Units sold as 112K](#units-sold-as-112k).
 
+**On a Mac, unplug the DC adapter first.** A fourth unit, from the same Amazon.ca listing, only
+connected to a Mac with its DC adapter unplugged. See
+[Unit 4](#unit-4-amazonca-macos-host).
+
 ## Identity
 
 | Item | Observed value |
@@ -64,7 +68,8 @@ Guess, not verified: the ADB difference from the ZC002 is in this build's `adbd`
 
 The owner replugged between the two attempts. What changed was not recorded, so this unit does
 not show whether USB-C to USB-C fails here. The USB-A to USB-C cable through a hub is the one that
-worked.
+worked. Whether the DC adapter was plugged in during the first attempt was not recorded; on
+[unit 4](#unit-4-amazonca-macos-host) that alone stopped the Mac from connecting.
 
 ## ADB
 
@@ -431,3 +436,98 @@ Android reports `AC powered: true` either way, which is consistent with `NOPMU`.
 | Screen always on | `settings put global stay_on_while_plugged_in 0` (it was `0` before) |
 
 Nothing was written to `/system` or the boot partition.
+
+## Unit 4 (Amazon.ca, macOS host)
+
+A second unit from the same [Amazon.ca B088NHSVJN](https://www.amazon.ca/dp/B088NHSVJN) listing as
+the first, tested on 2026-10-29. Host: macOS 26.5.2 on an Apple M5 Pro MacBook Pro, Homebrew
+`adb`. The serial, MAC addresses, eMMC CID and Wi-Fi details are left out.
+
+**Short version:** the same build as the first unit, on a third eMMC size. What is new is the USB
+connection: **with the frame's DC adapter plugged in, the Mac never turned its USB port on.** With
+DC unplugged, the Mac powered the frame over USB and ADB connected.
+
+### Identity
+
+| Item | Observed value |
+| --- | --- |
+| `adb devices -l` | `product:102K model:Digital_Photo_Frame device:102K`, USB `1f3a:1001` |
+| Firmware | `102K-MS33-HK9365-frameo_V1.29.13_NOPMU_20260113`, the same |
+| Fingerprint | `Allwinner/astar_xr819/astar-xr819:6.0.1/MOB30R/20260113:eng/test-keys`, `ro.build.type=user`, the same |
+| Boot partition SHA-256 | `c7e99c1d2f41c37320c1ab04baf2784ce398ece39e500faa6b48ee7e2826d5bc`, **identical** to the first unit |
+| eMMC | 61,341,696 sectors, larger than both earlier sizes (61,079,552 and 60,620,800). Every partition start and size in the [partition table](#partition-table) is the same except UDISK (`/data`): 57,073,664 sectors from 4268032, ending at the end of the eMMC |
+| `ro.config.low_ram` | `true`, as on units 2 and 3 |
+| Frameo / WebView | `net.frameo.frame` v1.29.13; `com.android.webview` 106.0.5249.126. SELinux permissive |
+
+### USB and power on a Mac
+
+| Setup | Result |
+| --- | --- |
+| USB-C to USB-C cable, frame on its DC adapter | Nothing enumerated. The Mac logged a failed connection attempt about every half second for about 20 minutes. Not retried with DC unplugged |
+| Mac USB-C port → USB-C-to-USB-A adapter → USB-A-to-USB-C data cable, frame on its DC adapter | Nothing enumerated, in two different ports. The Mac never turned the port on. Instead `AppleHPM` logged `LDCM Interrupt triggered` (its liquid-detection check) about every 31 s. A USB flash drive in the same adapter and port enumerated at once |
+| The same adapter and cable, DC unplugged | The Mac powered the frame, which booted. It enumerated as `1f3a:efe8` for about 3 s, then as `1f3a:1001` (`Android`) 6 s later, both at 480 Mb/s |
+
+- macOS blocked both devices at first. The log showed `device functionality blocked by transport
+  restrictions` until the owner allowed the accessory on the Mac. Then `adb devices` showed
+  `device`, with no prompt on the frame.
+- The frame ran on the Mac's USB power alone for the whole session, including the backup and the
+  kiosk setup.
+- `1f3a:efe8` is Allwinner's FEL ID. It showed up once, during the boot from USB power. Not
+  investigated.
+
+Guess, not verified: with DC in, the frame puts 5 V on its own USB VBUS, and the Mac won't turn on
+a port that already has voltage on it. Nothing was measured. The same cause may explain the USB-C
+to USB-C failure here.
+
+On this unit and this Mac: unplug the DC adapter before you connect USB, and unplug USB before you
+plug DC back in. Windows and Linux hosts, and powered hubs, were not tried with DC in.
+
+### Out of the box
+
+- Never on Wi-Fi; Frameo on its first-run language screen.
+- `pm list packages -d` listed only `com.android.systemui`. Adups FOTA and the vendor test apps
+  were enabled.
+- `persist.sys.timezone` was `America/New_York`. The clock read 2024-12-31 before the frame was
+  first online, and network time set it correctly once it joined Wi-Fi. Guess: no RTC battery.
+
+### Backup
+
+Every partition except UDISK and cache, read with
+`adb exec-out "su <uid> dd if=/dev/block/by-name/<name> bs=1048576"`: `su 0`, and `su 1000` for
+`misc` and `frp` (see [Root](#root)). For each image, the size matched
+`/sys/class/block/<dev>/size`, the MD5 matched `md5sum` on the frame, and the last 4 KiB was not
+`0xCC` filler. Second reads of `bootloader`, `env` and `boot` matched by SHA-256. The images were
+kept uncompressed, so there was no gzip readback.
+
+### What was set up (approved writes, all in `/data`)
+
+1. Built `dashboard/kiosk` with `build.sh` on macOS (Homebrew `openjdk@17` and
+   `android-commandlinetools`, build-tools 34.0.0, platform 34) at commit `0bff55e`. It built with
+   no changes.
+2. `adb install -r`, then
+   `am start -n com.wesbos.homehq/.MainActivity --es url https://home-dashboard.wesbos.workers.dev/ --ez home true`
+   (the hosted demo).
+3. `su 0 pm disable` for `net.frameo.frame`, `com.adups.fota`, `com.along.table`,
+   `com.along.factorytest` and `com.android.agingtest`, before the frame was ever online.
+4. The navigation service, as on [unit 3](#kiosk): `pm grant` of `WRITE_SECURE_SETTINGS`, then
+   `enabled_accessibility_services` and `accessibility_enabled` (both were `null`).
+5. `stay_on_while_plugged_in` 7 (it was 0). Time zone with `su 1000 setprop persist.sys.timezone <zone>`
+   and `su 1000 service call alarm 3 s16 <zone>`, which answered `Parcel(00000000 '....')`.
+
+After a reboot, `sys.boot_completed` came after about 20 s, then the kiosk
+(`com.wesbos.homehq/.Home`) on its "Connect to Wi-Fi?" screen. The disables, the navigation
+service binding and both settings held. The owner joined Wi-Fi on the panel from that screen.
+Online, network time set the clock, the demo loaded, and Frameo, Adups and the test apps were not
+running.
+
+Undo is as in [unit 3's table](#undo-this-unit), plus `adb uninstall com.wesbos.homehq`, and
+`su 1000 service call alarm 3 s16 America/New_York` for the time zone. Nothing was written to
+`/system` or the boot partition.
+
+### Not checked yet on this unit
+
+- By hand on the panel: the floating Back and Dashboard buttons outside the kiosk, and the
+  two-finger menu reaching Android Settings → Apps. Until then, the way back is USB ADB with
+  `su 0`.
+- USB-C to USB-C with DC unplugged, and a measurement of VBUS on the frame's port with DC in.
+- What Frameo or Adups do online over a longer period.
