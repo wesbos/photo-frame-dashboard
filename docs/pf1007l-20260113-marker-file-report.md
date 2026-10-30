@@ -106,3 +106,79 @@ Route used and result: empty license.properties microSD -> manufacturer screen -
 Host OS: macOS 26.6.2, Apple silicon
 First failed step: initial full boot stream returned 93184 of 33554432 bytes; rejected, USB subsequently disconnected. Device-side hashes completed after reconnect; host-side backup remains unverified.
 ```
+
+## Second unit, larger eMMC (macOS 27, 2026-10-30)
+
+A second PF1007L with the same firmware, reproduced from macOS 27.0.1 on Apple silicon. Every
+field below was read over USB in this session unless marked as the owner's.
+
+### Identity: matches the first unit
+
+| Field | Observed result |
+| --- | --- |
+| Firmware (About screen, owner) | `YHK.F-null-A33-1001-D1024-PF1007L-321-OS-AIMOR.0.20260113` |
+| Ports (owner) | USB-C only |
+| Build fingerprint | `AEEZO/astar_m86_8723cs/astar-m86_8723cs:6.0.1/MOB30R/20260113:eng/test-keys` |
+| AiMOR / WebView / test app | `6.0.78` (code 78) / `44.0.2403.119` / `YHKSign_20250303` |
+| Kernel, RAM, display | `3.4.39`; `MemTotal: 1026980 kB`; 1280 x 800, density 160 |
+| eMMC | 30,777,344 sectors (the larger eMMC) |
+| Boot partition | `mmcblk0p6`, start 172032, 65,536 sectors |
+| Boot SHA-256, first 31,028 sectors | `d71c313ddaa4693948acb20af7740ccb56c88bf9376746a47fce2d00c14fc6a4`, hashed on the frame and again on the host |
+| USB before / after | `1f3a:1000` "Android", mass storage with no medium, no ADB / `1f3a:1002`, `mass_storage,adb` |
+| ADB identity | `uid=0(root)` without `su`; `ro.adb.secure=0`; SELinux `Disabled` |
+| Network ADB | `service.adb.tcp.port` and `persist.adb.tcp.port` empty; the frame was never on Wi-Fi |
+
+### What was different
+
+- **Card:** a 64 GB microSD that came formatted exFAT, reformatted on the Mac with
+  `diskutil eraseDisk FAT32 AIMOR MBRFormat`. The empty `license.properties` worked from this card.
+  macOS also wrote an AppleDouble `._license.properties` (4,096 bytes) next to it; it did not stop
+  the marker from working. The card was not tried as exFAT, so whether exFAT works is untested.
+- **Connection:** the frame was on the USB 2.0 hub of a USB-C dock (VIA Labs hub). USB data and the
+  full backup below worked through it with no dropouts.
+- **Reboot persistence, measured by the host:** after `adb reboot` with no card inserted, the frame
+  re-enumerated as `1f3a:1002` about 25 s later and `sys.boot_completed=1` about 42 s after the
+  reboot command. `adb shell id` returned `uid=0(root)`, and both `sys.usb.config` and
+  `persist.sys.usb.config` were `mass_storage,adb`.
+
+### A full backup over USB ADB, no truncation
+
+The first unit's single-stream boot copy stopped at 93,184 bytes. On this unit, chunked reads with
+`/sbin/busybox dd` (BusyBox v1.18.3) never fell short:
+
+```sh
+adb -d exec-out '/sbin/busybox dd if=/dev/block/mmcblk0p6 bs=1048576 skip=<n> count=4 2>/dev/null'
+```
+
+For each chunk the host checked the exact byte count, rejected all-`0xCC` filler, and compared the
+host SHA-256 with a second, independent read hashed on the frame with `/sbin/busybox sha256sum`.
+The chunks were joined, hashed, gzipped and read back.
+
+| Capture | Chunks | Result |
+| --- | --- | --- |
+| `mmcblk0p6` (boot), 33,554,432 bytes | 8 × 4 MiB, about 1 s each | All matched on the first try; first 31,028 sectors = `d71c313d…` |
+| `mmcblk0boot0` and `mmcblk0boot1`, 4,194,304 bytes each | 1 × 4 MiB each | Matched; `boot1` is all zeros |
+| `mmcblk0`, 15,758,000,128 bytes | 59 × 256 MiB, about 43 min in all | All 59 matched on the first try; the boot region at sector 172032 in the full image matched the separate boot capture |
+
+The full image was read from running Android, so `/data` may have changed between chunks; each
+chunk's two reads agreed. Earlier units saw stock `dd` return 0 bytes past 2 GiB; `busybox dd`
+was used for every chunk here, so the stock `dd` limit was not tested.
+
+### Summary
+
+```text
+About model / firmware: PF1007L / YHK.F-null-A33-1001-D1024-PF1007L-321-OS-AIMOR.0.20260113
+AiMOR version: 6.0.78
+Ports (DC jack, or USB-C only): USB-C only
+Cable and port that gave USB data: frame USB-C -> USB 2.0 hub of a USB-C dock -> Mac
+T3 USB IDs seen / adb devices output: 1f3a:1000 "Android" (mass storage, no medium); after the marker route 1f3a:1002, device, product astar_m86_8723cs, model AEEZO
+T3b network ADB result (port 5555): not tested; frame never on Wi-Fi
+T4 sunxi-fel version output: skipped; no FEL needed
+T5 check-dump stage / chunks: skipped
+eMMC size in sectors: 30777344
+Boot partition start sector: 172032; partition length 65536 sectors
+Boot image SHA-256 (sector 172032, 31028 sectors): d71c313ddaa4693948acb20af7740ccb56c88bf9376746a47fce2d00c14fc6a4
+Route used and result: empty license.properties on a 64 GB FAT32 (MBR) microSD -> manufacturer screen -> top-left five taps -> test app -> is closed to is open -> root USB ADB; persisted across adb reboot (host-measured)
+Host OS: macOS 27.0.1, Apple silicon
+First failed step and its exact output: none; full eMMC backup over ADB in 256 MiB busybox dd chunks, all verified
+```
