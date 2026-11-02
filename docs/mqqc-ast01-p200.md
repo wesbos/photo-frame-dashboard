@@ -6,8 +6,9 @@ guesses. Unique identifiers (serial, MAC, IP) are left out.
 **Short version:** sold as MQQC AST01; Android reports a SciShion `P200` made by `ChipTrip`. It is
 an `F606C` + `rk915` build like the [Denver PFF-1024BMK2](denver-pff-1024bmk2.md) and the
 [Veidoo F10](veidoo-f10.md), with the same partition starts as the Denver PFF-1015, Rollei 107 and
-[Runxion RK3126](runxion-zn-dp1002-rk3126.md). ADB from Frameo's settings over a USB-A to USB-C
-cable, no prompt, shipped root `su`.
+[Runxion RK3126](runxion-zn-dp1002-rk3126.md). ADB from Frameo's settings, no prompt, shipped
+root `su`. **Only a USB-A to USB-C data cable worked**: USB-C to USB-C, wireless ADB and the reset
+button gave no connection.
 
 **It ships the hidden root agent `iotv`**, a newer build than the one recorded on the Runxion
 RK3126. See [iotv on this unit](#iotv-on-this-unit). Check for it before the frame goes online.
@@ -39,13 +40,16 @@ RK3126. See [iotv on this unit](#iotv-on-this-unit). Check for it before the fra
 
 ### USB, ADB and root
 
-- **Cable:** a USB-C to USB-C cable gave nothing: no USB device enumerated on the Mac, and no ADB on
-  the network. A **USB-A to USB-C** data cable (through a hub) worked.
+- **The only way in that worked was a USB-A to USB-C data cable** (USB-A end in a hub on the Mac).
+  These all failed:
+  - **USB-C to USB-C cable:** no USB device enumerated on the Mac at all.
+  - **Wireless ADB:** no connection (owner's test). A scan of TCP 5555 on the LAN also found
+    nothing, but the frame was not on Wi-Fi at that moment.
+  - **Reset button:** no connection (owner's test; exact sequence not recorded). Loader mode was not
+    reached.
 - **ADB:** Frameo → Settings → Beta program → ADB access, USB `2207:0006`, product `P200`. `adb devices` showed
   `device` (authorized). There is no `/data/misc/adb/adb_keys` or `/adb_keys`, although
   `ro.adb.secure=1`: as on the Denver frames, `adbd` appears not to check keys (one computer tested).
-- No network ADB: nothing answered on TCP 5555 (the frame was not on Wi-Fi during this record, so
-  that is not conclusive).
 - **Root:** `/system/xbin/su` (SuperSU, `daemonsu` started by `init`). `su 0 id` and `su -c id`
   return `uid=0(root)` with no prompt.
 - **Frameo holds root sessions:** two `su` processes owned by Frameo's uid while it runs.
@@ -131,8 +135,8 @@ updaters are still disabled; `su` works; Frameo starts as before.
 | Phase | State |
 | --- | --- |
 | 1 Identify | Done. `F606C`/`rk915` build, Denver PFF-1024BMK2 partition layout, 1 GB RAM. |
-| 2 ADB | Done: Frameo ADB access, USB-A to USB-C cable. |
-| 3 Loader mode | Not needed. Not tested. |
+| 2 ADB | Done: Frameo ADB access, USB-A to USB-C cable only. USB-C to USB-C and wireless ADB failed. |
+| 3 Loader mode | Not needed. The reset button gave no connection (owner's test). |
 | 4 Back up | Done and verified (partial: `userdata` excluded). Restore untested. |
 | 5 Root | Shipped `su` works. |
 | 6 Make it useful | Not started. `iotv` and the updaters removed or disabled; Frameo still the Home app. |
