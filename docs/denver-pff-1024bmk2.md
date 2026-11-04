@@ -136,7 +136,7 @@ Same as the PFF-1015 when disabling Frameo:
 
 USB ADB keeps working with Frameo disabled (`persist.sys.usb.config=adb`).
 
-Check for `/system/bin/iotv` and a `run_iotv` service: the [Runxion RK3126](runxion-zn-dp1002-rk3126.md#hidden-root-agent-iotv) shares this partition layout and ships that hidden root agent. Not checked on this unit.
+Check for `/system/bin/iotv` and a `run_iotv` service: the [Runxion RK3126](runxion-zn-dp1002-rk3126.md#hidden-root-agent-iotv) shares this partition layout and ships that hidden root agent. Not checked on this unit. The [MQQC AST01](mqqc-ast01-p200.md#iotv-on-this-unit), an `F606C` build with the same layout, ships it too.
 
 ## Status against the README phase map
 

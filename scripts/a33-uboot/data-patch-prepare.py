@@ -6,14 +6,21 @@ original bytes. Uses this repo's existing READ-ONLY U-Boot build
 (build-uboot.sh) — it never exposes the eMMC as a writable host disk.
 
 Usage (from the repository root):
-  python3 -I scripts/a33-uboot/data-patch-prepare.py \
+  python3 -I scripts/a33-uboot/data-patch-prepare.py [--nulldev] \
       <orig-data-partition.img> <edited-data-partition.img> <data-partition-start-sector>
 
 The two images are copies of the SAME /data partition extracted from your own
 verified eMMC backup: one untouched, one with your intended edit (made with
 e.g. `debugfs -w` on the edited copy only, never on the backup itself).
 <data-partition-start-sector> is that partition's start sector within the full
-eMMC, from your own parsed partition table.
+eMMC, from your own parsed partition table. The full backup and an edited clone
+of it, with start sector 0, give the same plan without extracting /data.
+
+--nulldev runs both generated scripts only after `setenv stdin nulldev`
+succeeds, as the null-console U-Boot builds' ums-readonly.cmd does, so floating
+serial input can't look like Ctrl-C and stop a script partway. If that command
+fails, nothing in the script runs. Use it only with a U-Boot built with
+CONFIG_SYS_DEVICE_NULLDEV=y; on other builds the guard stops every run.
 
 This only reads the two local images and writes payloads + guarded scripts to
 diagnostics/a33-data-patch/. Nothing here touches a device. Re-derive your own
@@ -46,9 +53,21 @@ OUT = REPO / "diagnostics/a33-data-patch"
 # 0x4A000000; boot-patch.py's own payloads use 0x50000000-0x55FFFFFF. Each
 # range gets three buffers (orig, new, a scratch read-back buffer), spaced
 # 64 KiB apart — generous for payloads this small, and clear of both ranges
-# above regardless of how many ranges a given plan has.
+# above. Refuse a plan that would exceed the reserved 16 MiB buffer window.
 BASE_ADDR = 0x58000000
 SLOT = 0x10000
+BUFFER_END = 0x59000000
+
+def with_nulldev(script):
+    """--nulldev: the whole script sits in the `then` branch of `setenv stdin nulldev`, the
+    same shape as the null-console ums-readonly.cmd, so nothing in it can run if that fails."""
+    return ("# Ignore floating serial input (it can look like Ctrl-C); the script runs only if that works.\n"
+            "if setenv stdin nulldev; then\n"
+            + script
+            + "else\n"
+            "  echo STOP: could not disable serial input, nothing written\n"
+            "  while true; do sleep 1; done\n"
+            "fi\n")
 
 
 def fail(message):
@@ -95,42 +114,74 @@ def fine_ranges(orig_path, edited_path, regions):
     return ranges
 
 
-def restore_script(writes):
-    """Undo, including after a write that stopped partway. Phase 1: every range must hold
-    either the new bytes or the original bytes (and both payload CRC-32s must match);
-    anything else means the eMMC is not in a state this plan made, so nothing is written.
-    Phase 2: ranges that already hold the original bytes are left alone; the others get the
-    original bytes back, each read back and compared, stopping at the first failure."""
-    lines = ["# Undo the userdata patch. Load each range's orig/new payload with sunxi-fel first.",
-             "# Phase 1: every range must hold the new or the original bytes, or nothing is written.",
-             "# Phase 2: ranges holding the new bytes get the original bytes back.",
-             "mmc dev 1",
-             "setenv all_ok 1"]
+def _read(w):
+    return f"mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x}"
+
+
+def _payload_checks(w):
+    return (f"crc32 -v {w['orig_addr']:#x} {w['length']:#x} {w['orig_crc32']} && "
+            f"crc32 -v {w['new_addr']:#x} {w['length']:#x} {w['new_crc32']}")
+
+
+def _compare(w, kind):
+    return f"cmp.b {w[f'{kind}_addr']:#x} {w['read_addr']:#x} {w['length']:#x}"
+
+
+def _write_checked(w, kind):
+    return (f"mmc write {w[f'{kind}_addr']:#x} {w['sector']:#x} {w['sectors']:#x} && "
+            f"{_read(w)} && {_compare(w, kind)}")
+
+
+def _script(writes, title, expect, write, restore=False):
+    """Nest every continuation inside successful checks, without mutable environment flags.
+
+    All ranges pass phase 1 before any write. Phase 2 rechecks both payloads and makes a fresh
+    read before each write. An already-original restore range is skipped, but an unknown range
+    or any command failure prevents every later write. Even if read-only ums returns, there is
+    no remaining write command outside the successful conditional branches.
+    """
+    if not writes:
+        raise ValueError("cannot generate a write script with no ranges")
+    lines = [f"# {title}. Load every orig/new payload with sunxi-fel first.",
+             "# Phase 1 checks all ranges; phase 2 rechecks each before writing and verifying it."]
+    closers = []
+
+    def guard(command, message):
+        pad = "  " * len(closers)
+        lines.append(f"{pad}if {command}; then")
+        closers.append((pad, message))
+
+    guard("mmc dev 1", "could not select eMMC, nothing written")
     for w in writes:
-        lines.append(f"mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x}")
-        lines.append(f"if crc32 -v {w['orig_addr']:#x} {w['length']:#x} {w['orig_crc32']} && "
-                     f"crc32 -v {w['new_addr']:#x} {w['length']:#x} {w['new_crc32']}; then")
-        lines.append(f"  if cmp.b {w['new_addr']:#x} {w['read_addr']:#x} {w['length']:#x}; then echo range {w['range']} holds the new bytes")
-        lines.append(f"  elif cmp.b {w['orig_addr']:#x} {w['read_addr']:#x} {w['length']:#x}; then echo range {w['range']} is already original")
-        lines.append(f"  else echo range {w['range']} holds unexpected bytes; setenv all_ok 0; fi")
-        lines.append(f"else echo range {w['range']} payload CRC FAILED; setenv all_ok 0; fi")
-    lines.append('if test "${all_ok}" = 1; then')
-    lines.append("  setenv go 1")
+        guard(f"{_read(w)} && {_payload_checks(w)}", f"range {w['range']} read or payload check failed, nothing written")
+        acceptable = _compare(w, expect)
+        if restore:
+            acceptable += f" || {_compare(w, 'orig')}"
+        guard(acceptable, f"range {w['range']} has unexpected bytes, nothing written")
     for w in writes:
-        lines.append('  if test "${go}" = 1; then')
-        lines.append(f"    mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x}")
-        lines.append(f"    if cmp.b {w['new_addr']:#x} {w['read_addr']:#x} {w['length']:#x}; then")
-        lines.append(f"      if mmc write {w['orig_addr']:#x} {w['sector']:#x} {w['sectors']:#x} && "
-                     f"mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x} && "
-                     f"cmp.b {w['orig_addr']:#x} {w['read_addr']:#x} {w['length']:#x}; then")
-        lines.append(f"        echo range {w['range']} restored")
-        lines.append(f"      else echo range {w['range']} restore FAILED; setenv go 0; fi")
-        lines.append("    fi")
-        lines.append("  fi")
-    lines.append("fi")
-    lines.append('if test "${all_ok}" != 1; then echo nothing written: the eMMC is not in a state this plan made; fi')
+        guard(f"{_read(w)} && {_payload_checks(w)}", f"range {w['range']} fresh read or payload check failed, no further writes")
+        if restore:
+            # A compound if has the status of its last executed command (U-Boot hush).
+            # Both branches must succeed before the next range is reachable; no go/all_ok flag.
+            pad = "  " * len(closers)
+            lines += [f"{pad}if", f"{pad}  if {_compare(w, 'orig')}; then",
+                      f"{pad}    true", f"{pad}  else",
+                      f"{pad}    {_compare(w, 'new')} && {_write_checked(w, 'orig')}",
+                      f"{pad}  fi", f"{pad}then"]
+            closers.append((pad, f"range {w['range']} restore failed, no further writes"))
+        else:
+            guard(f"{_compare(w, expect)} && {_write_checked(w, write)}",
+                  f"range {w['range']} check or write/readback failed, no further writes")
+    lines.append("  " * len(closers) + "echo all ranges verified")
+    for pad, message in reversed(closers):
+        lines += [f"{pad}else", f"{pad}  echo STOP: {message}", f"{pad}fi"]
     lines.append("ums 0 mmc 1")
     return "\n".join(lines) + "\n"
+
+
+def restore_script(writes):
+    """Undo a complete or partial write, leaving already-original ranges untouched."""
+    return _script(writes, "Undo the userdata patch", "new", "orig", restore=True)
 
 
 def script_image(text):
@@ -143,58 +194,27 @@ def script_image(text):
 
 
 def guarded_script(writes, title, expect, write):
-    """Two phases. First every range is checked (both CRC-32s, and the eMMC must hold the
-    `expect` bytes); if any check fails, nothing is written, so the filesystem is never left
-    half-edited by a range that was already wrong. Then a nested, fail-stop chain: range i's
-    write only runs if its checks pass again, and range i+1 only runs if range i's write
-    happened and read back correctly."""
-    lines = [f"# {title}. Load each range's orig/new payload with sunxi-fel first.",
-             f"# Phase 1 checks every range; nothing is written unless all hold the {expect} bytes.",
-             "# Phase 2 writes the ranges in order and stops at the first check or write that fails.",
-             "mmc dev 1",
-             "setenv all_ok 1"]
-    for w in writes:
-        lines.append(f"mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x}")
-        lines.append(f"if crc32 -v {w['orig_addr']:#x} {w['length']:#x} {w['orig_crc32']} && "
-                     f"crc32 -v {w['new_addr']:#x} {w['length']:#x} {w['new_crc32']} && "
-                     f"cmp.b {w[f'{expect}_addr']:#x} {w['read_addr']:#x} {w['length']:#x}; then")
-        lines.append(f"  echo range {w['range']} checked")
-        lines.append("else")
-        lines.append(f"  echo range {w['range']} FAILED its check; setenv all_ok 0")
-        lines.append("fi")
-    lines.append('if test "${all_ok}" = 1; then')
-    closers = ["fi"]
-    for w in writes:
-        pad = "  " * len(closers)
-        lines.append(f"{pad}mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x}")
-        checks = (f"crc32 -v {w['orig_addr']:#x} {w['length']:#x} {w['orig_crc32']} && "
-                  f"crc32 -v {w['new_addr']:#x} {w['length']:#x} {w['new_crc32']} && "
-                  f"cmp.b {w[f'{expect}_addr']:#x} {w['read_addr']:#x} {w['length']:#x}")
-        lines.append(f"{pad}if {checks}; then")
-        closers.append(f"{pad}fi")
-        pad2 = pad + "  "
-        write_check = (f"mmc write {w[f'{write}_addr']:#x} {w['sector']:#x} {w['sectors']:#x} && "
-                       f"mmc read {w['read_addr']:#x} {w['sector']:#x} {w['sectors']:#x} && "
-                       f"cmp.b {w[f'{write}_addr']:#x} {w['read_addr']:#x} {w['length']:#x}")
-        lines.append(f"{pad2}if {write_check}; then")
-        closers.append(f"{pad2}fi")
-    # The innermost `if` needs a body: an empty then/fi is invalid in U-Boot's hush shell.
-    lines.append(f"{pad2}  echo all ranges written")
-    lines += reversed(closers)
-    lines.append('if test "${all_ok}" != 1; then echo nothing written: a range did not hold the expected bytes; fi')
-    lines.append("ums 0 mmc 1")
-    return "\n".join(lines) + "\n"
+    """Check all original ranges first, then write and verify in a fail-closed chain."""
+    return _script(writes, title, expect, write)
 
 
 def main():
-    if len(sys.argv) != 4:
+    args = sys.argv[1:]
+    nulldev = "--nulldev" in args
+    if nulldev:
+        args.remove("--nulldev")
+    if len(args) != 3:
         sys.exit(__doc__)
-    orig_path = Path(sys.argv[1]).resolve(strict=True)
-    edited_path = Path(sys.argv[2]).resolve(strict=True)
-    partition_start_sector = int(sys.argv[3])
+    orig_path = Path(args[0]).resolve(strict=True)
+    edited_path = Path(args[1]).resolve(strict=True)
+    partition_start_sector = int(args[2])
+    if partition_start_sector < 0:
+        fail("partition start sector must be nonnegative")
     partition_start_byte = partition_start_sector * SECTOR
 
     size = orig_path.stat().st_size
+    if size == 0 or size % SECTOR:
+        fail("images must have a positive, whole-sector size")
     if edited_path.stat().st_size != size:
         fail("orig and edited images are different sizes")
 
@@ -206,6 +226,12 @@ def main():
     ranges = fine_ranges(orig_path, edited_path, regions)
     print(f"  {len(ranges)} byte range(s) differ, {sum(e - s for s, e in ranges)} bytes total")
 
+    if not ranges:
+        fail("images contain no changed sectors")
+    if BASE_ADDR + len(ranges) * 3 * SLOT > BUFFER_END:
+        fail("changed ranges exceed the reserved RAM buffer window")
+    if any(e - s > SLOT for s, e in ranges):
+        fail(f"a changed range exceeds the {SLOT}-byte RAM slot")
     if OUT.exists():
         fail(f"{OUT} already exists; remove it first to re-prepare")
     OUT.mkdir(parents=True)
@@ -249,6 +275,7 @@ def main():
         "partition_start_sector": partition_start_sector,
         "source_orig_image": str(orig_path),
         "source_edited_image": str(edited_path),
+        "nulldev": nulldev,
         "writes": writes,
     }
     (OUT / "plan.json").write_text(json.dumps(plan, indent=2) + "\n")
@@ -257,6 +284,8 @@ def main():
         ("write-data", guarded_script(writes, "Userdata patch", "orig", "new")),
         ("restore-data", restore_script(writes)),
     ):
+        if nulldev:
+            script = with_nulldev(script)
         (OUT / f"{name}.cmd").write_text(script)
         (OUT / f"{name}.scr").write_bytes(script_image(script.encode()))
 
@@ -269,6 +298,8 @@ def main():
     print("over FEL. It checks every range first and writes nothing unless all of them hold")
     print("the original bytes; then it writes them in order and stops at the first write that")
     print("does not read back correctly. Undo the same way with restore-data.scr.")
+    print("Before and after, check the ranges over the read-only UMS disk with")
+    print("`emmc-macos.py verify-data diskN <exact-bytes>`.")
 
 
 if __name__ == "__main__":

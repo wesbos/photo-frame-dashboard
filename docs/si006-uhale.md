@@ -1,5 +1,11 @@
 # SI006 Uhale frame access notes
 
+**Security update:** [issue #279](sammix-aw105-uhale.md) reports a SystemUI malware loader on
+three Sammix AW105 units with the same `si006asb` product but different firmware. This guide's
+disabled-app list includes the same payload package names. Disabling them does not establish
+that their source is removed. This SI006 build has not been checked for that loader; keep a
+suspected frame isolated and use the report's read-only checks. Do not disable SystemUI.
+
 One 10.1-inch Uhale frame tested on Linux on 2026-10-11. **Root USB ADB, a verified
 firmware backup, WebView 106, and the repo's dashboard are working.** Our locally
 modified kiosk boots into Home HQ, and USB ADB reconnects without an SD card or
@@ -258,6 +264,10 @@ com.mobile.applock.xk3
 ```
 
 For these previously enabled packages, undo is `adb -d shell pm enable PACKAGE`.
+This list records package state, not malware removal. In particular, the three `xk` packages
+also appear in the [Sammix SystemUI-loader report](sammix-aw105-uhale.md); on that firmware,
+SystemUI could install payloads independently of the vendor photo app. Re-enabling a suspected
+payload is not a recommended recovery step. Preserve evidence and containment first.
 Do not disable shared Android services merely because they have a vendor-looking
 name. Core Settings, SystemUI, networking, media, and storage services remain enabled.
 

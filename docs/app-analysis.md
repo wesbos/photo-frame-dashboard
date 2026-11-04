@@ -40,6 +40,10 @@ Local code references, relative to `diagnostics/app-analysis/sources/`:
 
 JADX preserves Java package names but renames some filenames for the Mac's case-insensitive filesystem; the paths above use the generated local names.
 
+On Linux, jadx keeps the short names and prefixes clashing packages instead, so these paths don't
+match. Search the sources for `compiled from: ManufacturersMenuSubViewModel.kt` (package `p357xb`
+with jadx 1.5.6 on a 2026-10-24 run of the same APK).
+
 ## What the empty Wi-Fi list does and does not establish
 
 `NetworkScanRepo.scanForNetworks()` registers for the scan-results broadcast and calls `WifiManager.startScan()`. It logs the boolean return, but then immediately emits an error response containing the current cached results, regardless of that boolean. When a broadcast arrives, the receiver unregisters itself and emits success containing `getScanResults()`. It does not inspect the broadcast's `EXTRA_RESULTS_UPDATED` flag.

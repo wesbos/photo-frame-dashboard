@@ -8,6 +8,7 @@ Usage (run from the repository root, with sudo):
   sudo python3 -I scripts/a33-uboot/emmc-macos.py backup-resume diskN <exact-bytes>
   sudo python3 -I scripts/a33-uboot/emmc-macos.py verify-resume diskN <exact-bytes>
   sudo python3 -I scripts/a33-uboot/emmc-macos.py verify-original-resume diskN <exact-bytes>
+  sudo python3 -I scripts/a33-uboot/emmc-macos.py verify-data diskN <exact-bytes>
 
 <exact-bytes> is the eMMC size from `diskutil info diskN` (Disk Size, in bytes); on Linux
 pass the whole disk (e.g. sdb) and its size from `lsblk -b`. It
@@ -29,6 +30,11 @@ backup-resume, verify-resume, verify-original-resume
         start of the first partition, which is unique per unit) as when the run started.
         On Linux the page cache is dropped around every read, so re-reads come from the eMMC.
         verify-resume refuses to continue a saved run made with a different plan.json.
+verify-data
+        before or after write-data / restore-data: reads only the ranges in
+        diagnostics/a33-data-patch/plan.json (from data-patch-prepare.py) and reports whether
+        each holds the new bytes, the original bytes, or neither. It passes only when every
+        range holds the new bytes, or every range holds the original bytes.
 """
 
 import gzip
@@ -50,6 +56,7 @@ IMAGE = BACKUPS / "a33-emmc-full.img"
 PARTIAL = BACKUPS / "a33-emmc-full.img.partial"
 GZIP_PATH = BACKUPS / "a33-emmc-full.img.gz"
 PLAN = REPO / "diagnostics/a33-boot-patch/plan.json"
+DATA_PLAN = REPO / "diagnostics/a33-data-patch/plan.json"
 SECTOR = 512
 CHUNK = 4 * 1024 * 1024
 FILLER_RUN = 4096
@@ -377,9 +384,60 @@ def verify_original_resume(raw_path, size):
     verify_resume(raw_path, size, patched=False)
 
 
+def verify_data(raw_path, size, plan_path=DATA_PLAN):
+    """Read-only check of a data-patch-prepare.py plan: each range must hold its new or its
+    original bytes, and all ranges must agree. Only the planned sectors are read."""
+    plan = json.loads(plan_path.read_text())
+    start_sector = plan.get("partition_start_sector")
+    if type(start_sector) is not int or start_sector < 0:
+        fail("plan.json partition start must be a nonnegative integer")
+    states = []
+    with open(raw_path, "rb", buffering=0) as disk:
+        for write in plan["writes"]:
+            name = f"range {write['range']}"
+            for field in ("sector", "sectors", "length", "partition_relative_byte"):
+                value = write.get(field)
+                if type(value) is not int or value < 0:
+                    fail(f"{name}: invalid {field} in plan.json")
+            payloads = {}
+            for kind in ("new", "orig"):
+                filename = write[f"{kind}_file"]
+                if not isinstance(filename, str) or Path(filename).name != filename:
+                    fail(f"{name}: payload must be a filename inside the plan folder")
+                payload = plan_path.parent / filename
+                if payload.is_symlink():
+                    fail(f"{name}: payload must not be a symlink")
+                data = payload.read_bytes()
+                if len(data) != write["length"] or hashlib.sha256(data).hexdigest() != write[f"{kind}_sha256"]:
+                    fail(f"{write[f'{kind}_file']} does not match plan.json")
+                payloads[kind] = data
+            start = write["sector"] * SECTOR
+            if write["length"] <= 0 or write["length"] != write["sectors"] * SECTOR:
+                fail(f"{name} is not a whole number of sectors in plan.json")
+            if start != plan["partition_start_sector"] * SECTOR + write["partition_relative_byte"]:
+                fail(f"{name}'s sector does not match its partition offset in plan.json")
+            if start + write["length"] > size:
+                fail(f"{name} is past the end of the disk")
+            drop_cache(disk.fileno(), start, write["length"])
+            disk.seek(start)
+            got = disk.read(write["length"])
+            state = "new" if got == payloads["new"] else "original" if got == payloads["orig"] else "UNEXPECTED"
+            states.append(state)
+            print(f"  {name} (sector {write['sector']}, {write['length']} bytes): {state}")
+    if not states:
+        fail("plan.json has no ranges")
+    if set(states) == {"new"}:
+        print(f"Verified: all {len(states)} range(s) hold the new bytes.")
+    elif set(states) == {"original"}:
+        print(f"Verified: all {len(states)} range(s) hold the original bytes; nothing of this plan is written.")
+    else:
+        fail("the ranges are mixed or unexpected; don't boot Android. restore-data.scr puts back "
+             "ranges that hold the new bytes, and writes nothing if any range is UNEXPECTED")
+
+
 ACTIONS = {"backup": backup, "verify": verify, "verify-original": verify_original,
            "backup-resume": backup_resume, "verify-resume": verify_resume,
-           "verify-original-resume": verify_original_resume}
+           "verify-original-resume": verify_original_resume, "verify-data": verify_data}
 
 
 def main():

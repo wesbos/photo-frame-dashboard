@@ -51,6 +51,9 @@ never reuse a disk number, sector offset, boot image or backup from another fram
   prompt. The password was not known at the time (other units use `YHK88888888`,
   [#135](https://github.com/wesbos/photo-frame-dashboard/issues/135)), and that screen was not needed for the successful
   root route.
+  On a later `20260519` unit (same boot image, `9a6e2456`), `YHK88888888` opened the test app,
+  and switching its debugging control from IS CLOSED to is open gave root USB ADB with no boot patch. It came back after a reboot.
+  See the [firmware table](pf1007l-start-here.md#known-firmware-and-units).
 - During startup a brief screen offered a “debug mode” action with a countdown.
   Its role in the successful route was not established; do not assume it is needed.
 - The frame had previously been disconnected from Wi-Fi during the recovery work.

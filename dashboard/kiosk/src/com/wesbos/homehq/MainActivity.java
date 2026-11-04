@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -89,6 +90,7 @@ public class MainActivity extends Activity {
   static final long PORTAL_CHECK_MS = 5000;
   static final long PORTAL_GIVE_UP_MS = 10 * 60 * 1000;
   static final int PROBE_ONLINE = 0, PROBE_PORTAL = 1, PROBE_FAILED = 2;
+  static final long TIME_NUDGE_MS = 60 * 1000;
 
   private WebView web;
   private Button menuButton;
@@ -110,6 +112,7 @@ public class MainActivity extends Activity {
   // Captive portal: found by the last probe, on screen, closed by the owner, or its page failed.
   private boolean probing, portalFound, portalMode, portalDismissed, portalFailed;
   private long portalSince;
+  private long lastTimeNudge = -TIME_NUDGE_MS;
   private LinearLayout portalBar;
   private TextView portalText;
 
@@ -261,6 +264,7 @@ public class MainActivity extends Activity {
             || error.hasError(SslError.SSL_DATE_INVALID)) {
           offlineTitle.setText("Setting the clock\u2026");
           offlineText.setText("The frame's date is wrong after a power cut. It reloads once the time is set.");
+          nudgeNetworkTime();
         }
         retryUrl = error.getUrl() != null ? error.getUrl() : savedUrl();
         handler.removeCallbacks(retry);
@@ -338,16 +342,25 @@ public class MainActivity extends Activity {
   /** A "url" extra is saved for later launches. A VIEW link from another app is shown, not saved. */
   private String urlFrom(Intent intent) {
     String saved = intent.getStringExtra(PREF_URL);
-    if (saved == null) return intent.getDataString();
-    // The activity is exported, so only save web URLs: never file:, content: or javascript:.
-    String scheme = Uri.parse(saved).getScheme();
-    if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
-      Log.w(TAG, "Ignoring non-web kiosk URL (scheme " + scheme + ")");
-      return null;
+    if (saved == null) {
+      String link = intent.getDataString();
+      return link != null && isWebUrl(link) ? link : null;
     }
+    if (!isWebUrl(saved)) return null;
     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, saved).apply();
     Log.i(TAG, "Saved kiosk URL: " + forLog(saved));
     return saved;
+  }
+
+  /**
+   * The activity is exported, and an explicit intent skips the manifest's http/https filter. So
+   * check both URL inputs: never load or save file:, content: or javascript:.
+   */
+  private static boolean isWebUrl(String url) {
+    String scheme = Uri.parse(url).getScheme();
+    if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) return true;
+    Log.w(TAG, "Ignoring non-web kiosk URL (scheme " + scheme + ")");
+    return false;
   }
 
   /**
@@ -584,6 +597,32 @@ public class MainActivity extends Activity {
     portalBar.setVisibility(View.GONE);
   }
 
+  /**
+   * Asks Android to fetch network time again, by turning automatic time off and on, at most once a
+   * minute while the date is wrong and Wi-Fi is up. Android 6's time service gives up when its
+   * boot-time attempts fail (Wi-Fi not ready yet, or a router that doesn't answer NTP) and waits
+   * 24 h, leaving a frame with no clock battery in 1969. Seen on an RK3126 Frameo frame, where
+   * `settings put global auto_time 0` then `1` set the time within seconds.
+   * Needs the same optional grant as the navigation repair (WRITE_SECURE_SETTINGS); does nothing
+   * if automatic time was turned off on purpose.
+   */
+  private void nudgeNetworkTime() {
+    if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED) return;
+    if (!wifiConnected()) return;
+    long now = SystemClock.elapsedRealtime();
+    if (now - lastTimeNudge < TIME_NUDGE_MS) return;
+    ContentResolver cr = getContentResolver();
+    if (Settings.Global.getInt(cr, Settings.Global.AUTO_TIME, 1) != 1) return;
+    lastTimeNudge = now;
+    try {
+      Settings.Global.putInt(cr, Settings.Global.AUTO_TIME, 0);
+      Settings.Global.putInt(cr, Settings.Global.AUTO_TIME, 1);
+      Log.i(TAG, "Clock is wrong; asked Android for network time again");
+    } catch (SecurityException e) {
+      Log.w(TAG, "Could not re-request network time: " + e);
+    }
+  }
+
   private boolean wifiConnected() {
     ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
     @SuppressWarnings("deprecation")
@@ -646,12 +685,10 @@ public class MainActivity extends Activity {
       Log.i(TAG, "Re-enabled navigation service");
       return;
     }
-    // Some firmware keeps the selected service but resets only the master switch at boot.
+    // Some firmware keeps the selected service but resets only the master switch at boot. On a
+    // PF1508 (Android 15) the switch alone doesn't bind the service, so still check it below.
     int enabled = Settings.Secure.getInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 0);
-    if (enabled != 1) {
-      setAccessibilityEnabled();
-      return;
-    }
+    if (enabled != 1) setAccessibilityEnabled();
     handler.postDelayed(() -> {
       if (NavigationService.isConnected()) return;
       // Writing the same list doesn't notify Android, so take the service off and put it back.
