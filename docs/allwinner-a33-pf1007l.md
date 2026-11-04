@@ -107,6 +107,8 @@ Reported from one PF1007L in [#135](https://github.com/wesbos/photo-frame-dashbo
 About firmware ending `20260529`, Android 6.0.1 `eng`/`test-keys`, AiMOR 6.0.78, Windows host.
 The frame was not on Wi-Fi. No card was in the TF slot. Nothing was written to the boot partition.
 A later comment on that issue confirmed the same About path on a PF1007 and a PF1506.
+The same route also worked on a [May `20260519` unit](pf1007l-aimor-20260519-macos-root-report.md)
+(#272). This does not establish the password on every firmware.
 Another May `20260529` report on the issue, from macOS, used the same steps. After the switch
 that host saw `1f3a:1002` rather than `1f3a:1009`. Treat the USB id as a clue, and treat
 `adb devices` plus a root shell as the pass condition.
@@ -165,11 +167,14 @@ adb shell settings get global adb_enabled
 
 Reboot from the panel, or with `adb reboot`, and run the same commands again.
 On that unit they were unchanged, including after a power cut in the macOS report.
-ADB is then persistent. Stop here. Do not continue to the SD-card section.
+ADB is then persistent. Skip the SD-card section and continue with the identity checks,
+verified backup and T8 lock-down in the [start-here guide](pf1007l-start-here.md). The tested
+units expose root USB ADB without a key check. To deliberately undo this access, return the
+test-app switch to **IS CLOSED**; that removes ADB, so keep another verified way in first.
 
 **Fail:** the dialog rejects the password, or USB never exposes ADB after **is open**.
-Continue with [pf1007l-start-here.md](pf1007l-start-here.md). Route U and Route S
-are for that case.
+Continue at [T3b](pf1007l-start-here.md#t3b-network-adb-test), then T3c. Use Route U or S
+only if those gentler routes fail.
 
 ### Where the password is
 

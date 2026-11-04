@@ -34,9 +34,12 @@ First failed step and its exact output: none
   `ro.secure=0` before anything was done to it. `persist.sys.usb.config=mass_storage,adb` was
   already present and survives a power cycle, so no boot patch was needed and none was applied
   (boot hash above is stock).
-- **No Wi-Fi until after lockdown.** The frame had never joined a network (the vendor app had
-  never phoned home; `com.efercro.os.aimor`'s server connection was the first thing killed).
+- **No Wi-Fi until after lockdown.** The frame had never joined a network according to the owner.
   Wi-Fi was configured only after the vendor apps were disabled, using the home network.
+
+**Backup verification was not recorded in this report.** This is a setup record, not a
+`/system`-write procedure. Complete [README rule 2](../README.md#rules-we-learned-the-hard-way)
+before following the canonical write guides.
 
 ## After root
 

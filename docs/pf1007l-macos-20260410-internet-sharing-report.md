@@ -37,8 +37,9 @@ First failed step and its exact output: none
 
 ## T3c on Internet Sharing when its DNS does not answer
 
-The steps of [#245](https://github.com/wesbos/photo-frame-dashboard/pull/245) were followed until
-the frame joined the Mac's network. Three things differed on this Mac.
+The owner followed [#245](https://github.com/wesbos/photo-frame-dashboard/pull/245) until the
+frame joined the Mac's network. That PR remains unmerged pending safety fixes; its helper is
+not a published route. Three things differed on this Mac.
 
 **The iPhone uplink.** Internet Sharing offered two iPhone interfaces, "iPhone USB" and
 "iPhone USB 2". With "iPhone USB" selected as the source, that interface went inactive and the
@@ -49,31 +50,21 @@ error `code002` for both the network and the server connection.
 
 **No DNS on the shared network.** The Mac's sharing DNS on `192.168.2.1:53` did not answer, so
 AiMOR never looked up its server and never opened TCP 7806. The 7806 redirect alone did nothing.
-Port 53 was already held by macOS, so `dns.py` could not bind it. It ran on another port without
-sudo, and `pf` sent the frame's DNS to it:
+Port 53 was already held by macOS. The owner ran the DNS helper on port 5300 without sudo,
+and redirected the frame's DNS and TCP 7806 using a dedicated `com.apple/aimor-t3c` pf anchor.
+Within a minute AiMOR looked up its server, got the Mac's address, and connected to the T3c
+listener. `adb connect` gave root. No internet was needed on the frame.
 
-```sh
-/usr/bin/python3 scripts/aimor-network-adb/dns.py --bind 192.168.2.1 --port 5300 \
-  --hostname imsconnect.efercro.com --allow-client <frame-ip> --allow-client 192.168.2.1
+This is a record of that setup, not a complete network configuration to copy. Follow the
+[T3c procedure](pf1007l-20260410-network-adb.md), including approval for the command, the listener's
+bind address, allowed frame address and time limit. Redirect and reset states for the selected
+frame only; a subnet-wide state reset interrupts other clients. Remove only the dedicated anchor
+and turn Internet Sharing off afterward.
 
-printf 'rdr pass on bridge103 inet proto { udp tcp } from 192.168.2.0/24 to any port 53 -> 192.168.2.1 port 5300\nrdr pass on bridge103 inet proto tcp from 192.168.2.0/24 to any port 7806 -> 192.168.2.1 port 7806\n' \
-  | sudo pfctl -a com.apple/aimor-t3c -f -
-sudo pfctl -k 192.168.2.0/24      # drop the frame's existing states so new lookups hit the rules
-```
-
-Within a minute AiMOR looked up `imsconnect.efercro.com`, got the Mac's address, logged in
-(`110009`), and `server.py` sent the command. `adb connect` gave `uid=0(root)`. No internet was
-needed on the frame, as in the [Linux hotspot report](pf1007l-linux-20260416-hotspot-report.md).
-Clean up with `sudo pfctl -a com.apple/aimor-t3c -F all` and Internet Sharing off.
-
-**`macos-redirect.sh` from #245.** `ipconfig getifaddr bridge103` printed nothing while
-`ifconfig bridge103` showed `inet 192.168.2.1` and `status: inactive`, so the script stopped with
-"has no address". Falling back to `ifconfig` fixed it:
-
-```sh
-ipconfig getifaddr "$bridge" 2>/dev/null ||
-  ifconfig "$bridge" 2>/dev/null | awk '/inet /{print $2; f=1; exit} END{exit !f}' ||
-```
+**Bridge address detection.** `ipconfig getifaddr bridge103` printed nothing while `ifconfig`
+showed an IPv4 address. Reading the address from `ifconfig` resolved the helper's address check
+on this Mac. Check the selected interface and require one unambiguous IPv4 address rather than
+assuming the default bridge is correct.
 
 Its default `bridge100` was a VM's bridge on this Mac; `BRIDGE=bridge103` was needed. The frame's
 address changed after a Wi-Fi toggle (`192.168.2.2`, then `.3`), and `server.py` had to be
@@ -90,6 +81,10 @@ the frame, with no retries. About 50 s per chunk, so about 50 minutes in all. Th
 size, no 1 MiB blocks of `0xCC`, re-reads with the stock `dd` of the bootloader, env, boot, misc,
 recovery and system partitions that matched the image, and `gzip -1` with a readback hash that
 matched. `mmcblk0boot0` and `boot1` (4 MiB each) were saved too.
+
+The report records MD5 checks but does not specify a full-image SHA-256. It therefore does not
+establish all of [README rule 2](../README.md#rules-we-learned-the-hard-way); complete those
+checks before system or flash writes.
 
 ## Lock-down and setup
 
@@ -122,6 +117,9 @@ matched. `mmcblk0boot0` and `boot1` (4 MiB each) were saved too.
   single-tap **Menu** button is on.
 
 ## Boot logo format
+
+This is an observation and a record of one unit's edits, not a write procedure. A guarded
+compare-before-write, readback and undo workflow is not supplied here.
 
 `/system/media/initlogo.rle` (4,096,000 bytes) shows the white "LOVE IS SHARING" screen before the
 boot animation. Despite the name it is not RLE565: it is a raw 800×1280 image, 4 bytes per pixel

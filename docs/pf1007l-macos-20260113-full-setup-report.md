@@ -10,18 +10,19 @@ It records a few operational gotchas met while doing the full post-root setup (v
 backup → WebView 44→106 swap → Let's Encrypt CA roots → kiosk as Home → vendor-app disable →
 live weather). Observations are kept separate from guesses, as the repo asks.
 
-## 1. Live weather via Open-Meteo needs the Let's Encrypt roots
+## 1. The observed Open-Meteo certificate chain needed a newer root
 
 To show real weather in the dashboard, the bundled page fetched `https://api.open-meteo.com`.
-Open-Meteo's certificate chains to **ISRG Root X1 / X2 (Let's Encrypt)**, which Android 6's 2015
-trust store does not contain, so WebView 106 rejected the request with
+The certificate chain observed during this setup used **Let's Encrypt**, but its required root
+was missing from this unit's Android 6 trust store. WebView 106 rejected the request with
 `net_error -202` (`ERR_CERT_AUTHORITY_INVALID`) and the kiosk's `onReceivedSslError` logged
 `Certificate error 3 on a subresource; blocked`.
 
 Adding `6187b673.0` (ISRG Root X1) and `8794b4e3.0` (ISRG Root X2) to
-`/system/etc/security/cacerts/` (the same roots the BIUFRAME guide installs) fixed it. This is a
-concrete second use case for those roots beyond external images: **any Open-Meteo / Let's Encrypt
-API needs them on these Android 6 frames.**
+`/system/etc/security/cacerts/` fixed it on this unit. This does not establish that both roots
+were necessary or that the server always uses the same certificate chain. Follow the
+[canonical certificate guidance](si006-uhale.md#fonts-and-https-photos) and verify the chain
+actually served to your frame.
 
 - `openssl verify` of the served `api.open-meteo.com` chain against those two roots passes on the host.
 - The cert files use the usual Android format: PEM body + `openssl x509 -text` dump, filename from
@@ -35,7 +36,7 @@ a truly fresh WebView process alone would have sufficed, because `am force-stop`
 produce a fresh process on this unit (see §3). Either way: if external HTTPS still fails right after
 adding roots, power-cycle the frame before concluding the certs are wrong.
 
-## 2. Firefox and the WebView-106 kiosk cannot both run on a 1 GB frame
+## 2. Running Firefox and the kiosk together exhausted memory on this unit
 
 With Firefox 143 left running from earlier testing (~380 MB across its processes on this 1 GB unit,
 `MemTotal` ≈ 1,026,980 kB) and the kiosk then launched, loading WebView 106's ~64 MB
@@ -44,8 +45,8 @@ process stuck in uninterruptible sleep (`D` state), and `am force-stop` / `logca
 not complete. A software reboot could not recover it (see §3); a physical power cycle did.
 
 With Firefox closed/uninstalled, the same kiosk ran fine (~400–530 MB free, load ~1). Suggestion:
-**close or `pm uninstall org.mozilla.firefox` before running the WebView-106 kiosk on 1 GB units**,
-and keep it only as a fallback that is not left running.
+**close Firefox before launching the kiosk if you see similar memory pressure**. Keep a working
+fallback and verify Settings access before removing any app.
 
 ## 3. Software reboot appeared to be ignored on this unit
 
@@ -66,8 +67,9 @@ Home HQ was made the default Home app (Android 6 route: `--ez home true`, then t
 **Always**). Later disabling AiMOR (`pm disable com.efercro.os.aimor`) and uninstalling Firefox
 changed the set of Home candidates, which **reset the preferred-Home preference** and brought the
 chooser back on the next Home event. Re-selecting Home HQ + Always after the vendor cleanup made it
-stick. Suggestion: **set the kiosk as Home *after* disabling/removing other launchers and the vendor
-app**, or re-confirm it afterward.
+stick. Keep a working replacement Home and manually verified Settings → Apps access before
+disabling any vendor app, as required by [T8](pf1007l-start-here.md#t8-lock-it-down-before-the-frame-stays-online).
+Re-confirm Home HQ + Always after cleanup if the chooser returns.
 
 ## Minor notes
 

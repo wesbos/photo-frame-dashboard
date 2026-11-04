@@ -48,61 +48,26 @@ First failed step: none
 The frame gets its DNS server from DHCP. If the Mac answers DHCP, the frame uses the Mac as DNS,
 and only the vendor hostname has to be redirected.
 
-## How it ran
+## Historical network setup
 
-1. `brew install dnsmasq`. Checked that nothing listened on UDP 53, TCP 53, UDP 67 or TCP 7806,
-   that the macOS firewall was off, and that a small pool at the top of the router's range was
-   unused (no ping or ARP replies). Ran `test-protocol.py`, `test-dns.py` and
-   `server.py --dry-run`; all passed.
-2. Wrote this config (example addresses: router `192.168.1.1`, Mac `192.168.1.133`) and checked
-   it with `dnsmasq --test -C <file>`:
+The owner temporarily used macOS `dnsmasq` as DHCP and DNS on the home LAN, with the router's
+DHCP switched off for the session. AiMOR's two command hostnames resolved to the Mac; other
+names were forwarded normally. The frame took a lease, and a listener bound to the Mac's
+address and restricted to the frame's address sent the T3c command within seconds, with a
+600-second limit. The reported identity checks returned root, `sun8i`, Android 6.0.1 and the
+expected `20260519` fingerprint. Persistent USB ADB then worked across power cycles.
 
-   ```ini
-   interface=en0
-   bind-interfaces
-   listen-address=192.168.1.133
-   except-interface=lo0
+**This is a record, not a recommended DHCP procedure.** The original setup could give other
+LAN devices leases pointing to the Mac's temporary DNS server. Stopping that server could leave
+those devices without DNS until their leases were repaired. Ping and ARP silence do not prove
+that addresses are unused. Running two DHCP servers during a switchover can also disrupt clients.
+Use the offline test-app route first, then a controlled isolated network and the canonical
+[T3c procedure](pf1007l-20260410-network-adb.md) where needed.
 
-   # Forward everything to public resolvers, except the two AiMOR command hosts.
-   no-resolv
-   no-hosts
-   server=1.1.1.1
-   server=8.8.8.8
-   address=/imsconnect.efercro.com/192.168.1.133
-   address=/iwsconnect.efercro.com/192.168.1.133
-
-   # Small pool outside the addresses already in use. Not authoritative, so it does not NAK
-   # other devices' existing leases.
-   dhcp-range=192.168.1.240,192.168.1.249,255.255.255.0,1h
-   dhcp-option=option:router,192.168.1.1
-   dhcp-option=option:dns-server,192.168.1.133
-   dhcp-leasefile=<private dir>/dnsmasq.leases
-   pid-file=<private dir>/dnsmasq.pid
-   log-facility=<private dir>/dnsmasq.log
-   log-dhcp
-   ```
-
-   Both hostnames point at the Mac, so AiMOR could not reach either vendor host during the
-   session. `dnsmasq` forwards every other name, so any other device that took a lease in that
-   window still resolved normally.
-3. Started it with `sudo dnsmasq -C <file>`, then turned off the router's DHCP server for the
-   session. Checked `dig @192.168.1.133 imsconnect.efercro.com` (the Mac) and an unrelated name
-   (a public address).
-4. The frame joined Wi-Fi and took a lease from the pool. The lease file gave its address for
-   `--frame-ip`. TCP 5555 was refused (T3b).
-5. Started `server.py --bind <mac-ip> --frame-ip <frame-ip> --seconds 600`. AiMOR connected
-   within seconds, with no Wi-Fi toggle: `received_frame 110009`, then
-   `runtime_adb_command_sent`. TCP 5555 opened right after.
-6. Identity checks passed: `uid=0(root)`, `sun8i`, Android 6.0.1,
-   `AEEZO/astar_m86_8723cs/astar-m86_8723cs:6.0.1/MOB30R/20260519:eng/test-keys`.
-7. `setprop persist.sys.usb.config mass_storage,adb`. The frame showed up as an ADB `device` over
-   USB straight away, and `adb -d shell id` returned root.
-8. Cleanup: forgot the Wi-Fi network on the frame **before** restoring the network, turned the
-   router's DHCP back on, stopped `dnsmasq` (`sudo kill $(cat <pid-file>)`), then power-cycled the
-   frame. USB ADB came back as root, with no `:7806` connection.
-
-Forgetting the network first matters. Otherwise the frame renews its lease from the router later,
-gets the router's DNS, and AiMOR reaches the real vendor server again before T8 is done.
+For cleanup, the owner forgot the frame's Wi-Fi network before restoring the router's DHCP,
+stopped the temporary service, and power-cycled the frame. Root USB ADB returned with no TCP
+7806 connection. Forgetting the network prevented AiMOR from reconnecting to its real vendor
+server before T8. This account does not establish rollback for other clients' leases.
 
 ## Persistent USB ADB
 

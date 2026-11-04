@@ -130,8 +130,8 @@ field below was read over USB in this session unless marked as the owner's.
 
 ### What was different
 
-- **Card:** a 64 GB microSD that came formatted exFAT, reformatted on the Mac with
-  `diskutil eraseDisk FAT32 AIMOR MBRFormat`. The empty `license.properties` worked from this card.
+- **Card:** a 64 GB microSD that came formatted exFAT, reformatted on the Mac as FAT32 with
+  an MBR partition map. Formatting erases the selected card. The empty `license.properties` worked from it.
   macOS also wrote an AppleDouble `._license.properties` (4,096 bytes) next to it; it did not stop
   the marker from working. The card was not tried as exFAT, so whether exFAT works is untested.
 - **Connection:** the frame was on the USB 2.0 hub of a USB-C dock (VIA Labs hub). USB data and the
