@@ -64,6 +64,9 @@ import java.util.Map;
  * - Offer the kiosk as a Home app (--ez home false undoes it), then pick it:
  *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
  *     adb shell cmd package set-home-activity com.wesbos.homehq/.Home
+ * - Or keep the vendor Home app and open the kiosk after boot (--ez boot false undoes it; Android 10+
+ *   also needs: adb shell appops set com.wesbos.homehq SYSTEM_ALERT_WINDOW allow):
+ *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez boot true
  * - Wi-Fi with a sign-in page (captive portal): when the dashboard can't load on Wi-Fi, the kiosk
  *   checks for one and shows it, so the terms can be accepted; then it returns to the dashboard.
  */
@@ -73,6 +76,7 @@ public class MainActivity extends Activity {
   static final String PREFS = "kiosk";
   static final String PREF_URL = "url";
   static final String PREF_MENU_BUTTON = "menu_button";
+  static final String PREF_BOOTANIM_EXIT = "bootanim_exit";
   static final long EXIT_HOLD_MS = 1500;
   static final int CANCEL_POINTER_IDS = 10; // touch ids 0-9
   static final long RETRY_MS = 5000;
@@ -94,6 +98,7 @@ public class MainActivity extends Activity {
 
   private WebView web;
   private Button menuButton;
+  private Thread bootanimThread;
   private final Handler handler = new Handler(Looper.getMainLooper());
   // Not cleared in onDestroy, so a navigation rebind that has started always finishes.
   private final Handler rebindHandler = new Handler(Looper.getMainLooper());
@@ -183,6 +188,8 @@ public class MainActivity extends Activity {
     super.onCreate(state);
     applyDebugFlag(getIntent());
     applyHomeFlag(getIntent());
+    applyBootanimFlag(getIntent());
+    applyBootFlag(getIntent());
     keepNavigationEnabled();
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -239,6 +246,22 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(stall);
         retryPending = true;
         if (resumed) handler.postDelayed(retry, RETRY_MS);
+      }
+
+      @Override
+      public void onReceivedHttpError(WebView view, WebResourceRequest req, WebResourceResponse res) {
+        // A hosting proxy answers with its own error page while the app restarts or deploys
+        // ("upstream connect error ... 503"). That page has no reload code of its own, so the kiosk
+        // would show it until someone reloads by hand. Treat a 5xx on the page itself as a failed load.
+        if (!req.isForMainFrame() || res.getStatusCode() < 500 || res.getStatusCode() >= 600) return;
+        Log.w(TAG, "Page answered HTTP " + res.getStatusCode() + ", retrying in " + RETRY_MS + " ms");
+        pageFailed = true;
+        showOffline();
+        retryUrl = req.getUrl().toString();
+        handler.removeCallbacks(retry);
+        handler.removeCallbacks(stall);
+        retryPending = true;
+        handler.postDelayed(retry, RETRY_MS);
       }
 
       @Override
@@ -348,7 +371,9 @@ public class MainActivity extends Activity {
     setIntent(intent);
     applyDebugFlag(intent);
     applyHomeFlag(intent);
+    applyBootFlag(intent);
     applyMenuButtonFlag(intent);
+    applyBootanimFlag(intent);
     String url = urlFrom(intent);
     if (url != null) {
       closePortal();
@@ -804,6 +829,73 @@ public class MainActivity extends Activity {
         .getBoolean(PREF_MENU_BUTTON, false) ? View.VISIBLE : View.GONE);
   }
 
+  /**
+   * A saved opt-in for frames whose vendor boot animation keeps covering the kiosk after a power
+   * cut. sys.bootanim.exit is a per-boot property, so it has to be set again on every start. It
+   * works without root only where SELinux is permissive or the app runs as system; where it is
+   * refused, setprop fails, the failure is logged and nothing else changes.
+   */
+  private void applyBootanimFlag(Intent intent) {
+    if (intent != null && intent.hasExtra(PREF_BOOTANIM_EXIT)) {
+      getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+          .putBoolean(PREF_BOOTANIM_EXIT, intent.getBooleanExtra(PREF_BOOTANIM_EXIT, false)).apply();
+    }
+    boolean enabled = getSharedPreferences(PREFS, MODE_PRIVATE)
+        .getBoolean(PREF_BOOTANIM_EXIT, false);
+    Log.i(TAG, "Boot animation exit " + (enabled ? "on" : "off"));
+    if (bootanimThread != null) bootanimThread.interrupt();
+    if (!enabled) return;
+    bootanimThread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        // The property service may not be ready at the first start after a power cut, so try
+        // twice. Both attempts are cheap and setting it when the animation is already gone is
+        // harmless.
+        for (int attempt = 0; attempt < 2; attempt++) {
+          if (Thread.currentThread().isInterrupted()
+              || !getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_BOOTANIM_EXIT, false)) return;
+          Process process = null;
+          try {
+            process = Runtime.getRuntime().exec(
+                new String[] {"/system/bin/setprop", "sys.bootanim.exit", "1"});
+            // Process.waitFor(timeout) requires API 26; bounded polling also works on API 23.
+            long deadline = SystemClock.elapsedRealtime() + 2000;
+            while (true) {
+              try {
+                int rc = process.exitValue();
+                if (rc != 0) Log.w(TAG, "setprop sys.bootanim.exit exited " + rc);
+                break;
+              } catch (IllegalThreadStateException running) {
+                if (SystemClock.elapsedRealtime() >= deadline) {
+                  Log.w(TAG, "setprop sys.bootanim.exit timed out");
+                  break;
+                }
+                Thread.sleep(50);
+              }
+            }
+          } catch (IOException e) {
+            Log.w(TAG, "Could not set sys.bootanim.exit");
+            return;
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+          } finally {
+            if (process != null) process.destroy();
+          }
+          if (attempt == 0) {
+            try {
+              Thread.sleep(RETRY_MS);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return;
+            }
+          }
+        }
+      }
+    }, "bootanim-exit");
+    bootanimThread.start();
+  }
+
   /** Turns the Home alias on or off. The shell can't enable a component of a release app. */
   private void applyHomeFlag(Intent intent) {
     if (intent == null || !intent.hasExtra("home")) return;
@@ -812,6 +904,16 @@ public class MainActivity extends Activity {
         home ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
         PackageManager.DONT_KILL_APP);
     Log.i(TAG, "Home alias " + (home ? "on" : "off"));
+  }
+
+  /** Turns BootReceiver on or off, for frames that keep their own Home app. Same reason as above. */
+  private void applyBootFlag(Intent intent) {
+    if (intent == null || !intent.hasExtra("boot")) return;
+    boolean boot = intent.getBooleanExtra("boot", false);
+    getPackageManager().setComponentEnabledSetting(new ComponentName(this, BootReceiver.class),
+        boot ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
+        PackageManager.DONT_KILL_APP);
+    Log.i(TAG, "Start after boot " + (boot ? "on" : "off"));
   }
 
   /** Watches for the two-finger exit hold; all touches still go to the page (after a stale-touch reset). */

@@ -29,6 +29,22 @@ root or additional permissions. The button and physical single-tap interaction w
 in a local adaptation on the [QCREA YYD-1156](../../docs/qcrea-yyd-1156.md); the saved opt-in is
 the shared-kiosk version of that adaptation.
 
+## Clear a vendor boot animation that covers the kiosk
+
+Some frames keep a vendor boot animation on top of every window after Android has finished
+booting, so the kiosk is running underneath while the panel still shows the splash. The
+[IQUAL 10X1](../../docs/iqual-10x1-rk3326.md) behaves this way once its photo app is disabled.
+Android has a property for exactly this, and the kiosk can set it on every start:
+
+```sh
+adb shell am start -n com.wesbos.homehq/.MainActivity --ez bootanim_exit true
+```
+
+The opt-in is saved and applied at every launch (and again 5 s later, in case the first attempt
+lost a race with the property service). `--ez bootanim_exit false` turns it off. It needs no root
+only where SELinux is **permissive**, which is the case on that frame; Android otherwise refuses
+property writes from an app, and the attempt fails quietly while the splash stays.
+
 ## Dashboard URL
 
 The kiosk opens the hosted demo dashboard by default. To show your own, save its URL once:
@@ -98,6 +114,27 @@ The kiosk then opens the saved URL at boot, and the Home button returns to it. I
 fails to load at boot because Wi-Fi isn't up yet, the kiosk keeps retrying. In the controls,
 **Open launcher** skips the kiosk and opens another Home app. To undo, pick another Home app in
 Settings → Apps → Default apps, then run the first command with `--ez home false`.
+
+### Without replacing Home
+
+On some frames, making the kiosk the Home app is risky: on a PF1506 (AiMOR, Android 10) the boot
+animation stayed over the screen and the frame couldn't be reached again (#118). There, keep the
+vendor Home app and let the kiosk open itself once Android has booted:
+
+```sh
+adb shell am start -n com.wesbos.homehq/.MainActivity --ez boot true
+adb shell appops set com.wesbos.homehq SYSTEM_ALERT_WINDOW allow
+```
+
+The second line is needed on Android 10 and later, which blocks apps from opening a screen from the
+background otherwise. If the kiosk doesn't open, the frame shows the vendor app instead of getting
+stuck. Undo with `--ez boot false` and `adb shell appops set com.wesbos.homehq SYSTEM_ALERT_WINDOW default`.
+
+This was reported on one PF1506 with firmware `20250731`. It is not a recovery fix for the
+locked-out `20250813` unit in #118. Confirm physical Settings and USB ADB access first, keep the
+vendor Home enabled and selected, and follow the README backup rule. The receiver makes one
+launch attempt; network retries happen inside the kiosk. It does not launch Firefox or switch
+Home apps. Some vendor firmware blocks boot broadcasts or background launches entirely.
 
 ## Returning from Android Settings or another app
 
