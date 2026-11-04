@@ -16,5 +16,5 @@
       }).join('') + '</div></section>';
   }
 
-  App.register('felix', window.makeKidView('felix', readingSection));
+  App.register('felix', window.makeKidView('felix', readingSection, 'scrub'));
 })();

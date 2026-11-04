@@ -16,5 +16,5 @@
       }).join('') + '</div></section>';
   }
 
-  App.register('clara', window.makeKidView('clara', readingSection));
+  App.register('clara', window.makeKidView('clara', readingSection, 'letters'));
 })();

@@ -53,6 +53,14 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
   Papa/Maman builder).
 - `js/reading.js` (`window.Reading`) — plays pre-recorded French audio clips for reading
   practice. **Not Web Speech API** — see "No TTS in this WebView" below.
+- `js/homework.js` (`window.Homework`) — full-screen "Commencer les devoirs" review, launched
+  from a button in `kid-view.js` via `App.sheet` (`.sheet--homework` full-bleed variant). A
+  slider scrubber under the current word: for Clara (`mode: 'letters'`) dragging across each
+  letter plays that letter's phonetic sound from `public/audio/fr-letters/<letter>.mp3`
+  (sounding-out, not the whole word); for Félix (`mode: 'scrub'`) the slider scrubs the
+  position of the whole-word clip from `js/reading.js`'s `CLIPS` map, like a real audio
+  scrubber. Word lists come from `FAMILY.claraPhonics` / `FAMILY.felixSpelling.themes`
+  (flattened), not the daily "mot du jour" picker.
 - `js/bus-alarm.js` — `App.soundVolume` (persisted) + a Web Audio beep helper (`App.beep`,
   `BusAlarm.ring`), not an `<audio>` clip.
 - `js/outfit.js` (`window.Outfit`) — "what to wear today" widget for the kid views: reads live
@@ -101,6 +109,11 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
   currently cover all 1135 words across `wordBank`/`felixSpelling`/`claraPhonics`. Adding new
   words later (e.g. Félix's real homework list) means regenerating just the delta — don't redo
   the whole set.
+- **`scripts/gen-letter-audio.sh`** — generates the 26 French phonetic letter-sound clips
+  (`public/audio/fr-letters/<letter>.mp3`) for Clara's letters-mode homework scrubber
+  (`homework.js`). Phonetic sounds, not alphabet names: "beu" for B, "keu" for C, not "bé"/"cé".
+  Accented letters in a word reuse the base letter's clip (`homework.js` strips the accent
+  before looking up the slug).
 - **`scripts/ical-import.mjs` + `scripts/ical-emit.mjs`** — parses a Google Calendar `.ics`
   export (via `node-ical`, NOT a `dashboard/package.json` dependency — see the usage comment at
   the top of `ical-import.mjs` for how to install it standalone) into `/tmp/ical-out.json`, then

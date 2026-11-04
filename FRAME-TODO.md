@@ -31,6 +31,12 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
 - **Kid views (Clara, Félix).** Shared `kid-view.js` builder: chores with paid task picker,
   holiday countdown, "mot du jour" (5 words/day, different per kid), and the outfit widget.
   Clara's reading panel is phonics-by-sound; Félix's is spelling-by-theme.
+- **"Commencer les devoirs" homework review (`homework.js`).** A "Readino"-style slider
+  scrubber: a full-screen review cycling through one word at a time (Clara's 30 phonics words /
+  Félix's 88 spelling words) with a slider under it. Dragging the slider for Clara sounds out
+  each letter as it crosses (phonetic sounds, not alphabet names — `scripts/gen-letter-audio.sh`
+  generated the 26 letter clips); for Félix it scrubs the position of the whole-word audio clip
+  like a real audio scrubber. "Réécouter" replays, "Suivant"/"Terminer" advances or closes.
 - **Adult views (Papa, Maman).** Shared `adult-view.js` builder: that parent's events today
   (including the garbage/recycling reminder when it applies to them).
 - **Reading practice — pre-recorded audio, not TTS.** This WebView has no Web Speech API (see

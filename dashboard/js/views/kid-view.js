@@ -1,7 +1,10 @@
 // Shared builder for the Clara and Félix persona views: chores (room + bath routine + paid
-// task menu), a holiday countdown, "mot du jour", and a what-to-wear-today widget, plus a
-// reading-practice panel supplied by the caller (French copy throughout).
-window.makeKidView = function (personId, readingSection) {
+// task menu), a holiday countdown, "mot du jour", a what-to-wear-today widget, a reading-
+// practice panel supplied by the caller, and a "Commencer les devoirs" button that launches
+// the full-screen slider-scrubbing homework review (see homework.js). homeworkMode is
+// 'letters' (Clara — sounds out each letter as the slider crosses it) or 'scrub' (Félix —
+// scrubs through the whole-word audio clip), passed in by clara.js/felix.js.
+window.makeKidView = function (personId, readingSection, homeworkMode) {
   'use strict';
   var F = window.FAMILY;
   var V = { el: null };
@@ -84,10 +87,15 @@ window.makeKidView = function (personId, readingSection) {
       }).join('') + '</div></section>';
   }
 
+  function startHomeworkCard() {
+    return '<button class="kd-start-hw" data-start-homework>' +
+      App.icon('play', 24) + ' Commencer les devoirs</button>';
+  }
+
   function render() {
     V.el.innerHTML = '<div class="kd">' +
       '<div class="kd-col">' + choreCard() + holidayCard() + wordOfDayCard() + window.Outfit.card(personId) + '</div>' +
-      '<div class="kd-col">' + readingSection() + '</div>' +
+      '<div class="kd-col">' + startHomeworkCard() + readingSection() + '</div>' +
       '</div>';
   }
 
@@ -102,6 +110,10 @@ window.makeKidView = function (personId, readingSection) {
     }
     if ((t = e.target.closest('[data-say]'))) {
       window.Reading.speak(t.dataset.say);
+      return;
+    }
+    if (e.target.closest('[data-start-homework]')) {
+      window.Homework.start(personId, homeworkMode);
       return;
     }
   }

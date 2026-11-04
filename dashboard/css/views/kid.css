@@ -71,6 +71,51 @@
 .outfit-pic .outfit-fig { width: 100%; height: 100%; }
 .outfit-label { font-weight: 700; font-size: 17px; line-height: 1.25; }
 
+/* "start homework" button, above the reading-practice card */
+.kd-start-hw {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: var(--tap); border-radius: var(--r-s); flex: none;
+  background: var(--c, var(--ink)); color: var(--c-ink, #fff);
+  font-weight: 800; font-size: 20px;
+}
+.kd-start-hw:active { transform: scale(.98); }
+
+/* full-screen homework review sheet (word + scrubber slider) */
+.sheet--homework {
+  width: 92vw; max-width: 900px; max-height: 88vh;
+}
+.hw { display: flex; flex-direction: column; align-items: center; padding: 48px 40px 36px; gap: 28px; }
+.hw-progress { align-self: flex-start; color: var(--mute); font-weight: 800; font-size: 18px; }
+
+.hw-word { font-family: var(--serif); font-size: 72px; display: flex; gap: 4px; }
+.hw-word--whole { letter-spacing: 1px; }
+.hw-letter { transition: color .15s, transform .15s; }
+.hw-letter.is-active { color: var(--c, var(--ink)); transform: scale(1.15); }
+
+.hw-slider-wrap { width: 100%; max-width: 560px; }
+.hw-slider {
+  width: 100%; height: var(--tap); -webkit-appearance: none; appearance: none;
+  background: transparent;
+}
+.hw-slider::-webkit-slider-runnable-track {
+  height: 10px; border-radius: 999px; background: var(--paper-2);
+}
+.hw-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; margin-top: -19px;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--c, var(--ink)); border: 4px solid var(--card);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+
+.hw-actions { display: flex; gap: 14px; }
+.hw-btn {
+  min-height: var(--tap); padding: 0 28px; border-radius: 999px;
+  background: var(--c, var(--ink)); color: var(--c-ink, #fff);
+  font-weight: 800; font-size: 19px; display: inline-flex; align-items: center; gap: 8px;
+}
+.hw-btn:active { transform: scale(.97); }
+.hw-btn--ghost { background: var(--paper-2); color: var(--ink); }
+
 /* task picker sheet */
 .kd-menu { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .kd-menu-item {

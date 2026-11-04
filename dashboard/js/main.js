@@ -7,6 +7,7 @@ import './weather.js';
 import './holidays.js';
 import './outfit.js';
 import './reading.js';
+import './homework.js';
 import './bus-alarm.js';
 import './system.js';
 import './slideshow.js';
