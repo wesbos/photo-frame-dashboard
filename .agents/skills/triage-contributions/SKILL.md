@@ -84,6 +84,16 @@ git merge --no-edit pr-<N> -m "Merge pull request #<N>"
 
 ### 4. Apply the fixes
 
+**Try to fix issues yourself before asking contributors for revisions.** Investigate the problem,
+make the correction and validate it within the existing safety rules. This applies to issue
+reports as well as PRs. Broken links, filenames, wording, merge conflicts, thumbnail presentation,
+and repairable code or safety problems are work for the triage agent, not reasons to send a
+contributor away. Preserve their commits and put your corrections in separate fix-up commits.
+
+Ask a contributor only when progress needs information, hardware results, source assets or a
+decision you cannot obtain yourself. Explain the specific remaining blocker and what you already
+tried. Do not invent missing evidence, weaken guards or bypass the owner's escalation rules.
+
 Make each reviewer's MERGE-AFTER-FIX change yourself, as a separate commit after the merge, with a
 message that names the PR numbers. Common fixes:
 
@@ -92,7 +102,8 @@ message that names the PR numbers. Common fixes:
   `index-v2.json`), not just by downloading and hashing.
 - Mark a one-unit report as a record, not a procedure, when its tools aren't in the repo.
 - Correct overstated claims ("no key check" → "appears to skip the key check; one computer tested").
-- Blur location hints, faces or personal data in images (PIL is available).
+- Fix image privacy and presentation yourself, using a suitable author-provided image or an
+  appropriate image-editing tool.
 - Update `docs/pf1007l-start-here.md` and `docs/devices.md` so new facts appear once, in the right row.
 
 Test what you can offline: stub devices with files, run generators in a scratch copy, compile the
@@ -131,7 +142,8 @@ When editing an existing bot comment, preserve the footer and include it only on
 - Merged unchanged: no comment needed.
 - Harvested and closed: thank them, say where the facts went, say exactly why the code wasn't
   taken, and say what follow-up PR would be welcome.
-- Changes requested (PR left open): the exact change, and why.
+- Changes requested (PR left open): only after attempting the fix yourself; explain the remaining
+  blocker, what you tried, and the specific information or action needed from the contributor.
 - Issues: close when the docs now answer them, with a link. Keep open what is unsolved, with a short
   status comment. Answer direct questions directly.
 

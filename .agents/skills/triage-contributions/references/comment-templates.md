@@ -23,8 +23,11 @@ every template below, including short replies and closure comments.
 
 ## Changes requested (left open)
 
-> Thanks, this is valuable: [what's good]. Before we can merge it: [the exact change]. [Why, in one
-> or two sentences.] [Optional: "Please coordinate with #N, which covers the same device."]
+Use only after trying to fix the problem yourself. Do not request revisions for cleanup the
+triage agent can do.
+
+> Thanks! I [what was investigated or fixed]. The remaining blocker is [specific missing evidence,
+> hardware result, asset or decision]. Could you [smallest action needed to unblock it]?
 
 ## Out of scope (closed)
 

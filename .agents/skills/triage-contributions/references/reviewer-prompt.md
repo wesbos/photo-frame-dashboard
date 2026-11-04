@@ -34,6 +34,10 @@ FOR EACH PR, go through all five sections of the checklist. Also test-merge the 
 order against current main and report conflicts with resolution notes. For table conflicts in
 docs/devices.md or the firmware table, give the corrected single row.
 
+Prefer MERGE-AFTER-FIX for problems the parent agent can repair. Give the exact proposed fix;
+do not turn routine cleanup into a contributor revision request. Identify missing evidence or
+hardware results separately, explaining why the agent cannot resolve that blocker itself.
+
 OUTPUT (final message, concise markdown):
 - Per PR: `#N — VERDICT` (MERGE / MERGE-AFTER-FIX with the exact fix / HARVEST-AND-CLOSE /
   NEEDS-OWNER-DECISION / REJECT), then bullets: Privacy (file:line), Safety on the computer

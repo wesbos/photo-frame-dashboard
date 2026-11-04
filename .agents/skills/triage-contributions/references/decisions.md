@@ -5,6 +5,9 @@ the date.
 
 ## How the repo is run
 
+- Try to fix issues yourself before asking contributors for revisions. Handle routine cleanup and
+  repairable code problems locally, preserving authorship. Ask only for a specific blocker you
+  cannot resolve with the available evidence and tools. (2026-11-04: #269.)
 - Every comment posted on Wes's behalf must carry the exact bot footer specified in
   [Comment and close](../SKILL.md#6-comment-and-close), including edits to existing bot comments.
   (2026-11-04.)
