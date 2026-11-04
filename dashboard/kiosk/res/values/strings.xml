@@ -1,4 +1,5 @@
 <resources>
+    <string name="night_description">Night view. Tap to return to the dashboard.</string>
     <string name="navigation_label">Home HQ navigation</string>
     <string name="navigation_description">Shows floating Back and Dashboard buttons outside Home HQ, for frames without a navigation bar. Drag the dots to move the buttons. Does not read screen content.</string>
 </resources>

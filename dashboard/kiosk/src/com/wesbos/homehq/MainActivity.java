@@ -106,6 +106,7 @@ public class MainActivity extends Activity {
   private boolean pageFailed;
   // A retry is queued: keep the offline screen up until it runs, even if the failed load "finishes".
   private boolean retryPending;
+  private boolean resumed;
   private LinearLayout offline;
   private TextView offlineTitle, offlineText;
   private Button signIn;
@@ -119,6 +120,7 @@ public class MainActivity extends Activity {
   private final Runnable retry = new Runnable() {
     @Override
     public void run() {
+      if (!resumed) return;
       retryPending = false;
       if (retryUrl == null) return;
       load(retryUrl);
@@ -132,7 +134,7 @@ public class MainActivity extends Activity {
   private final Runnable stall = new Runnable() {
     @Override
     public void run() {
-      if (retryUrl == null || offline.getVisibility() != View.VISIBLE) return;
+      if (!resumed || retryUrl == null || offline.getVisibility() != View.VISIBLE) return;
       Log.w(TAG, "Retry still pending after " + STALL_MS + " ms, starting a new one");
       retry.run();
     }
@@ -143,7 +145,7 @@ public class MainActivity extends Activity {
   private final BroadcastReceiver networkChange = new BroadcastReceiver() {
     @Override
     public void onReceive(Context context, Intent intent) {
-      if (retryUrl == null || offline.getVisibility() != View.VISIBLE || !wifiConnected()) return;
+      if (!resumed || retryUrl == null || offline.getVisibility() != View.VISIBLE || !wifiConnected()) return;
       Log.i(TAG, "Wi-Fi connected or clock changed, retrying now");
       showOffline();
       handler.removeCallbacks(retry);
@@ -236,7 +238,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(retry);
         handler.removeCallbacks(stall);
         retryPending = true;
-        handler.postDelayed(retry, RETRY_MS);
+        if (resumed) handler.postDelayed(retry, RETRY_MS);
       }
 
       @Override
@@ -270,7 +272,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(retry);
         handler.removeCallbacks(stall);
         retryPending = true;
-        handler.postDelayed(retry, RETRY_MS);
+        if (resumed) handler.postDelayed(retry, RETRY_MS);
       }
     });
     LinearLayout column = new LinearLayout(this);
@@ -311,12 +313,31 @@ public class MainActivity extends Activity {
   @Override
   protected void onResume() {
     super.onResume();
+    resumed = true;
+    web.resumeTimers();
+    web.onResume();
     NavigationService.setDashboardVisible(true);
+    if (portalMode) {
+      handler.removeCallbacks(portalCheck);
+      handler.post(portalCheck);
+    } else if (retryUrl != null && offline.getVisibility() == View.VISIBLE) {
+      handler.removeCallbacks(retry);
+      handler.removeCallbacks(stall);
+      retryPending = true;
+      handler.post(retry);
+    }
   }
 
   @Override
   protected void onPause() {
+    resumed = false;
     cancelExit();
+    // pauseTimers affects every WebView in this app process. Native retries need pausing too.
+    web.onPause();
+    web.pauseTimers();
+    handler.removeCallbacks(retry);
+    handler.removeCallbacks(stall);
+    handler.removeCallbacks(portalCheck);
     NavigationService.setDashboardVisible(false);
     super.onPause();
   }
@@ -501,13 +522,13 @@ public class MainActivity extends Activity {
 
   /** Probes PORTAL_PROBE off the main thread; the result goes to onProbe. One probe at a time. */
   private void checkPortal() {
-    if (probing) return;
+    if (!resumed || probing) return;
     probing = true;
     new Thread(() -> {
       int result = probePortal();
       handler.post(() -> {
         probing = false;
-        if (!isDestroyed()) onProbe(result);
+        if (!isDestroyed() && resumed) onProbe(result);
       });
     }, "portal-probe").start();
   }
@@ -537,6 +558,7 @@ public class MainActivity extends Activity {
   }
 
   private void onProbe(int result) {
+    if (!resumed) return;
     if (portalMode) {
       if (result == PROBE_ONLINE || !wifiConnected()) {
         Log.i(TAG, result == PROBE_ONLINE ? "Signed in to Wi-Fi, back to the dashboard" : "Wi-Fi dropped during sign-in");

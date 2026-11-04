@@ -41,6 +41,13 @@
         <data android:scheme="http" />
       </intent-filter>
     </activity>
+    <!-- Explicit shell/system opt-in only; ordinary apps cannot cover the dashboard. -->
+    <activity android:name=".NightActivity" android:exported="true"
+        android:permission="android.permission.DUMP"
+        android:launchMode="singleTask" android:taskAffinity="com.wesbos.homehq.night"
+        android:excludeFromRecents="true" android:screenOrientation="sensorLandscape"
+        android:configChanges="orientation|screenSize|keyboardHidden|keyboard"
+        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
     <!-- Off by default so installing the kiosk doesn't bring up a Home chooser. MainActivity
          turns it on with the "home" extra; see its class comment. -->
     <activity-alias
