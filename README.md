@@ -61,6 +61,9 @@ Settings → About before you follow any guide:
   [skylight-150cal-ddr-v126.md](docs/skylight-150cal-ddr-v126.md).
 - **LOOFII C-3 21.5" calendar** (Allwinner A133, Android 10): root ADB over USB out of the box. See
   [allwinner-a133-loofii-c3.md](docs/allwinner-a133-loofii-c3.md); don't run the Rockchip or A33 scripts on it.
+- **Dromart MI86** (Frameo, firmware `wifi photo frame_20250822`, platform `rk312x`): the unit
+  tested never enumerated over USB. Root and network ADB came from an SD card. Start with
+  [dromart-mi86.md](docs/dromart-mi86.md), and match the fingerprint before using the card.
 - **Frameo, Dragon Touch, Joyhong, Uhale, VESWWE, Pastigio and others:** see the
   [device index](docs/devices.md).
 - **Something else:** work through the [phase map](#phase-map), create `docs/<device>.md`, and

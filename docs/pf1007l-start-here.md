@@ -286,6 +286,8 @@ retain leases pointing at a DNS server that has been stopped. Prefer an isolated
 A [Windows Mobile Hotspot report](pf1007l-windows-20260529-mobile-hotspot-report.md) records ICS
 answering temporary hosts-file entries on one `20260529` unit; it does not supply a complete
 peer-restricted network configuration.
+On a Mac, Internet Sharing and a `pf` redirect of TCP 7806 do the same with no DNS change at all
+([macOS Internet Sharing guide](t3c-macos-internet-sharing.md), `20260519`).
 
 **While this access is active, port 5555 is root ADB with no key check, open to your whole
 network.** Run it on a network you control, finish the T8 lock-down in the same session, then

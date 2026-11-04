@@ -38,8 +38,10 @@ First failed step and its exact output: none
 ## T3c on Internet Sharing when its DNS does not answer
 
 The owner followed [#245](https://github.com/wesbos/photo-frame-dashboard/pull/245) until the
-frame joined the Mac's network. That PR remains unmerged pending safety fixes; its helper is
-not a published route. Three things differed on this Mac.
+frame joined the Mac's network. The [published helper](t3c-macos-internet-sharing.md) now uses
+an explicit frame address, preserves pfctl failures and reads the bridge address with `ifconfig`.
+Those corrections have offline coverage but have not been rerun on this Mac. Three things
+differed in the original session.
 
 **The iPhone uplink.** Internet Sharing offered two iPhone interfaces, "iPhone USB" and
 "iPhone USB 2". With "iPhone USB" selected as the source, that interface went inactive and the

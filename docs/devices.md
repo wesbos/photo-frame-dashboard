@@ -78,6 +78,7 @@ welcome. Missing yours? See the README's
 | <a href="https://amzn.to/4zwU6e0"><img src="images/devices/B0GCCFPHZ4.jpg" width="120" alt="15.6 inch Frameo frame"></a><br>15.6" Frameo | Not documented yet | Not documented yet | Not documented yet | Confirmed working; no write-up yet | [15.6" Frameo, 1920x1080](https://amzn.to/4zwU6e0) |
 | Whale Framely 15.6" (Zeasn app `com.zeasn.frame`, build `RAM_S915_15.6_20260623`, board `BND-S915-C A1.0`) | Rockchip RK3326-S (chip marking), 1 GB; Android version not confirmed | **No.** USB is MTP (`2207:0001`) or PTP (`2207:0002`) only, and only through a USB-A port on the computer side. No open network ports | Not reached | [whale-framely-ram-s915.md](whale-framely-ram-s915.md). Failed routes listed; UART pads unprobed | Not recorded |
 | Frameo "Digital Photo Frame 159K" 15.6" (firmware `RK3326_8.1_AY_FRAMEO_202605131837`) | Rockchip RK3326, Android 8.1 | TCP ADB after a boot-ramdisk patch; historical macOS and [ozzyonfire / ArchLinux](https://github.com/wesbos/photo-frame-dashboard/pull/213#issuecomment-6457452772) reports. USB ADB did not enumerate. **Port 5555 on all interfaces after every boot, shipped `su` root available; unknown-key rejection untested. Use an isolated, trusted network** | Root through shipped `su`, owner-confirmed | [frameo-159k.md](frameo-159k.md). Revised offline builder requires pinned boot and matching system properties; root:root 0644 key and verified ramdisk-before-header writes. Current builder/recipe not hardware-tested. Loader: [#126](https://github.com/wesbos/photo-frame-dashboard/issues/126) | [Amazon UK B0G43VB5PP](https://www.amazon.co.uk/dp/B0G43VB5PP); also Amazon.ca |
+| Dromart MI86 (Frameo, firmware `wifi photo frame_20250822`, brand `BND`, model `wifi photo frame`) | Rockchip RK3126 (`/proc/device-tree/compatible`), Android 6.0.1, 1280×800 | No. Nothing enumerated over USB (macOS; USB-C to USB-A to USB-C, including RESET and POWER holds). TCP 5555 was closed | SD manufacturer utility ran a root script (`uid=0`, `u:r:toolbox:s0`). `/system/xbin/su` is on disk and was not run by the probe. Authenticated network ADB on 5555 is shell (uid 2000); root was also reached in that session | [dromart-mi86.md](dromart-mi86.md). Probe before the ADB script, with approval: even its vendor trigger changes ADB configuration. Match fingerprint `…user.zcx.20250822.060141…` | Not recorded |
 
 ## Details: the first three frames
 
@@ -95,6 +96,9 @@ welcome. Missing yours? See the README's
 ## Patterns so far
 
 - **Frameo frames** often have an ADB toggle under Settings → About → Beta Program.
+- **One Frameo build runs a root shell from its SD manufacturer utility.** Confirmed on the
+  [Dromart MI86](dromart-mi86.md) (`wifi photo frame_20250822`). The 159K thread that described
+  the idea is still unreviewed on 159K hardware.
 - **Try ADB over the network** (`adb connect <ip>:5555`) as well as USB. Several Allwinner frames
   ship with root ADB open on Wi-Fi with no key check. That is convenient, but anything on the same
   network gets root, so keep these frames on an isolated network.
