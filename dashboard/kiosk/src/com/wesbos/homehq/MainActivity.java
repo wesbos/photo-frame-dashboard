@@ -38,12 +38,16 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -59,11 +63,17 @@ import java.util.Map;
  *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez debug true
  * - Launch with a URL: adb shell am start -a android.intent.action.VIEW -d <url> -n com.wesbos.homehq/.MainActivity
  * - Set the saved URL, used on every later launch: adb shell am start -n com.wesbos.homehq/.MainActivity --es url <url>
+ * - Sites for "Switch site" in the controls (Name=URL, comma-separated; picking one saves it as the URL):
+ *     adb shell am start -n com.wesbos.homehq/.MainActivity --esa sites 'Home=https://a.example/,Work=https://b.example/'
  * - A site bundled at build time (KIOSK_SITE) is answered at http://127.0.0.1:8765/ from the
  *   APK's assets/site/, with no server; every other URL goes to the network as usual.
+ * - Brightness: two-finger hold, then "Brightness" (kept in the kiosk, not in Android settings).
  * - Offer the kiosk as a Home app (--ez home false undoes it), then pick it:
  *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true
  *     adb shell cmd package set-home-activity com.wesbos.homehq/.Home
+ * - Or keep the vendor Home app and open the kiosk after boot (--ez boot false undoes it; Android 10+
+ *   also needs: adb shell appops set com.wesbos.homehq SYSTEM_ALERT_WINDOW allow):
+ *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez boot true
  * - Wi-Fi with a sign-in page (captive portal): when the dashboard can't load on Wi-Fi, the kiosk
  *   checks for one and shows it, so the terms can be accepted; then it returns to the dashboard.
  */
@@ -74,6 +84,10 @@ public class MainActivity extends Activity {
   static final String PREF_URL = "url";
   static final String PREF_MENU_BUTTON = "menu_button";
   static final String PREF_BOOTANIM_EXIT = "bootanim_exit";
+  static final String PREF_SITES = "sites";
+  static final String PREF_BRIGHTNESS = "brightness";
+  static final String PREF_BOOT_FIREFOX_APP = "boot_firefox_app";
+  static final int MIN_BRIGHTNESS = 5; // percent; lower can look switched off
   static final long EXIT_HOLD_MS = 1500;
   static final int CANCEL_POINTER_IDS = 10; // touch ids 0-9
   static final long RETRY_MS = 5000;
@@ -164,13 +178,24 @@ public class MainActivity extends Activity {
       handler.removeCallbacks(showControls);
       Log.i(TAG, "Opening kiosk controls");
       cancelPageTouches();
+      List<String> items = new ArrayList<>();
+      String firefoxApp = BootReceiver.firefoxApp(MainActivity.this);
+      String openFirefoxApp = "Open " + Uri.parse(firefoxApp).getHost();
+      if (!firefoxApp.isEmpty()) items.add(openFirefoxApp);
+      if (!savedSites().isEmpty()) items.add("Switch site");
+      Collections.addAll(items, "Brightness", "Open launcher", "Android settings", "Wi-Fi settings",
+          "Reload dashboard");
       new AlertDialog.Builder(MainActivity.this)
           .setTitle("Home HQ")
-          .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings", "Reload dashboard"},
+          .setItems(items.toArray(new String[0]),
               (dialog, which) -> {
-                if (which == 0) openLauncher();
-                else if (which == 1) startActivity(new Intent(Settings.ACTION_SETTINGS));
-                else if (which == 2) openWifiSettings();
+                String item = items.get(which);
+                if (item.equals(openFirefoxApp)) BootReceiver.openFirefoxApp(MainActivity.this, firefoxApp);
+                else if (item.equals("Switch site")) showSites();
+                else if (item.equals("Brightness")) showBrightness();
+                else if (item.equals("Open launcher")) openLauncher();
+                else if (item.equals("Android settings")) startActivity(new Intent(Settings.ACTION_SETTINGS));
+                else if (item.equals("Wi-Fi settings")) openWifiSettings();
                 else web.reload();
               })
           .setNegativeButton("Back to dashboard", null).show();
@@ -183,9 +208,12 @@ public class MainActivity extends Activity {
     applyDebugFlag(getIntent());
     applyHomeFlag(getIntent());
     applyBootanimFlag(getIntent());
+    applyBootFlag(getIntent());
+    applySites(getIntent());
     keepNavigationEnabled();
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    setBrightness(getSharedPreferences(PREFS, MODE_PRIVATE).getInt(PREF_BRIGHTNESS, -1));
 
     web = new WebView(this);
     WebSettings s = web.getSettings();
@@ -235,6 +263,22 @@ public class MainActivity extends Activity {
         pageFailed = true;
         showOffline();
         retryUrl = failingUrl;
+        handler.removeCallbacks(retry);
+        handler.removeCallbacks(stall);
+        retryPending = true;
+        handler.postDelayed(retry, RETRY_MS);
+      }
+
+      @Override
+      public void onReceivedHttpError(WebView view, WebResourceRequest req, WebResourceResponse res) {
+        // A hosting proxy answers with its own error page while the app restarts or deploys
+        // ("upstream connect error ... 503"). That page has no reload code of its own, so the kiosk
+        // would show it until someone reloads by hand. Treat a 5xx on the page itself as a failed load.
+        if (!req.isForMainFrame() || res.getStatusCode() < 500) return;
+        Log.w(TAG, "Page answered HTTP " + res.getStatusCode() + ", retrying in " + RETRY_MS + " ms");
+        pageFailed = true;
+        showOffline();
+        retryUrl = req.getUrl().toString();
         handler.removeCallbacks(retry);
         handler.removeCallbacks(stall);
         retryPending = true;
@@ -329,8 +373,10 @@ public class MainActivity extends Activity {
     setIntent(intent);
     applyDebugFlag(intent);
     applyHomeFlag(intent);
+    applyBootFlag(intent);
     applyMenuButtonFlag(intent);
     applyBootanimFlag(intent);
+    applySites(intent);
     String url = urlFrom(intent);
     if (url != null) {
       closePortal();
@@ -388,6 +434,115 @@ public class MainActivity extends Activity {
 
   private String savedUrl() {
     return getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_URL, DEFAULT_URL);
+  }
+
+  /**
+   * Saves the "Switch site" list from a "sites" string-array extra of Name=URL entries. An empty
+   * array clears it. Only http(s) URLs are kept, as for the "url" extra.
+   */
+  private void applySites(Intent intent) {
+    if (intent == null || !intent.hasExtra(PREF_SITES)) return;
+    String[] entries = intent.getStringArrayExtra(PREF_SITES);
+    StringBuilder kept = new StringBuilder();
+    int count = 0;
+    for (String entry : entries == null ? new String[0] : entries) {
+      int eq = entry.indexOf('=');
+      String name = eq > 0 ? entry.substring(0, eq).trim() : "";
+      String url = eq > 0 ? entry.substring(eq + 1).trim() : "";
+      String scheme = Uri.parse(url).getScheme();
+      if (name.isEmpty() || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+        Log.w(TAG, "Ignoring site entry without Name=http(s)://... (entry " + count + ")");
+        continue;
+      }
+      if (kept.length() > 0) kept.append('\n');
+      kept.append(name).append('\n').append(url);
+      count++;
+    }
+    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_SITES, kept.toString()).apply();
+    Log.i(TAG, "Saved " + count + " sites");
+  }
+
+  /** Saved sites as {name, url} pairs, in the order they were given. */
+  private List<String[]> savedSites() {
+    String raw = getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_SITES, "");
+    List<String[]> sites = new ArrayList<>();
+    String[] lines = raw.isEmpty() ? new String[0] : raw.split("\n");
+    for (int i = 0; i + 1 < lines.length; i += 2) sites.add(new String[] {lines[i], lines[i + 1]});
+    return sites;
+  }
+
+  private void showSites() {
+    List<String[]> sites = savedSites();
+    String[] names = new String[sites.size()];
+    int current = -1;
+    String saved = savedUrl();
+    for (int i = 0; i < names.length; i++) {
+      names[i] = sites.get(i)[0];
+      if (sites.get(i)[1].equals(saved)) current = i;
+    }
+    new AlertDialog.Builder(this)
+        .setTitle("Switch site")
+        .setSingleChoiceItems(names, current, (dialog, which) -> {
+          dialog.dismiss();
+          String url = sites.get(which)[1];
+          getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, url).apply();
+          Log.i(TAG, "Switched to site: " + forLog(url));
+          handler.removeCallbacks(retry);
+          handler.removeCallbacks(stall);
+          retryPending = false;
+          retryUrl = url;
+          load(url);
+        })
+        .setNegativeButton("Back to dashboard", null).show();
+  }
+
+  /**
+   * Some firmware has no SystemUI, so the brightness slider in Android settings does nothing.
+   * This one dims the kiosk window instead: no permission needed, and it applies whenever the
+   * dashboard is on screen. The value (percent, -1 = system setting) is kept across restarts.
+   */
+  private void showBrightness() {
+    int saved = getSharedPreferences(PREFS, MODE_PRIVATE).getInt(PREF_BRIGHTNESS, -1);
+    TextView label = new TextView(this);
+    label.setGravity(Gravity.CENTER);
+    label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+    SeekBar bar = new SeekBar(this);
+    bar.setMax(100 - MIN_BRIGHTNESS);
+    bar.setProgress((saved < 0 ? 100 : saved) - MIN_BRIGHTNESS);
+    label.setText((bar.getProgress() + MIN_BRIGHTNESS) + " %");
+    bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+      @Override
+      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        int percent = progress + MIN_BRIGHTNESS;
+        label.setText(percent + " %");
+        setBrightness(percent);
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(PREF_BRIGHTNESS, percent).apply();
+      }
+
+      @Override
+      public void onStartTrackingTouch(SeekBar seekBar) {}
+
+      @Override
+      public void onStopTrackingTouch(SeekBar seekBar) {}
+    });
+    int pad = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24, getResources().getDisplayMetrics());
+    LinearLayout box = new LinearLayout(this);
+    box.setOrientation(LinearLayout.VERTICAL);
+    box.setPadding(pad, pad, pad, pad);
+    box.addView(label);
+    box.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, pad * 3));
+    new AlertDialog.Builder(this)
+        .setTitle("Brightness")
+        .setView(box)
+        .setPositiveButton("Done", null).show();
+  }
+
+  private void setBrightness(int percent) {
+    WindowManager.LayoutParams params = getWindow().getAttributes();
+    params.screenBrightness = percent < 0
+        ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        : percent / 100f;
+    getWindow().setAttributes(params);
   }
 
   /**
@@ -834,6 +989,22 @@ public class MainActivity extends Activity {
         home ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
         PackageManager.DONT_KILL_APP);
     Log.i(TAG, "Home alias " + (home ? "on" : "off"));
+  }
+
+  /** Turns BootReceiver on or off, for frames that keep their own Home app. Same reason as above. */
+  private void applyBootFlag(Intent intent) {
+    if (intent != null && intent.hasExtra(PREF_BOOT_FIREFOX_APP)) {
+      String app = intent.getStringExtra(PREF_BOOT_FIREFOX_APP);
+      app = app == null || !app.startsWith("https://") ? "" : app;
+      getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_BOOT_FIREFOX_APP, app).apply();
+      Log.i(TAG, app.isEmpty() ? "After boot: kiosk" : "After boot: Firefox web app " + app);
+    }
+    if (intent == null || !intent.hasExtra("boot")) return;
+    boolean boot = intent.getBooleanExtra("boot", false);
+    getPackageManager().setComponentEnabledSetting(new ComponentName(this, BootReceiver.class),
+        boot ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
+        PackageManager.DONT_KILL_APP);
+    Log.i(TAG, "Start after boot " + (boot ? "on" : "off"));
   }
 
   /** Watches for the two-finger exit hold; all touches still go to the page (after a stale-touch reset). */

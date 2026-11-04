@@ -6,6 +6,9 @@
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <!-- Optional; only used if granted with adb (see kiosk README). -->
   <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+  <!-- Only used by BootReceiver, which is disabled until turned on with adb (see its class comment). -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
   <application
       android:label="Home HQ"
@@ -54,5 +57,14 @@
         <category android:name="android.intent.category.DEFAULT" />
       </intent-filter>
     </activity-alias>
+    <!-- Off by default: opens the kiosk after boot on frames that keep their own Home app. -->
+    <receiver
+        android:name=".BootReceiver"
+        android:enabled="false"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

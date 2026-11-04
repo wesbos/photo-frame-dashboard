@@ -86,6 +86,8 @@ public class NavigationService extends AccessibilityService {
     addButton("Back", view -> performGlobalAction(GLOBAL_ACTION_BACK));
     addButton("Dashboard", view -> startActivity(new Intent(this, MainActivity.class)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)));
+    // Android's own power menu, so a frame on a power bank can shut down cleanly before unplugging.
+    addButton("Power off", view -> performGlobalAction(GLOBAL_ACTION_POWER_DIALOG));
     updateVisibility();
   }
 
