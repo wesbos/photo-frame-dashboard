@@ -3,6 +3,9 @@
 Comments go out under the owner's GitHub account. Keep them short, specific and kind. Say what
 happened, why, and what would be welcome next. Never quote private data back.
 
+Append the required bot-comment footer from [the skill](../SKILL.md#6-comment-and-close) to
+every template below, including short replies and closure comments.
+
 ## Merged with changes
 
 > Merged, thanks! One change after merging: [what changed], because [why, in one sentence].

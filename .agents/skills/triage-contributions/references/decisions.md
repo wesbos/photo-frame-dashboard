@@ -5,6 +5,9 @@ the date.
 
 ## How the repo is run
 
+- Every comment posted on Wes's behalf must carry the exact bot footer specified in
+  [Comment and close](../SKILL.md#6-comment-and-close), including edits to existing bot comments.
+  (2026-11-04.)
 - The agent may merge, fix, push to `main`, comment, and close PRs and issues on its own, within
   [SKILL.md](../SKILL.md). Escalate the items listed there.
 - Merge PRs by merging their commits into `main` (so GitHub marks them merged and keeps authorship),

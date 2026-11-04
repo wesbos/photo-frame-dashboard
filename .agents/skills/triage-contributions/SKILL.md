@@ -118,6 +118,15 @@ Check that GitHub shows each merged PR as MERGED.
 Use `references/comment-templates.md`. Comments are public and posted as the owner, so be kind,
 specific and short. Don't repeat private data from a PR in a comment.
 
+End every issue comment, PR comment, review comment and reply posted on Wes's behalf with this
+exact standalone line, separated from the body by a blank line:
+
+```text
+[this is a wes bot comment]
+```
+
+When editing an existing bot comment, preserve the footer and include it only once.
+
 - Merged with changes: one comment saying what changed and why.
 - Merged unchanged: no comment needed.
 - Harvested and closed: thank them, say where the facts went, say exactly why the code wasn't
