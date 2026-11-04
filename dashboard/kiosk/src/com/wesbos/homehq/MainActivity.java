@@ -655,12 +655,10 @@ public class MainActivity extends Activity {
       Log.i(TAG, "Re-enabled navigation service");
       return;
     }
-    // Some firmware keeps the selected service but resets only the master switch at boot.
+    // Some firmware keeps the selected service but resets only the master switch at boot. On a
+    // PF1508 (Android 15) the switch alone doesn't bind the service, so still check it below.
     int enabled = Settings.Secure.getInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 0);
-    if (enabled != 1) {
-      setAccessibilityEnabled();
-      return;
-    }
+    if (enabled != 1) setAccessibilityEnabled();
     handler.postDelayed(() -> {
       if (NavigationService.isConnected()) return;
       // Writing the same list doesn't notify Android, so take the service off and put it back.

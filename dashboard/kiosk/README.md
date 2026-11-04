@@ -146,7 +146,10 @@ The grant survives updates. To turn the buttons off for good, revoke it first
 January `20260113` and May `20260529` firmware were also observed keeping a navigation service in
 the selected list but resetting `accessibility_enabled` to `0` after boot. On `20260529` (#234)
 the buttons came back on every boot once Home HQ was the Home app (see [Start at boot](#start-at-boot)). With the same optional grant,
-Home HQ repairs either state when it starts, without rewriting an already selected list.
+Home HQ repairs either state when it starts, without rewriting an already selected list while the
+service is running. On a PF1508 (Android 15) turning the switch back on was not enough, so if the
+service still isn't running 5 seconds later, Home HQ takes it off the list and puts it back
+([allwinner-a333-pf1508.md](../../docs/allwinner-a333-pf1508.md#the-navigation-service-after-a-reboot)).
 This reset was measured with a separate navigation app; the Home HQ change has host regression
 coverage but has not been installed on that unit. See the
 [January report](../../docs/allwinner-a33-pf1007l.md#9-january-unit-remote-management-and-background-services).
