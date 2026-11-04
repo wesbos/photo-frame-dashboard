@@ -4,8 +4,6 @@ Turn a cheap Android photo frame into a family dashboard: unlock it, root it, re
 
 **TLDR:** buy a $50 frame, point an agent at this repo and let 'er rip!
 
-Before setup, read the [security guidance](SECURITY.md), especially before network access or adding private data.
-
 [![The family dashboard running on the BIUFRAME 10.1" photo frame](docs/images/dashboard-on-frame.jpg)](https://youtu.be/ZLycoUMltNI)
 
 ▶️ **Watch the video: [https://youtu.be/ZLycoUMltNI](https://youtu.be/ZLycoUMltNI)**
@@ -165,6 +163,7 @@ trusting it, and remember that a past approval is not permission for a new write
 
 ## Other docs
 
+- [Frame security](SECURITY.md): containment, reported firmware risks and security reporting
 - Skylight Wi-Fi investigation: [live-diagnostics.md](docs/live-diagnostics.md),
   [native-wifi-root-tests.md](docs/native-wifi-root-tests.md),
   [wifi-firmware-candidate.md](docs/wifi-firmware-candidate.md),
