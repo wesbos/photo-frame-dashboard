@@ -72,6 +72,10 @@ October 2026, on a 2 A wall supply:
   verifies both directions in both families. Failed activation removes its new hooks and preserves
   previous chains; a rollback failure is logged for USB recovery. Cleanup refuses referenced chains.
   Host command-double tests cover failures and damaged rules; revised hardware behavior is untested.
+- Observed on a May `20260519` unit: the frame has no power supply at all —
+  `/sys/class/power_supply/` is empty. `dumpsys battery` still reports `present: true, level: 100,
+  AC powered: true`, which is healthd's fallback with no supply to read, not a measurement.
+  `voltage: 0` and an empty `technology` are the only tells.
 - Guess: the Wi-Fi start freeze is a power problem (current spike with no battery), not a driver
   bug. The kernel log ends at different points of the Wi-Fi start, and the frame survived the
   same start when it ran after boot.
