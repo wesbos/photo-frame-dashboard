@@ -3,7 +3,7 @@
   'use strict';
   var D = window.DATA;
   var V = { el: null, routine: null, pending: {} };
-  var LANES = ['alex', 'jordan', 'maya', 'otto', 'any'];
+  var LANES = ['papa', 'maman', 'clara', 'felix', 'any'];
 
   function routine() { return V.routine ? D.routines.filter(function (r) { return r.id === V.routine; })[0] : App.currentRoutine(); }
   function listFor(who, r) {

@@ -1,7 +1,13 @@
 // Entry point. Order matters: each module attaches to the shared window.App.
 import './icons.js';
 import './data.js';
+import './family-data.js';
 import './app.js';
+import './weather.js';
+import './holidays.js';
+import './outfit.js';
+import './reading.js';
+import './bus-alarm.js';
 import './system.js';
 import './slideshow.js';
 import './views/home.js';
@@ -12,4 +18,10 @@ import './views/photos.js';
 import './views/control.js';
 import './views/agents.js';
 import './views/ambient.js';
+import './views/kid-view.js';
+import './views/adult-view.js';
+import './views/papa.js';
+import './views/maman.js';
+import './views/clara.js';
+import './views/felix.js';
 import './diag.js';

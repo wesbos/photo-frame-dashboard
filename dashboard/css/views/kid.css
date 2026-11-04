@@ -1,0 +1,84 @@
+/* ---------------------------------------------------------------- kid persona views (Clara, Félix) */
+.kd { height: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); min-height: 0; }
+.kd-col { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; overflow-y: auto; }
+
+.kd-card { background: var(--card); border-radius: var(--r); overflow: hidden; flex: none; }
+.kd-earned { display: inline-flex; align-items: center; gap: 4px; font-size: 22px; }
+.kd-earned .num { font-size: 22px; font-weight: 800; }
+
+.ch-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; background: var(--c, var(--ink)); color: var(--c-ink, #fff); }
+.ch-head b { font-size: var(--fs-m); display: block; }
+.ch-sub { font-size: var(--fs-label); opacity: .8; margin-left: 10px; }
+
+.ch-list { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ch {
+  display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  background: var(--paper); border-radius: var(--r-s); min-height: var(--tap);
+  text-align: left;
+}
+.ch.is-done { background: var(--paper-2); }
+.ch:active { transform: scale(.98); }
+.ch-emoji { position: relative; font-size: 28px; flex: none; }
+.ch-check { position: absolute; inset: -4px; display: flex; align-items: center; justify-content: center; opacity: 0; }
+.ch-check svg { stroke: var(--ok); stroke-width: 3; fill: none; }
+.ch.is-done .ch-check, .ch-check.is-done { opacity: 1; background: var(--card); border-radius: 50%; }
+.ch-text { flex: 1; font-size: 19px; }
+.ch-text small { display: block; color: var(--ok); font-weight: 800; }
+
+.kd-add {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); border: 2px dashed var(--line); border-radius: var(--r-s);
+  font-weight: 700; color: var(--mute); background: transparent; margin-top: 4px;
+}
+.kd-add:active { transform: scale(.97); }
+
+.kd-empty { padding: 20px; color: var(--mute); font-size: 20px; }
+
+/* holiday countdown card */
+.kd-holiday { display: flex; align-items: center; gap: 18px; padding: 20px 22px; }
+.kd-holiday-emoji { font-size: 56px; line-height: 1; }
+.kd-holiday h2 { font-size: var(--fs-l); margin-top: 2px; }
+.kd-holiday .label { color: var(--mute); font-size: var(--fs-label); }
+
+/* reading practice */
+.kd-reading { flex: 1; padding: 0; display: flex; flex-direction: column; min-height: 0; }
+.kd-words { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px; overflow-y: auto; }
+.kd-word {
+  display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px;
+  background: var(--paper); border-radius: 999px; font-size: 20px; font-weight: 700;
+}
+.kd-word:active { transform: scale(.95); background: var(--paper-2); }
+.kd-word .i { color: var(--mute); }
+
+.kd-phonics { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.kd-phonics-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.kd-phonics-group--stack { flex-direction: column; align-items: stretch; gap: 8px; }
+.kd-theme-label { font-weight: 800; font-size: 18px; color: var(--mute); }
+.kd-sound {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px;
+  background: var(--ink); color: var(--paper); border-radius: 999px;
+  font-family: var(--serif); font-style: italic; font-size: 22px; flex: none;
+}
+.kd-sound:active { transform: scale(.95); }
+.kd-phonics-words { display: flex; flex-wrap: wrap; gap: 8px; }
+.kd-wotd-words { padding: 16px; }
+
+/* "what to wear" widget — pinned to the bottom of the left column */
+.kd-outfit {
+  margin-top: auto; display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+}
+.outfit-pic { width: 56px; height: 56px; flex: none; color: var(--c); }
+.outfit-pic .outfit-fig { width: 100%; height: 100%; }
+.outfit-label { font-weight: 700; font-size: 17px; line-height: 1.25; }
+
+/* task picker sheet */
+.kd-menu { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.kd-menu-item {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+  background: var(--paper); border-radius: var(--r-s); min-height: var(--tap);
+  font-size: 19px; font-weight: 700; text-align: left;
+}
+.kd-menu-item:active { transform: scale(.98); background: var(--paper-2); }
+.kd-menu-emoji { font-size: 26px; flex: none; }
+.kd-menu-item > span:nth-child(2) { flex: 1; }
+.kd-menu-price { color: var(--ok); font-weight: 800; flex: none; }
