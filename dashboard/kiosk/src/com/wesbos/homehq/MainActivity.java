@@ -98,6 +98,7 @@ public class MainActivity extends Activity {
 
   private WebView web;
   private Button menuButton;
+  private Thread bootanimThread;
   private final Handler handler = new Handler(Looper.getMainLooper());
   // Not cleared in onDestroy, so a navigation rebind that has started always finishes.
   private final Handler rebindHandler = new Handler(Looper.getMainLooper());
@@ -820,31 +821,57 @@ public class MainActivity extends Activity {
     boolean enabled = getSharedPreferences(PREFS, MODE_PRIVATE)
         .getBoolean(PREF_BOOTANIM_EXIT, false);
     Log.i(TAG, "Boot animation exit " + (enabled ? "on" : "off"));
+    if (bootanimThread != null) bootanimThread.interrupt();
     if (!enabled) return;
-    new Thread(new Runnable() {
+    bootanimThread = new Thread(new Runnable() {
       @Override
       public void run() {
         // The property service may not be ready at the first start after a power cut, so try
         // twice. Both attempts are cheap and setting it when the animation is already gone is
         // harmless.
         for (int attempt = 0; attempt < 2; attempt++) {
+          if (Thread.currentThread().isInterrupted()
+              || !getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_BOOTANIM_EXIT, false)) return;
+          Process process = null;
           try {
-            Process p = Runtime.getRuntime().exec(
+            process = Runtime.getRuntime().exec(
                 new String[] {"/system/bin/setprop", "sys.bootanim.exit", "1"});
-            int rc = p.waitFor();
-            if (rc != 0) Log.w(TAG, "setprop sys.bootanim.exit exited " + rc);
-          } catch (IOException | InterruptedException e) {
-            Log.w(TAG, "Could not set sys.bootanim.exit: " + e);
+            // Process.waitFor(timeout) requires API 26; bounded polling also works on API 23.
+            long deadline = SystemClock.elapsedRealtime() + 2000;
+            while (true) {
+              try {
+                int rc = process.exitValue();
+                if (rc != 0) Log.w(TAG, "setprop sys.bootanim.exit exited " + rc);
+                break;
+              } catch (IllegalThreadStateException running) {
+                if (SystemClock.elapsedRealtime() >= deadline) {
+                  Log.w(TAG, "setprop sys.bootanim.exit timed out");
+                  break;
+                }
+                Thread.sleep(50);
+              }
+            }
+          } catch (IOException e) {
+            Log.w(TAG, "Could not set sys.bootanim.exit");
             return;
-          }
-          try {
-            Thread.sleep(RETRY_MS);
           } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return;
+          } finally {
+            if (process != null) process.destroy();
+          }
+          if (attempt == 0) {
+            try {
+              Thread.sleep(RETRY_MS);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return;
+            }
           }
         }
       }
-    }, "bootanim-exit").start();
+    }, "bootanim-exit");
+    bootanimThread.start();
   }
 
   /** Turns the Home alias on or off. The shell can't enable a component of a release app. */

@@ -159,7 +159,6 @@ optional service adds floating **Back** and **Dashboard** buttons outside Home H
 
 - **Back** performs Android's normal Back action.
 - **Dashboard** returns directly to Home HQ, keeping the current dashboard URL.
-  before it is unplugged.
 - Drag the dots to move the buttons. Their position is saved.
 
 The buttons hide while Home HQ is active and return when you leave it. Android

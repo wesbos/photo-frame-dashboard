@@ -242,7 +242,7 @@ Observations:
 ## Before Wi-Fi
 
 - Use an isolated or IoT network and a dedicated, limited Home Assistant user. Root ADB stays on
-  over USB, `su` is world-runnable, a factory ADB key was authorized (removed on this unit), and the
+  over USB, `su` is world-runnable, an extra preinstalled ADB key was authorized (removed on this unit), and the
   security patch is from 2022. This unit gets a UniFi IoT VLAN that can reach only Home Assistant's
   port 8123 on the home LAN.
 - Turn off ADB key expiry first (above).
