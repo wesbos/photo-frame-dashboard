@@ -212,7 +212,7 @@ staging key files, changing properties or restarting ADB. There is no override. 
 still create the card's `started` marker and `result.txt`; inspect that result before retrying.
 
 The script is [`scripts/dromart-mi86/enable-adb.sh`](../scripts/dromart-mi86/enable-adb.sh)
-(16,869 bytes, SHA-256 `559c4107f2a0e08e918eda2cbdbab03dca6b7cc6587fc4db7bdccab45e4d73db`).
+(16,867 bytes, SHA-256 `c29e93a0718cf62d1b543500f3d75b487ada31755707158decd8ada4698dfff5`).
 It is the upstream `p_frameo_jb` template
 ([blob `479eca15adf773080c792be0e481e72723945936`](https://github.com/dusty-du/frameo-159k-jailbreak-builder/blob/479eca15adf773080c792be0e481e72723945936/templates/p_frameo_jb))
 with the changes this frame forced:

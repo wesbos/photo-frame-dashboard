@@ -133,7 +133,7 @@ main() {
     present)
       [ -f "$d/adb_keys.before" ] && [ ! -L "$d/adb_keys.before" ] || fail 'invalid recovery backup'
       clean_current "$d/adb_keys.before" > "$attempt/adb_keys.recovery.clean" || fail 'cannot inspect existing recovery backup'
-      validate_keys "$attempt/adb_keys.recovery.clean" recovery || fail 'invalid existing recovery backup' 
+      validate_keys "$attempt/adb_keys.recovery.clean" recovery || fail 'invalid existing recovery backup'
       ;;
   esac
   # Cleaning supplies line boundaries; deduplicate only the exact key blob.
@@ -421,4 +421,3 @@ on_exit() {
 }
 
 main > "$out" 2>&1
-

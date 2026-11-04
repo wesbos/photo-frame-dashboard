@@ -30,7 +30,7 @@ ENABLE = HERE / "enable-adb.sh"
 # Pins of the reviewed sources staged by this tool; hardware coverage is in the doc.
 EXPECTED = {
     PROBE: "421ffd9c25a9ecb74a2fcf7cafbe31bcaff537d38bf73fcadf2f8d8927913c62",
-    ENABLE: "559c4107f2a0e08e918eda2cbdbab03dca6b7cc6587fc4db7bdccab45e4d73db",
+    ENABLE: "c29e93a0718cf62d1b543500f3d75b487ada31755707158decd8ada4698dfff5",
 }
 CONFIG = "auto_run=action_update_version\n"
 APK_NAME = (
