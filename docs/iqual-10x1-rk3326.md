@@ -173,7 +173,7 @@ Temurin JDK 17, Android build-tools 34.0.0, platform 34, plus a `zip` shim on `P
 (`build.sh` uses `zip`, which was not installed).
 
 ```sh
-adb install -r kiosk/build/homehq.apk
+adb install -r dashboard/kiosk/build/homehq.apk
 adb shell am start -n com.wesbos.homehq/.MainActivity --ez home true \
   --ez bootanim_exit true --es url <dashboard-url>
 adb shell cmd package set-home-activity com.wesbos.homehq/.Home
@@ -238,7 +238,7 @@ Settings access with USB ADB still connected. Only then uninstall the kiosk or a
 
 | Change | Command | Undo |
 | --- | --- | --- |
-| Home HQ kiosk installed | `adb install -r kiosk/build/homehq.apk` (`com.wesbos.homehq` 1.1, versionCode 2, debug-signed) | Restore and test Frameo Home and Settings first, then `adb uninstall com.wesbos.homehq` |
+| Home HQ kiosk installed | `adb install -r dashboard/kiosk/build/homehq.apk` (`com.wesbos.homehq` 1.1, versionCode 2, debug-signed) | Restore and test Frameo Home and Settings first, then `adb uninstall com.wesbos.homehq` |
 | Kiosk is HOME | `am start -n com.wesbos.homehq/.MainActivity --ez home true` then `cmd package set-home-activity com.wesbos.homehq/.Home` | `pm enable net.frameo.frame`, then select `net.frameo.frame/net.frameo.frame.ui.activities.AWaitForDeferredInitCompleted` and test Home |
 | Rootless Pixel Launcher 3.9.1 installed, as an escape hatch for the kiosk's two-finger menu | `adb install rootless.apk` (F-Droid `amirz.rootless.nexuslauncher_30911.apk`, SHA-256 `7fa44d560dc4577374d45176220de2c0b00a71e09d6d148cdea4e0a52d38404a`) | `adb uninstall amirz.rootless.nexuslauncher` |
 | Adups updater disabled | `pm disable-user --user 0 com.incar.update` | `pm enable com.incar.update` |

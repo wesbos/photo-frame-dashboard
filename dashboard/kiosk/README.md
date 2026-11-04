@@ -59,27 +59,6 @@ URL when run without one.
 Every later launch, including after a reboot, opens the saved URL. Links that other apps open
 in the kiosk, such as a sign-in page, are shown but not saved.
 
-## Brightness
-
-Hold two fingers on the screen, then pick **Brightness** for a slider (5–100 %). It dims the kiosk
-window itself, so it needs no permission and works on firmware without SystemUI, where the slider
-in Android settings does nothing. The value is kept across restarts and applies while the kiosk is
-on screen.
-
-## Switching between sites
-
-To flip between a few dashboards from the frame, save them once as `Name=URL` entries:
-
-```sh
-adb shell am start -n com.wesbos.homehq/.MainActivity \
-  --esa sites "'Family=https://your-dashboard/,Work=https://work.example/'"
-```
-
-The two-finger controls then start with **Switch site**, which lists them and marks the one
-showing. Picking one saves it as the dashboard URL, so it is also what the frame opens after a
-reboot. `--esa` splits on commas, so percent-encode commas inside a URL (`%2C`). Send
-`--esa sites "''"` to clear the list and hide the entry.
-
 ## A page bundled in the APK (no server)
 
 A static page can ship inside the APK instead of being hosted. Build with `KIOSK_SITE` set to a
@@ -149,21 +128,13 @@ adb shell appops set com.wesbos.homehq SYSTEM_ALERT_WINDOW allow
 
 The second line is needed on Android 10 and later, which blocks apps from opening a screen from the
 background otherwise. If the kiosk doesn't open, the frame shows the vendor app instead of getting
-stuck. Undo with `--ez boot false` and `appops set ... default`.
+stuck. Undo with `--ez boot false` and `adb shell appops set com.wesbos.homehq SYSTEM_ALERT_WINDOW default`.
 
-If a site needs a newer engine than the frame's WebView, install it as a web app in Firefox (Firefox
-menu → **Add app to Home screen**; the Home app must accept shortcuts, so on a PF1506 switch Home to a
-launcher only for that step) and open that instead after boot. An empty value goes back to the kiosk:
-
-```sh
-adb shell am start -n com.wesbos.homehq/.MainActivity --es boot_firefox_app https://example.com/
-```
-
-Firefox shows its offline page if it opens before Wi-Fi is up, so after boot the kiosk waits for a
-working connection (up to 45 seconds) before it opens the web app.
-
-The controls then list **Open example.com** to go back to it. To get from the web app to the kiosk,
-turn on the [navigation buttons](#frames-without-home-or-back-buttons): **Dashboard** opens the kiosk.
+This was reported on one PF1506 with firmware `20250731`. It is not a recovery fix for the
+locked-out `20250813` unit in #118. Confirm physical Settings and USB ADB access first, keep the
+vendor Home enabled and selected, and follow the README backup rule. The receiver makes one
+launch attempt; network retries happen inside the kiosk. It does not launch Firefox or switch
+Home apps. Some vendor firmware blocks boot broadcasts or background launches entirely.
 
 ## Screen density
 
@@ -184,11 +155,10 @@ Some frame firmware omits Android's navigation bar. The two-finger gesture only
 works inside Home HQ, so it cannot bring you back from another app's settings.
 
 Enable **Home HQ navigation** in Android **Settings → Accessibility**. The
-optional service adds floating **Back**, **Dashboard** and **Power off** buttons outside Home HQ:
+optional service adds floating **Back** and **Dashboard** buttons outside Home HQ:
 
 - **Back** performs Android's normal Back action.
 - **Dashboard** returns directly to Home HQ, keeping the current dashboard URL.
-- **Power off** opens Android's power menu, so a frame on a power bank can shut down cleanly
   before it is unplugged.
 - Drag the dots to move the buttons. Their position is saved.
 
