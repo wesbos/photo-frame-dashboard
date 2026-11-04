@@ -8,8 +8,11 @@ addresses, SSIDs) are left out.
 [kiosk app](../dashboard/kiosk/README.md) set as HOME on a Home Assistant dashboard, the Adups
 updater and the factory test app disabled, Frameo disabled, the time zone corrected, and a
 rootless speed pass that took the kiosk from ~140% CPU to ~7% ([Performance](#performance)). No
-partition was written, no `/system` file was touched. The Magisk route is an open question at
-the end.
+raw partition or `/system` file was written.
+
+**Configuration record, not a setup procedure.** There is no verified full-device backup;
+this report does not meet README rule 2. Preserve a physical Settings route and USB ADB before
+changing launchers or disabling apps. No flashing or rooting route is established here.
 
 **The Frameo boot animation is handled by the kiosk, without root.** On this build the Frameo
 animation runs above every window after a power cut, so the panel shows the splash while the
@@ -65,7 +68,7 @@ RK3126 fingerprint and refuses).
 | Time zone | Ships as `America/New_York` |
 | Trust store | ISRG Root X1 present (`6187b673.0`); ISRG Root X2 absent |
 
-Because SystemUI is disabled, **no "Allow USB debugging?" dialog can ever render**, and the
+No "Allow USB debugging?" dialog was observed while SystemUI was disabled. The
 kiosk gets a clean fullscreen with no status or navigation bar. The clock screen shows
 1280 × 800 with `wm size` / `wm density` agreeing.
 
@@ -98,13 +101,12 @@ adb shell setprop persist.adb.tcp.port 5555
 ```
 
 `persist.adb.tcp.port` is read by adbd at start, so after the next boot the frame listens on
-5555 **and** keeps USB ADB working; both transports appear in `adb devices` at once. Because
-`ro.adb.secure=1`, the listener still requires a key that this frame already trusts, so a
-stranger on the LAN cannot connect just by finding the port. It is a plain, unencrypted
-listener on every interface, though: treat it as a convenience on a trusted network, and clear
-it (`setprop persist.adb.tcp.port ""`) if the frame moves to a shared one. With two devices
-listed, `adb -s <ip>:5555 shell …` is needed, because plain `adb shell` fails with "more than
-one device".
+5555 **and** keeps USB ADB working; both transports appear in `adb devices` at once.
+`ro.adb.secure=1` was reported, but rejection of an unknown host key was not tested. Do not infer
+that the network listener is protected from that property alone. Keep it off on shared networks;
+prefer USB. Clearing the property (`setprop persist.adb.tcp.port ""`) and restarting adbd or the
+frame should remove the listener; verify it is closed. With two transports listed, select the
+intended target explicitly with `adb -s <target> shell …`.
 
 ## 3. Root status: `su` exists but does not work
 
@@ -127,7 +129,7 @@ only `CapBnd: 00000000000000c0` (`CAP_SETUID|CAP_SETGID`), app processes get the
 `/system/bin/run-as` here has **no** setuid bit (`-rwxr-x--- root shell`). That points at the
 adbd shell's `SECBIT_NOROOT`: `su` runs with `euid 0` but no capabilities, so its `setgid(0)`
 gets `EPERM`. Whatever the exact cause, treat the shipped `su` as unusable and do not spend time
-on it; a root shell needs a patched `boot`, not this binary.
+on it. No working root route was demonstrated.
 
 **SELinux is `Permissive` on this unit** (`getenforce` prints `Permissive`), which is why the
 `shell` user can write persistent properties here:
@@ -161,7 +163,7 @@ Partitions 1–16 are contiguous. `/proc/partitions` reports the same sizes in 1
 | rknand0p16 | `userdata` | 6851248 | 53703983 | ~25.6 GiB |
 
 `su` is setuid but the shell user cannot read any of these block devices
-(`dd if=/dev/block/rknand0p7` returns 0 bytes), so a partition dump needs loader mode, not ADB.
+(`dd if=/dev/block/rknand0p7` returns 0 bytes), so no ADB partition dump was obtained. Loader readback remains unverified.
 
 ## 5. Dashboard kiosk
 
@@ -230,22 +232,23 @@ loaded from. With the panel on `http://<ip>:8123`, do not expect the `https://` 
 
 ## 6. What was changed
 
-Every item is reversible from ADB. Nothing on a read-only filesystem was modified.
+These are changes reported on this unit. Nothing on a read-only filesystem was modified.
+Before undoing the kiosk, enable Frameo, select its Home activity, and test Home plus physical
+Settings access with USB ADB still connected. Only then uninstall the kiosk or alternate launcher.
 
 | Change | Command | Undo |
 | --- | --- | --- |
-| Home HQ kiosk installed | `adb install -r kiosk/build/homehq.apk` (`com.wesbos.homehq` 1.1, versionCode 2, debug-signed) | `adb uninstall com.wesbos.homehq` |
-| Kiosk is HOME | `am start -n com.wesbos.homehq/.MainActivity --ez home true` then `cmd package set-home-activity com.wesbos.homehq/.Home` | `cmd package set-home-activity net.frameo.frame/net.frameo.frame.ui.activities.AWaitForDeferredInitCompleted` |
+| Home HQ kiosk installed | `adb install -r kiosk/build/homehq.apk` (`com.wesbos.homehq` 1.1, versionCode 2, debug-signed) | Restore and test Frameo Home and Settings first, then `adb uninstall com.wesbos.homehq` |
+| Kiosk is HOME | `am start -n com.wesbos.homehq/.MainActivity --ez home true` then `cmd package set-home-activity com.wesbos.homehq/.Home` | `pm enable net.frameo.frame`, then select `net.frameo.frame/net.frameo.frame.ui.activities.AWaitForDeferredInitCompleted` and test Home |
 | Rootless Pixel Launcher 3.9.1 installed, as an escape hatch for the kiosk's two-finger menu | `adb install rootless.apk` (F-Droid `amirz.rootless.nexuslauncher_30911.apk`, SHA-256 `7fa44d560dc4577374d45176220de2c0b00a71e09d6d148cdea4e0a52d38404a`) | `adb uninstall amirz.rootless.nexuslauncher` |
 | Adups updater disabled | `pm disable-user --user 0 com.incar.update` | `pm enable com.incar.update` |
 | Factory test app disabled | `pm disable-user --user 0 com.DeviceTest` | `pm enable com.DeviceTest` |
 | Frameo disabled | `pm disable-user --user 0 net.frameo.frame` | `pm enable net.frameo.frame` (then set it HOME again if wanted) |
-| Time zone corrected | `setprop persist.sys.timezone Australia/Sydney` (see below) | `setprop persist.sys.timezone America/New_York` |
+| Time zone corrected | `setprop persist.sys.timezone <local-zone>` (see below) | `setprop persist.sys.timezone America/New_York` |
 | Animations off (also turns on `prefers-reduced-motion` in WebView; see [Performance](#performance)) | `settings put global window_animation_scale 0`, same for `transition_animation_scale` and `animator_duration_scale` | set all three back to `0.5` |
 | Hot apps AOT-compiled | `cmd package compile -m speed -f <pkg>` for `com.android.webview`, `com.google.android.inputmethod.latin`, `com.android.settings`, `com.android.permissioncontroller`, `amirz.rootless.nexuslauncher` | `cmd package compile --reset <pkg>` |
 | Unused system apps disabled | `pm disable-user --user 0 <pkg>` for each package in the list below | `pm enable <pkg>` |
 | Cached background processes capped at 8 | `settings put global activity_manager_constants max_cached_processes=8` | `settings delete global activity_manager_constants` |
-| Kiosk JavaScript bridge on (the dashboard sets the backlight; see [Screen control](#screen-control)) | `am start -n com.wesbos.homehq/.MainActivity --ez bridge true` | `--ez bridge false` |
 | BLE "always scanning" off | `settings put global ble_scan_always_enabled 0` (it was unset; Wi-Fi scan-always was already `0`) | `settings delete global ble_scan_always_enabled` |
 
 The packages disabled for speed, all checked unused by a Wi-Fi-only kiosk:
@@ -314,13 +317,8 @@ them for good needs root.
 ### Screen control
 
 The panel ships at brightness 217/255 with `screen_off_timeout` at its maximum, so it stays bright
-all night. Two rootless controls, both checked on 2026-10-27:
+all night. The following rootless behavior was checked on 2026-10-27:
 
-- **The dashboard dims it** through the kiosk's opt-in bridge (`--ez bridge true`,
-  [kiosk README](../dashboard/kiosk/README.md#let-the-dashboard-dim-the-screen)).
-  `HomeHQ.setBrightness(0.02)` showed up as `mScreenBrightnessOverrideFromWindowManager=0.02` in
-  `dumpsys power`, and `-1` cleared it to `NaN`. A call from `https://example.com/`, loaded in the
-  same WebView, changed nothing.
 - **ADB turns it off.** `input keyevent KEYCODE_SLEEP` takes `/sys/class/backlight/backlight/brightness`
   to 0 (`bl_power=4`), and `KEYCODE_WAKEUP` brings the kiosk straight back. With
   `sys.bootanim.exit=1` already set, waking does **not** bring the Frameo splash back
@@ -333,16 +331,14 @@ sleep for off. **Set brightness through `screen_brightness_float` (0.0–1.0), n
 to 217 left the backlight at 10, because the float setting stayed at the minimum.
 `settings put system screen_brightness_float 0.851` restored it, and the integer followed.
 
-A system brightness set over ADB only shows while the dashboard's override is `-1`. When the
-page has set its own level, that level wins until the page hands it back.
+A native window brightness override also worked in the contributor's experiment. The proposed
+JavaScript bridge is not included: a top-level URL check cannot authenticate the frame that
+invokes an Android WebView JavaScript interface. Use the device controls rather than granting a
+page native access.
 
-**Home Assistant over ADB.** This frame can't approve a new ADB key, so give Home Assistant a key
-it already trusts. Copy the host's `~/.android/adbkey` and `adbkey.pub` to
-`/config/.storage/androidtv_adbkey` and `androidtv_adbkey.pub` (the Android Debug Bridge
-integration's default key path; modes 600 and 644). From a Docker install, `adb_shell` 0.4.4
-inside the container connected to `<frame-ip>:5555` with that key and ran shell commands, with
-nothing shown on the frame. That key now also lives on the HA host, so anything with
-access to HA's config can reach a shell on the frame. Remove both files to revoke it.
+A separate Home Assistant ADB experiment reused an already authorized host key. Do not copy a
+personal ADB private key into another service. Independently authorizing another host was not
+tested here, and deleting a copied key does not revoke the key on the frame.
 
 ### The way back on the panel
 
@@ -430,32 +426,16 @@ for a broken frame:
    later. Disabling it again and waiting ~45 s held. The other two vendor apps stayed disabled
    across the same reboot. Wait half a minute before rebooting after any `pm` change.
 
-## 7. Magisk: what is known, and what is missing
+## 7. Readback and recovery observations
 
-Not attempted. Root here would mean a Magisk-patched `boot` image on NAND, and this build is a bad
-first candidate until the backup route is solved. What it would buy, and what stands in the way:
-
-0. **What root would buy.** Less than it did before this session. The original reason was a
-   late-start service script that sets `sys.bootanim.exit 1` after every boot; the kiosk now does
-   that itself without root (section 5). What is left is convenience and belt-and-braces: a
-   boot-time hook that does not depend on the kiosk starting, the ability to set the clock and
-   URL without an app, and a shell that can read the NAND. None of those is needed for the
-   dashboard.
-
-   **For speed, root's usual levers are already used up** (see [Performance](#performance)). The
-   `interactive` governor already holds all four cores at their 1512 MHz top under load, and the
-   Mali GPU sits at its 520 MHz top, so switching to the `performance` governor gains nothing.
-   Overclocking would mean a modified device tree in `boot`. Root would still buy three
-   things: keeping the `PERSISTENT` updater and SystemUI processes down (~175 MB RSS between
-   them), a newer WebView via a Magisk module so HA serves its modern bundle instead of
-   `frontend_es5`, and zram and LMK tuning. Every one of those needs the stock `boot.img`
-   first, and there is still no way to read it (items 1–4 below).
+No verified backup or root route was obtained. These are findings from the contributor's
+investigation, not instructions to enter an untested mode or flash the frame.
 
 1. **No verified backup route yet.** The bootloader reports
    `flash.locked=0` / `verifiedbootstate=orange`, which usually means an unlocked Rockchip
    loader, but `ro.boot.veritymode=enforcing` means a patched `boot` alone may not boot. The
-   shell user cannot read any block device, so the stock `boot.img` has to come from loader mode
-   (`2207:310b`-class USB ID) with `rkdeveloptool`/`upgrade_tool`. `rkdeveloptool` builds cleanly
+   shell user cannot read any block device, and loader readback remains unverified
+   (`2207:310b`-class USB ID is expected for this family). `rkdeveloptool` builds cleanly
    from source on this host with the distro `gcc`, `make` and `libusb-1.0`; nothing else is needed.
 2. **`adb reboot bootloader` is untested**, and whether this unit's U-Boot exposes fastboot at
    all is unknown. `fastboot` on the host is available; the frame's behaviour is not.
@@ -468,8 +448,7 @@ first candidate until the backup route is solved. What it would buy, and what st
    applied boots the AOSP recovery menu (section 7, next paragraph); it does not present a
    Rockchip USB device, and the menu has no maskrom entry. With `adb reboot loader` and
    `adb reboot maskrom` both ignored, the software routes and the one accessible hardware route
-   are exhausted. What is left is opening the frame to find a maskrom button or test point, with
-   the usual risk of shorting the wrong pad on NAND.
+   are exhausted. No safe hardware entry route has been identified; do not short unidentified pads.
 
    `adb reboot recovery` **does** reach the AOSP recovery menu, and recovery's USB is alive:
    the frame enumerates as `18d1:d001` and `adb devices` lists it as `unauthorized`. Recovery
@@ -483,8 +462,7 @@ first candidate until the backup route is solved. What it would buy, and what st
    this unit. `fastboot devices` lists the frame within ~15 s, `lsusb` shows the fastbootd
    gadget (`18d1:4ee0`), and `fastboot getvar all` answers with `is-userspace:yes`,
    `dynamic-partition:true`, `partition-type:*:raw` for `boot`, `vbmeta`, `misc`, `uboot`,
-   `trust`, `dtbo`, `recovery`, `baseparameter`, `super`, and logical `system`/`vendor`/... So a
-   flash of `boot` and `vbmeta` is possible in principle, without loader mode.
+   `trust`, `dtbo`, `recovery`, `baseparameter`, `super`, and logical `system`/`vendor`/... These variables do not establish that flashing works or is recoverable.
 
    Two cautions from the first session. `fastboot getvar all` is a long sequence of getvars;
    piping it into `head` kills fastboot with SIGPIPE part-way through and **leaves fastbootd
@@ -492,8 +470,7 @@ first candidate until the backup route is solved. What it would buy, and what st
    frame is power-cycled. Capture the whole output to a file instead.
 
 4. **Readback is not available in fastbootd.** `fastboot fetch misc out.img` fails at once with
-   `Unable to get max-fetch-size. Device does not support fetch command.` So fastbootd here is
-   write-only: it can flash `boot` and `vbmeta`, but it cannot hand back a backup first. What it
+   `Unable to get max-fetch-size. Device does not support fetch command.` No readback route was obtained, and writes were not tested. What it
    does report, captured in full:
 
    | Variable | Value |
@@ -509,7 +486,7 @@ first candidate until the backup route is solved. What it would buy, and what st
    | `partition-size:super` | `0x96000000` |
 
    The sizes match the partition table in section 4 exactly, and `fastboot reboot` returns the
-   frame to Android in ~30 s. That makes fastbootd the flashing route once a backup exists.
+   frame to Android in ~30 s. This establishes enumeration and reboot behavior, not a flashing route.
 
 5. **The Adups updater identifies itself as RK3566.** `ro.fota.platform=RK3566_11.0` and
    `ro.fota.oem=incartech3566_11.0`, while the device tree, `dmesg` and `ro.board.platform` all
@@ -518,23 +495,14 @@ first candidate until the backup route is solved. What it would buy, and what st
    `/data/media/0/incarupdate/update.zip`, but that directory does not exist on this unit, so
    there was no cached `update.zip` to extract `boot.img` from.
 
-What is known: `boot` is `rknand0p7`, 71,344 sectors; `vbmeta` is `rknand0p6`;
-`ro.boot.dynamic_partitions=true`; `super` is p15. The Magisk patcher would also need the
-`vbmeta` flags handled with `--disable-verity --disable-verification` or an AVB-preserving patch.
-
-Do not start a flash on this unit without a byte-counted, SHA-256-verified readback of at least
-`uboot`, `trust`, `misc`, `dtbo`, `vbmeta`, `boot`, `recovery`, `baseparameter` and `super`.
+A verified full-device backup is still required before writes under README rule 2. A partition
+map and fastboot variables are not backups. Bootloader/AVB behavior and a safe recovery path
+remain unknown.
 
 ## Open questions
 
-- Whether **maskrom** is reachable at all. `adb reboot loader` dropped the frame off USB,
-  `adb reboot maskrom` was ignored (straight back to Android), and the reset pinhole boots
-  recovery rather than a Rockchip mode. Only a maskrom button or test point inside the shell is
-  left, and that is the only path to the verified backup that would have to exist before a
-  Magisk flash. Since the kiosk now clears the boot splash on its own, nothing is blocked by
-  this any more; it matters only if root is wanted for its own sake.
-- Whether a Magisk-patched `boot` boots with dm-verity enforcing, or whether `vbmeta` must be
-  patched too.
+- Whether a safe, read-only full-device backup route exists. Loader/maskrom access was not
+  established and fastbootd does not support `fetch` on this unit.
 - Whether a second computer's ADB key is accepted on this unit without toggling ADB access again.
 - What Adups actually contacts when it is left enabled; only the APK was inspected, not traffic.
   Disabled, it still runs (`PERSISTENT`) and crashes on every connectivity change, because its

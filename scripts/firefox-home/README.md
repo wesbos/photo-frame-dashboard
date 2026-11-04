@@ -64,4 +64,3 @@ usable launcher. Only then uninstall:
 ```sh
 adb uninstall com.photoframe.firefoxhome
 ```
-

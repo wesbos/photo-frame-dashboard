@@ -45,28 +45,6 @@ lost a race with the property service). `--ez bootanim_exit false` turns it off.
 only where SELinux is **permissive**, which is the case on that frame; Android otherwise refuses
 property writes from an app, and the attempt fails quietly while the splash stays.
 
-## Let the dashboard dim the screen
-
-The kiosk can give the dashboard one JavaScript call to set the backlight, so night and idle
-modes can dim the panel itself. It is off by default:
-
-```sh
-adb shell am start -n com.wesbos.homehq/.MainActivity --ez bridge true
-```
-
-The page then has `window.HomeHQ`:
-
-```js
-HomeHQ.setBrightness(0.05); // 0..1; the kiosk never goes below 0.01, so the page can't black the screen out
-HomeHQ.setBrightness(-1);   // back to the system brightness setting
-```
-
-The level applies only while the kiosk is on screen and is not saved, so a page that wants it
-after a restart sets it again when it loads. Only the saved dashboard's origin (scheme, host and
-port) is obeyed; if the kiosk ends up on any other page, calls do nothing. The setting is saved;
-`--ez bridge false` removes the interface and hands brightness back to the system. Turning the
-screen fully off needs ADB (`input keyevent KEYCODE_SLEEP`), not this call.
-
 ## Dashboard URL
 
 The kiosk opens the hosted demo dashboard by default. To show your own, save its URL once:
