@@ -830,7 +830,7 @@ advertised interfaces:
 | Interface | Observed | Unverified |
 | --- | --- | --- |
 | SC7A20 accelerometer | Live XYZ samples; `sc7a20` at I2C `1-0019`. Physical portrait/landscape rotation worked with `SCREEN_ORIENTATION_FULL_SENSOR`. | Calibration and accuracy. |
-| LTR-C216R-14 light | SensorService sends values 63–64 to AutomaticBrightnessController. | Response to changing light; physical part identity. |
+| LTR-C216R-14 light | The sensor sits behind the hole in the front bezel: a finger over it takes the value to 0 in under a second, and lifting it restores the reading (`20260519` unit, 4 Hz trace of `/dev/input/event3`). A phone torch aimed at it from every angle never pushed it past 63, so 63–64 is the top of the scale, not a lux figure. AutomaticBrightnessController does apply it (`mAppliedAutoBrightness=true`, curve 0 → 4 %, 59 → 100 %), as #156 expected. Android smooths the input, so the panel dims a few seconds after the sensor does and not at all if the light keeps changing; both seen by hand on the panel. | Physical part identity; what the value means below saturation. |
 | AW. ambient temperature | Type 13 advertised; no samples or active client. | A working ambient sensor. |
 | SoC thermal | `sunxi-therm` reports raw 43 in thermal and hwmon nodes. | Scaling and calibration; distinct from ambient temperature. |
 | Silead touch | `gslX680new` at I2C `0-0040`; multitouch advertised. Taps and swipes worked. | Reliable close two-finger gestures. |
