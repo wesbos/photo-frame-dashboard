@@ -408,3 +408,71 @@ not listening. **mDNS `.local` names do not resolve** on this Android 8.1 build
 Assistant dashboard over plain `http://` loaded in the kiosk on WebView 106.
 
 Motion/PIR, loader mode, firmware restore and a WebView upgrade were not tested on this unit.
+
+## Fifth unit: "DPF Frame 156", firmware v2026010414, tested on macOS (2026-10-24)
+
+A fifth unit, named `DPF Frame 156` in Frameo **Settings -> About**, on the original firmware.
+It was tested from an Apple silicon Mac (macOS 27.0, platform-tools 37.0.1). USB used a
+USB-A to USB-C data cable through a USB-C to USB-A adapter. `ro.product.model` and
+`ro.product.device` are `FRAME156`. It matched the [identity table](#identity) above
+(`FrameO.DP105F.v2026010414`, RK3326, Android 8.1/API 27, 1920x1080 at 170 dpi, WebView 106,
+Frameo v1.29.13, `su` root, `com.android.launcher3` already disabled,
+`ro.boot.veritymode=enforcing`, `ro.boot.flash.locked=1`). USB ADB appeared as `2211:0006`,
+product `FRAME156`.
+
+### ADB authorization and persistence
+
+With Frameo **Settings -> About -> Beta Program -> ADB Access** on and computer photo transfer off,
+the host first showed `unauthorized`. No authorization dialog appeared on the frame through
+replugging, a reboot, or toggling ADB Access. The Mac showed its own accessory prompt; after that the
+transport became `device`. `/data/misc/adb/adb_keys` contained the host's public key (739 bytes,
+`system:shell`, `0640`, `u:object_r:adb_keys_file:s0`). After `adb reboot`, a fresh Wi-Fi connection
+authorized from that file, so the authorization was persistent rather than in-memory. No loader or
+key injection was needed. If the file is missing on another unit, writing `~/.android/adbkey.pub`
+there through the shipped root shell is the equivalent; this unit already had it.
+
+### Network ADB across reboots
+
+Port 5555 was closed before `adb tcpip 5555`. After it, `service.adb.tcp.port=5555` and the port was
+open. Setting `persist.adb.tcp.port=5555` kept it open after a reboot; `persist.internet_adb_enable=1`
+was set too, but the Rockchip init hook described for the RK3326 S101 build was not found under
+`/vendor/etc/init/` on this unit. `ro.adb.secure=1`, so the stored key is required. USB did not
+re-enumerate within the post-reboot wait; Wi-Fi ADB on 5555 did.
+
+### Backup and kiosk setup
+
+Sectors 0-5,612,544 (2,873,622,528 bytes) were captured with the base64 method from
+[Backup](#backup-2026-10-09-verified). `boot`, `recovery` and `vendor` hashes matched fresh device
+reads; the whole-disk hash and identifiers stayed private. `userdata`, `mmcblk2boot0/1` and `rpmb`
+were not captured.
+
+The kiosk (`homehq.apk` 1.2) was installed, its URL saved, `WRITE_SECURE_SETTINGS` granted, the
+accessibility navigation service enabled, `stay_on_while_plugged_in=7` set, the timezone set to
+the owner's local zone, and the `.Home` alias enabled before `cmd package set-home-activity` (same order as
+the [kiosk README](../dashboard/kiosk/README.md#start-at-boot)). `com.muxintu.app.mxota` and
+`net.frameo.frame` were disabled with `pm disable-user --user 0`. After a reboot the kiosk was HOME,
+both packages stayed disabled and were not running, the navigation service and stay-on setting
+survived, and ADB returned over Wi-Fi.
+
+### User CA store for a self-hosted HTTPS dashboard
+
+The kiosk targets SDK 23, so it trusts user-installed CAs. The dashboard server's local root CA plus
+ISRG Root X1 and GTS Root R4 were installed in `/data/misc/user/0/cacerts-added/` as
+`<subject_hash_old>.0`, owned `system:everybody`, mode `0644`. Deleting the three files undoes it.
+The server certificate's SAN included its LAN IP, so hostname verification passed. This path worked
+on Android 8.1; the keychain path did not.
+
+### Aspect ratio and boot logo
+
+The fixed 1280x800 stage again fitted the 1920x1080 panel at 1728x1080, leaving 96-pixel bars.
+`wm size 1920x1200` did **not** remove them: Android scaled the logical display preserving aspect, so
+the stage stayed 1728x1080; `wm size reset` restored the native size. The merged
+[#226](https://github.com/wesbos/photo-frame-dashboard/pull/226) fixes this by keeping the 800 px
+design height and widening the stage to the screen's aspect; 16:10 frames are unchanged. This unit's
+dashboard build predated that change.
+
+The vendor `bootanimation.zip` still shows Frameo branding at boot. Frameo is disabled and not
+running (`ps` shows no Frameo process); the logo is cosmetic. Replacing it needs a `/system` write and
+was not attempted.
+
+Motion/PIR, loader mode, firmware restore and a WebView upgrade were not tested on this unit.
