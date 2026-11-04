@@ -3,6 +3,7 @@
 Report from one unit tested on 2026-10-12 using an Apple silicon Mac running
 macOS. Original ADB findings: [issue #39](https://github.com/wesbos/photo-frame-dashboard/issues/39).
 The related [FRAME156 report](pastigio-frame156.md) covers a different model.
+Mainline Linux and Omarchy on a third unit: [pastigio-frame157-linux.md](pastigio-frame157-linux.md).
 
 **Verified result:** holding the power button while connecting power and USB
 opened Rockchip Loader. After a verified backup, adding the host's public ADB
