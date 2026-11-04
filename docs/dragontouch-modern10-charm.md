@@ -317,3 +317,77 @@ note above, while `date` already showed 19 October 2026. A jump of years was not
 session.
 
 Not tested here: whether USB ADB survives a reboot, factory reset, and firmware restore.
+
+## Follow-up, 2026-10-31: firmware `V03`, Wi-Fi root ADB from macOS
+
+Third unit, **newer firmware** than the units above. Host: Apple silicon MacBook Pro, macOS 26
+(Darwin 25.6.0), Google platform-tools 37.0.1 (the zip from `dl.google.com`; no Homebrew).
+
+| Item | Observed value |
+| --- | --- |
+| Firmware build | `Modern10 charm_A33MAU_26060810_4.0_V03` |
+| Build fingerprint | `joy/astar_ococci/astar-ococci:6.0.1/MOB30R/20260608:user/test-keys` |
+| VPhoto version (Settings → About) | `2.1.3.73` |
+| CPU ABI | `armeabi-v7a` |
+| ADB shell identity | `uid=0(root)`, SELinux context `u:r:su:s0` |
+| BusyBox | `/sbin/busybox` |
+
+### ADB: Wi-Fi only on this host
+
+- **Wi-Fi:** `adb connect <frame-ip>:5555` succeeded with no prompt; the shell was root. As on `V01`,
+  nothing had to be enabled first.
+- **USB-C to USB-C:** the frame's USB-C port to the Mac's USB-C port, with a cable that syncs a phone
+  on the same Mac, plugged in directly. `system_profiler SPUSBHostDataType` listed only the Mac's own
+  buses: no device, and no macOS "Allow accessory" prompt. A USB-A host (an adapter or hub) on the Mac
+  was not tried; the Windows report above may have used one.
+- **Frame's USB-A port:** with a USB-C-to-USB-A cable from the frame's USB-A port to the Mac, the
+  **Mac started charging from the frame**, which suggests the frame acts as USB host on that port. No
+  data path to the Mac was seen. Don't leave a laptop charging from it.
+- **Finding the IP:** the frame's Wi-Fi details dialog (Status, Signal strength, Link speed,
+  Security) shows no IP address. A ping sweep of the subnet, then `arp -a` filtered by the Wi-Fi MAC
+  from Settings → About, found it; the DHCP hostname was `android-<hex>`.
+
+### Vendor updater: no boot hook on this build
+
+`getprop persist.sys.start_ac` printed nothing, so the FOTA boot hook described in
+[joyhong-c2-a133.md](joyhong-c2-a133.md#the-vendor-fota-boot-hook-read-this-before-disabling-anything)
+does not appear to be present. `com.waophoto.fota` is `versionName=1.0` and lists
+`.MainActivity`, `.MessageService` and `com.blankj.utilcode.util.MessengerUtils$ServerService`.
+`pm list packages -3` was empty (VPhoto and the updater are system apps).
+
+Only the updater service was disabled, not the whole package:
+
+```sh
+adb shell pm disable com.waophoto.fota/.MessageService
+adb shell am force-stop com.waophoto.fota
+# undo: adb shell pm enable com.waophoto.fota/.MessageService
+```
+
+`dumpsys package com.waophoto.fota` then listed `MessageService` under `disabledComponents`. Whether
+this survives a reboot has not been tested yet.
+
+### Partial backup and partition sizes
+
+Not a full backup: only `bootloader`, `env`, `boot`, `recovery`, `misc`, `frp`, `mmcblk0boot0` and
+`mmcblk0boot1`, over Wi-Fi with `adb exec-out "busybox dd if=… bs=1048576 2>/dev/null"`. Each file's
+macOS `md5` matched an on-device `busybox md5sum` of the same block device, and the byte counts were
+33,554,432, 16,777,216, 16,777,216, 33,554,432, 16,777,216, 524,288, 4,194,304 and 4,194,304.
+Wi-Fi moved about 0.3 to 0.6 MB/s here, so a whole-disk copy over Wi-Fi was not attempted.
+
+The `by-name` links and every partition size in `/proc/partitions` match the 19 October table
+above (start sectors were not read on this unit). `/proc/partitions` lists `mmcblk0` as
+15,388,672 one-kilobyte blocks, which is exactly the 15,758,000,128-byte user area; the
+15,386,672 figure in the 19 October section looks like a typo.
+
+### Browser dashboard
+
+Rootless Pixel Launcher 3.9.1 and Firefox 143.0.4 ARMv7, the same pinned files and SHA-256
+values as the first report, installed with `adb install -r` over Wi-Fi (Firefox took about
+5.5 minutes to push). After choosing Rootless as Home (**Always**) and adding the hosted demo with
+Firefox's **Add to Home screen**, the dashboard opened full-screen, as on `V01`.
+
+There was no on-screen Back or Home control after leaving the dashboard for Settings (SystemUI's
+state was not checked). `adb shell input keyevent 3` returned to the launcher.
+
+Not tested on this unit: reboot persistence of network ADB and of the disabled updater service,
+the native kiosk, a USB-A host on the Mac, factory reset and restore.

@@ -180,10 +180,80 @@ What fixed it, in that project:
 - `color-mix(in oklab, …)` gradients, which Tailwind 4 also emits, rendered correctly on this
   WebView.
 
+## Third unit: ADB on from the factory, root ADB on TCP 9815
+
+A third unit with the same build string, set up on 2026-10-31 from a Mac (Apple silicon) with
+Homebrew `adb` 1.0.41 over USB. The owner had only chosen the language and time zone in Frameo's
+first-run screens and had not tapped **Setup as new**. The About-screen name and the listing were
+not recorded.
+
+**ADB was already on, before Frameo onboarding.** `adb devices` listed the frame as `device` with
+no prompt, and `adb shell id` returned `uid=0(root)`. `/data/misc/adb/` was empty, so no host key
+was on file. Read on the frame:
+
+| Field | Value seen on the third unit |
+| --- | --- |
+| USB ID | `1f3a:1007`, vendor name `Allwinner`, product `DP101` (from `ioreg -p IOUSB`; `system_profiler SPUSBDataType` did not list it, as on the second unit) |
+| SoC | `/sys/class/sunxi_info/sys_info`: `sunxi_platform: sun50iw10`, `sunxi_chiptype: 00001400`. `/proc/cpuinfo`: 4 × `ARMv8 Processor rev 4 (v8l)` |
+| Kernel, RAM, storage | 4.9.170; `MemTotal` 2020260 kB (2 GB); `/data` 25 GB |
+| Build flags | `ro.build.type=user`, `ro.secure=0`, `ro.debuggable=1`, `ro.adb.secure=1`, `ro.config.low_ram=true`, SELinux permissive, security patch 2023-02-05 |
+| ADB at first boot | `settings get global adb_enabled` = 1, `persist.sys.usb.config` = `mtp,adb` |
+| `su` | `/system/xbin/su`, setuid (`-rwsr-sr-t root shell`). Not needed |
+| Disabled from the factory | `com.android.systemui`, `com.android.nfc` |
+| Frameo | `v1.32.16` (version code 80320) |
+| Adups | `com.adups.fota` 5.30 in `/product/priv-app/FotaUpdate`, running while Frameo onboarding was on screen |
+
+**Root ADB is open on the network, on port 9815, with no key check.** `adbd` listens on `:::9815`
+(all interfaces; `netstat -ltnp` shows PID of `/system/bin/adbd --root_seclabel=u:r:su:s0`). The port
+comes from `service.adb.tcp.port=9815` in `/system/etc/prop.default` and `/default.prop`, and
+`adbd` was listening on it again after a reboot. An ADB `CNXN` packet sent with no key, from the
+frame's own shell to its Wi-Fi address, got a `CNXN` reply with the device banner, not `AUTH`:
+
+```sh
+adb shell 'printf "CNXN\x01\x00\x00\x01\x00\x00\x04\x00\x07\x00\x00\x00\x32\x02\x00\x00\xbc\xb1\xa7\xb1host::\x00" | timeout 4 nc <frame-ip> 9815 | head -c 64 | od -c'
+```
+
+The listener accepted an unauthenticated handshake locally. Treat reachable port 9815 as a
+root-access risk, but a complete external ADB session was not verified from a second computer. From the Mac, `adb connect` and a Python socket both failed with
+`No route to host` while `ping` and `nc -z <frame-ip> 9815` succeeded. TCP `0.0.0.0:14035` was also
+listening, owned by `/vendor/bin/hw/android.hardware.audio@2.0-service`; what it serves was not
+checked.
+
+**Setup**, following the steps above (each checked with a read-back):
+
+1. Before any write: saved `pm list packages -s -e`, `-d` and `-f`, and the screen, density and Home
+   settings. `/cache/recovery` was empty and no large files were in `/sdcard` or the Adups data
+   folder, so no OTA had been downloaded.
+2. `pm uninstall -k --user 0 com.adups.fota` straight away (the frame was online), instead of
+   `disable-user` first. The Adups process kept running after the uninstall and after
+   `am force-stop`; `kill <pid>` as root stopped it and it did not come back, also after a reboot.
+3. Built Home HQ with `dashboard/kiosk/build.sh` using Homebrew `openjdk@17` (the Mac's default
+   `java` was 1.8) and build-tools 34. Installed it, granted `WRITE_SECURE_SETTINGS`, then ran
+   `am start … --ez home true` and, 3 seconds later, `set-home-activity`. It printed `Success` the
+   first time. `enabled_accessibility_services` listed the Home HQ navigation service and
+   `accessibility_enabled` was 1.
+4. `wm density 160`. The whole 1280×800 dashboard fit.
+5. The owner checked by hand on the panel: a two-finger hold opened the controls, **Android
+   settings** → **Apps** listed Frameo, and the floating **Dashboard** button returned to the kiosk.
+6. `pm disable-user --user 0 net.frameo.frame`. `package-restrictions.xml` showed `enabled="3"` 30
+   seconds later.
+7. Reboot: `sys.boot_completed` was 1 about 12 seconds after `adb wait-for-device` returned. Home HQ
+   was the resumed activity and showed the dashboard; density 160, the navigation service, the
+   Wi-Fi connection and the disabled and removed packages were all as set. No `frameo` or `adups`
+   process was running.
+
+Frameo onboarding was never finished: Wi-Fi had been joined during onboarding and was stored in
+Android.
+
 ## Guesses
 
-- `ceres` is probably an Allwinner Android 10 platform name. The second unit's USB vendor ID `1f3a`
-  points to Allwinner, but the SoC model was not read from `/proc/cpuinfo` on either unit.
+- `ceres` is an Allwinner Android 10 platform name. The third unit reports `sun50iw10`, which is
+  the Allwinner A133 (the same `sun50iw10p1` as the other A133 frames in this repo); the first two
+  units were not checked.
+- Port 9815 is set in the firmware's `prop.default`, so the first two units, with the same build
+  string, probably listen on it too. Not checked on them.
+- The `No route to host` from `adb` and Python on the Mac, while `nc` reached the port, is probably
+  macOS's Local Network permission blocking those programs, not the frame. Not confirmed.
 - Why `var(--x,)` fails only for `@property`-registered variables: probably a WebView 113 bug with an
   empty fallback on a registered property. Not investigated; the table above is only what was
   measured.
