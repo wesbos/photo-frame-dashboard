@@ -491,6 +491,12 @@ same payloads. Restore also works after a write that stopped partway: ranges tha
 original bytes are left alone, and it writes nothing if any range holds bytes this plan didn't make. Both scripts end in `ums 0 mmc 1`, so the eMMC is available
 read-only afterward for a whole-partition reread.
 
+The generator checks device selection and every read, including the fresh read immediately
+before each write. Failure cannot fall through using an old RAM buffer or a stale environment
+flag. Restore leaves already-original ranges untouched and stops before later ranges on any
+unexpected content or failed write/readback. Synthetic command-failure tests cover these paths;
+the revised control flow has not been tested on a frame.
+
 If your U-Boot was built with the null console (`CONFIG_SYS_DEVICE_NULLDEV=y` and an
 `ums-readonly.cmd` starting with `setenv stdin nulldev`, as this ZC002 unit needed), prepare with
 `data-patch-prepare.py --nulldev ...`. Both scripts then run only inside a successful

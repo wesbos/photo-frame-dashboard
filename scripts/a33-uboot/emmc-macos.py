@@ -388,13 +388,26 @@ def verify_data(raw_path, size, plan_path=DATA_PLAN):
     """Read-only check of a data-patch-prepare.py plan: each range must hold its new or its
     original bytes, and all ranges must agree. Only the planned sectors are read."""
     plan = json.loads(plan_path.read_text())
+    start_sector = plan.get("partition_start_sector")
+    if type(start_sector) is not int or start_sector < 0:
+        fail("plan.json partition start must be a nonnegative integer")
     states = []
     with open(raw_path, "rb", buffering=0) as disk:
         for write in plan["writes"]:
             name = f"range {write['range']}"
+            for field in ("sector", "sectors", "length", "partition_relative_byte"):
+                value = write.get(field)
+                if type(value) is not int or value < 0:
+                    fail(f"{name}: invalid {field} in plan.json")
             payloads = {}
             for kind in ("new", "orig"):
-                data = (plan_path.parent / write[f"{kind}_file"]).read_bytes()
+                filename = write[f"{kind}_file"]
+                if not isinstance(filename, str) or Path(filename).name != filename:
+                    fail(f"{name}: payload must be a filename inside the plan folder")
+                payload = plan_path.parent / filename
+                if payload.is_symlink():
+                    fail(f"{name}: payload must not be a symlink")
+                data = payload.read_bytes()
                 if len(data) != write["length"] or hashlib.sha256(data).hexdigest() != write[f"{kind}_sha256"]:
                     fail(f"{write[f'{kind}_file']} does not match plan.json")
                 payloads[kind] = data
