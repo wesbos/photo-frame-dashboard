@@ -17,6 +17,26 @@ as proof of enforcement. Keep the frame on an isolated, trusted network.**
 
 ## Identity
 
+### Other access reports: try identification before a boot patch
+
+[Issue #126](https://github.com/wesbos/photo-frame-dashboard/issues/126) contains reports of
+USB-keyboard **Win+N → External storage** opening an APK installer, followed by a terminal and
+the shipped `su`. That shortcut failed on another firmware; it is not established on every 159K.
+
+A [later report](https://github.com/wesbos/photo-frame-dashboard/issues/126#issuecomment-6556703178)
+on `RK3326_8.1_AY_FRAMEO_202511241509`, Frameo 80321, used an SD manufacturer-utility trigger
+to authorize a public ADB key. The owner reports network ADB with `su` and cold-boot persistence
+through the stock `persist.internet.adb.enable` hook, without boot flashing. Its external tools
+are not reviewed or included here. The related MI86 work in
+[PR #262](https://github.com/wesbos/photo-frame-dashboard/pull/262) targets different firmware;
+do not bypass its identity checks. A successful authorized connection does not by itself test
+rejection of unknown keys. Keep network ADB isolated.
+
+The builder below remains restricted to the **May 2026** stock image. Neither these reports
+nor a matching retail name justifies changing its hashes or reusing offsets on another build.
+
+### Boot-patch unit
+
 | Item | Observed value |
 | --- | --- |
 | Brand / size | Frameo / BIGASUO “Digital Photo Frame 159K”, 15.6-inch |
@@ -37,8 +57,10 @@ showed `2207:330d`; `rkdeveloptool ld` reported Loader/Maskrom.
 
 Before any flash write:
 
-1. Take a full pre-userdata backup and verify its raw and compressed
-   hashes.
+1. Take a full verified backup under the [README backup rule](../README.md#rules-we-learned-the-hard-way):
+   exact byte count, SHA-256, gzip readback, filler checks and independent partition re-reads.
+   The historical pre-userdata captures omit personal data and do not meet that full-device
+   requirement. They are partial backups, not proof that a complete restore will work.
 2. Read the 64 MiB `boot` partition more than once and confirm the stock
    SHA-256:
    `8ab5a0be2740c86ee6af013a9675eb6a571e0dff0967574a4657d5415b8b717e`.

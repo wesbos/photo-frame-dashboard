@@ -139,5 +139,9 @@ setting, Android 12 stopped rejoining the frame's Wi-Fi after a reboot.
 
 ## Undo
 
-`pm enable com.skylight`, choose Skylight as the Home app, and turn off the navigation service
-(`settings delete secure enabled_accessibility_services`). Nothing was written to flash.
+Re-enable `com.skylight`, select it as Home, and verify Home and Settings by hand before removing
+the kiosk. If Home HQ has the optional `WRITE_SECURE_SETTINGS` grant, revoke it first so its
+repair logic cannot re-enable navigation. Then turn off only Home HQ's navigation service in
+Android's Accessibility settings, preserving other services. Restore any saved network settings
+to their prior values. No raw flash image was written; package and settings changes persist in
+Android's data partition.
