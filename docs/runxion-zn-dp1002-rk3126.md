@@ -89,6 +89,7 @@ section.
 ### Hidden root agent: iotv
 
 Found on 2026-10-15 while checking which processes use the network, after Frameo had been removed.
+A newer build of the same agent ships on the [MQQC AST01](mqqc-ast01-p200.md#iotv-on-this-unit).
 
 | | |
 | --- | --- |
