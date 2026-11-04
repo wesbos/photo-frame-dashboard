@@ -1,0 +1,85 @@
+{
+  "format_version": 1,
+  "brand": "Pastigio",
+  "model": "FRAME156",
+  "variant": {
+    "id": "rk3326-v2026010414-61063168",
+    "soc": "Rockchip RK3326",
+    "board_revision": null,
+    "firmware": "FrameO.DP105F.v2026010414",
+    "android": "8.1",
+    "sector_size_bytes": 512,
+    "disk_sectors": 61063168,
+    "userdata_start_lba": 5612544
+  },
+  "device_guide": "../../../pastigio-frame156.md#additional-unit-tested-on-macos-2026-10-12",
+  "source_issue": "https://github.com/wesbos/photo-frame-dashboard/issues/209",
+  "provenance": "community-derived sanitized candidate from the additional macOS unit captured on 2026-10-12; not official manufacturer firmware",
+  "verification": {
+    "capture_verified": true,
+    "candidate_integrity_verified": true,
+    "privacy_review": "contributor_checked_maintainer_pending",
+    "restore_tested": false,
+    "cross_unit_restore_tested": false
+  },
+  "publication": {
+    "status": "maintainer_decision_required",
+    "project_release_url": null
+  },
+  "artifacts": [
+    {
+      "filename": "frame156-pre-userdata-sanitized.img.gz",
+      "purpose": "sanitized firmware range before userdata",
+      "compression": "gzip",
+      "file_bytes": 565177521,
+      "sha256": "cb95c19d4348258091fbb5c60ad6075cb757d5abf5c9f6af21926a37f7dacf0b",
+      "expanded_bytes": 2873622528,
+      "expanded_sha256": "aa16b5700723629b489c9d5c46e36366f682d2f8ae289fc70c0069a15ffa1862",
+      "start_lba": 0,
+      "sector_count": 5612544,
+      "download_url": null
+    },
+    {
+      "filename": "frame156-boot-chain-sanitized.img.gz",
+      "purpose": "sanitized boot chain only; cannot restore Android alone",
+      "compression": "gzip",
+      "file_bytes": 1997942,
+      "sha256": "60ff92595a61f8fb0adba5d5e7cb2d3ca94eec14c250f8f972a856df13947a42",
+      "expanded_bytes": 37748736,
+      "expanded_sha256": "bbf3f444d47b74c77963a3bcceba57dc68317878a29aa80a2f7e0c8e3e2160c5",
+      "start_lba": 0,
+      "sector_count": 73728,
+      "download_url": null
+    },
+    {
+      "filename": "gpt-backup.bin",
+      "purpose": "matching regenerated backup GPT for this disk capacity only",
+      "compression": "none",
+      "file_bytes": 16896,
+      "sha256": "0e27a45b1485dbfb0c43d928ac04bf43f44e9b0e0234b6ad7299bcdaad73916a",
+      "expanded_bytes": 16896,
+      "expanded_sha256": "0e27a45b1485dbfb0c43d928ac04bf43f44e9b0e0234b6ad7299bcdaad73916a",
+      "start_lba": 61063135,
+      "sector_count": 33,
+      "download_url": null
+    }
+  ],
+  "privacy_exclusions": [
+    "userdata, personal app archives and media",
+    "original GPT identifiers and idbloader chip/UID records",
+    "unpartitioned Rockchip vendor storage",
+    "donor Frameo licence, device UUID and provisioning files",
+    "original vendor journal and unallocated filesystem blocks",
+    "cache history, metadata contents, misc, backup, security and FRP contents",
+    "eMMC boot0/boot1 and RPMB"
+  ],
+  "limitations": [
+    "Exact board revision unconfirmed; matching model/SoC/capacity is not proof of compatibility.",
+    "Original capture ran with Android online and is not a transactional userdata snapshot.",
+    "The original OEM capture has the documented one-byte journal difference from later reads.",
+    "Restoration, Android boot, display, Wi-Fi and app activation on another unit are untested.",
+    "Donor provisioning is absent; Frameo activation and hardware identity/calibration may need manufacturer support.",
+    "Recipient userdata initialization through stock recovery remains untested.",
+    "No approved project download is supplied; maintainer distribution decision is pending."
+  ]
+}
