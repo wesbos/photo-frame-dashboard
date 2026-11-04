@@ -86,9 +86,9 @@ window.DATA = (function () {
     return ((weeks % 2) + 2) % 2 === 0;
   }
 
-  var JUDO = ['papa', 'clara', 'felix'];
-
-  // Garbage/recycling + judo for the explicit "today → +6" window above.
+  // Garbage/recycling for the explicit "today → +6" window above. (Judo used to be a synthetic
+  // placeholder here too, but it's now covered by the real imported calendar below — real data
+  // always wins over a hand-authored placeholder for the same activity.)
   for (var dd = 0; dd <= 6; dd++) {
     var dowToday = new Date(at(dd, '00:00')).getDay();
     if (dowToday === 4) {
@@ -99,8 +99,6 @@ window.DATA = (function () {
       var garbageTomorrow = isGarbageWeek(at(dd + 1, '00:00'));
       events.push(allDay(dd, 1, garbageTomorrow ? 'Reminder: garbage tomorrow 🗑️' : 'Reminder: recycling tomorrow ♻️', ALL, { reminder: true }));
     }
-    if (dowToday === 2 || dowToday === 4) events.push(ev(dd, '18:00', '19:00', 'Judo', JUDO, { loc: 'Dojo' }));
-    if (dowToday === 0) events.push(ev(dd, '10:00', '11:00', 'Kinder Judo', JUDO, { loc: 'Dojo' }));
   }
 
   // Background recurring events so the month view has texture
@@ -110,11 +108,10 @@ window.DATA = (function () {
     if (dow === 1) events.push(ev(d, '15:45', '16:30', 'Piano lesson', ['felix']));
     if (dow === 3) events.push(ev(d, '19:00', '20:00', 'Yoga', ['maman']));
     if (dow === 6) events.push(ev(d, '10:00', '10:45', 'Swim lessons', ['felix']));
-    if (dow === 0) { events.push(ev(d, '17:30', '19:30', "Dinner at Nonna's", ALL)); events.push(ev(d, '10:00', '11:00', 'Kinder Judo', JUDO, { loc: 'Dojo' })); }
+    if (dow === 0) events.push(ev(d, '17:30', '19:30', "Dinner at Nonna's", ALL));
     if (dow === 5 && d % 2 === 0) events.push(ev(d, '18:00', '19:30', 'Pizza night', ALL));
     if (d % 9 === 0) events.push(ev(d, '12:00', '13:00', 'Lunch meeting', ['papa']));
     if (d % 11 === 0) events.push(ev(d, '09:00', '10:00', 'Doctor', ['maman']));
-    if (dow === 2 || dow === 4) events.push(ev(d, '18:00', '19:00', 'Judo', JUDO, { loc: 'Dojo' }));
     if (dow === 4) {
       var garbageWk = isGarbageWeek(at(d, '00:00'));
       events.push(allDay(d, 1, garbageWk ? 'Garbage night' : 'Recycling night', ALL, { bin: garbageWk ? 'garbage' : 'recycling' }));
@@ -124,9 +121,249 @@ window.DATA = (function () {
       events.push(allDay(d, 1, garbageNextWk ? 'Reminder: garbage tomorrow 🗑️' : 'Reminder: recycling tomorrow ♻️', ALL, { reminder: true }));
     }
   }
-  events.push(allDay(115, 1, "Clara's birthday 🎂", ALL));
-  events.push(allDay(357, 1, "Félix's birthday 🎂", ALL));
   events.push(allDay(-8, 3, 'Cottage weekend', ALL));
+
+  // Real family calendar (imported from Google Calendar exports -- Lessards/Family/Birthdays
+  // calendars, today forward). See scripts/ and dashboard/CLAUDE.md's "Pipelines" section for
+  // how to re-run this import. Annual birthdays/anniversaries are deliberately only included
+  // once (the nearest upcoming occurrence), not every year in the expansion window.
+  var icalEvents = [];
+  icalEvents.push(ev(0, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(1, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(2, 1, 'Frank off afternoon', ['papa']));
+  icalEvents.push(ev(3, '09:00', '14:30', '2026 Rising Star Pre-Competitive Competition', ALL));
+  icalEvents.push(ev(4, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(5, '18:45', '19:30', 'Tesla costco tire change', ALL, { loc: '300 RETAIL DRIVE' }));
+  icalEvents.push(allDay(6, 1, 'Frank afternoon off', ['papa']));
+  icalEvents.push(ev(6, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(7, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(8, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(10, '09:00', '10:00', 'GABBY @ mall', ALL));
+  icalEvents.push(ev(10, '14:00', '16:00', 'Suzanne\'s Baby Shower', ALL, { loc: 'Oromocto Baptist Church' }));
+  icalEvents.push(ev(11, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(13, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(14, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(15, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(16, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(16, 1, 'Frank off', ['papa']));
+  icalEvents.push(ev(18, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(20, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(21, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(22, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(23, 1, 'Henry birthday 2019', ALL));
+  icalEvents.push(allDay(24, 2, 'Christmas in the village st Martins', ALL));
+  icalEvents.push(ev(24, '14:00', '16:30', 'Ticket: Frozen', ALL, { loc: 'Irving Oil Auditorium' }));
+  icalEvents.push(ev(24, '16:00', '20:00', 'KV santa parade', ALL));
+  icalEvents.push(ev(25, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(26, 5, 'Frank TO', ['papa']));
+  icalEvents.push(ev(27, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(28, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(29, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(30, 3, 'Stay: Four Points by Sheraton Halifax', ALL, { loc: 'Four Points by Sheraton Halifax' }));
+  icalEvents.push(allDay(30, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(31, 1, '2026 Winterfest Baton Twirling Championship', ALL));
+  icalEvents.push(allDay(31, 1, 'PREP ST NICHOLAUS BOOT', ALL));
+  icalEvents.push(allDay(32, 1, 'Cambridge supper', ALL));
+  icalEvents.push(ev(32, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(34, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(35, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(36, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(39, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(41, '08:00', '08:30', 'Dry Cut Maintenance (Katrina Fraser', ALL, { loc: '154 Hampton Road, #103,Rothesay,New Brunswick,E2E2R3' }));
+  icalEvents.push(ev(41, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(42, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(43, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(45, 1, 'Elkes Birthday', ALL));
+  icalEvents.push(ev(46, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(47, 4, 'VACATION/NO SCHOOL', ALL));
+  icalEvents.push(ev(47, '12:00', '13:00', 'Massage', ALL));
+  icalEvents.push(allDay(48, 1, 'Frank off afternoon', ['papa']));
+  icalEvents.push(ev(48, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(49, 2, 'Frank off', ['papa']));
+  icalEvents.push(ev(49, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(50, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(53, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(54, 4, 'VACATION/NO SCHOOL', ALL));
+  icalEvents.push(ev(55, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(56, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(allDay(57, 1, 'Frank afternoon off', ['papa']));
+  icalEvents.push(ev(57, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(58, 1, 'New year\'s Day hike', ALL));
+  icalEvents.push(ev(60, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(62, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(63, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(64, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(67, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(68, '12:00', '13:00', 'Clara East Coast Ped dentistry Moncton', ['clara']));
+  icalEvents.push(ev(69, '14:00', '15:00', 'Dentist 🦷 Lisa', ALL));
+  icalEvents.push(ev(69, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(70, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(71, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(74, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(75, '18:30', '19:30', 'Parent committee meeting', ALL));
+  icalEvents.push(ev(76, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(77, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(78, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(79, 1, 'Jocelynes Bday', ALL));
+  icalEvents.push(ev(81, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(83, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(84, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(85, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(86, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(87, 2, 'Kata clinic Fredericton', ALL));
+  icalEvents.push(ev(88, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(90, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(91, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(92, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(95, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(97, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(98, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(99, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(100, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(100, 1, 'Lisa VAC', ALL));
+  icalEvents.push(allDay(101, 3, 'Québec kayak w Latimer\'s', ALL));
+  icalEvents.push(ev(102, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(103, 1, 'Lisa VAC', ALL));
+  icalEvents.push(allDay(103, 1, 'Kyle Latimer\'s birthday', ALL));
+  icalEvents.push(ev(104, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(105, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(106, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(108, '09:00', '10:00', 'Clara bday party?', ['clara']));
+  icalEvents.push(ev(109, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(110, 1, 'Claras birthday', ['clara']));
+  icalEvents.push(ev(111, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(112, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(113, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(116, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(117, 5, 'MARCH BREAK VACATION', ALL));
+  icalEvents.push(ev(118, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(119, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(120, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(123, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(125, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(126, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(127, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(129, 1, 'Viktoria Stührenberg 2025', ALL));
+  icalEvents.push(ev(130, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(132, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(133, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(allDay(134, 1, 'Lisa\'s bday', ALL));
+  icalEvents.push(ev(134, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(135, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(136, 2, 'NB OPEN ROTHESAY', ALL));
+  icalEvents.push(allDay(137, 1, 'Rothesay youth Open', ALL));
+  icalEvents.push(ev(137, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(139, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(140, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(141, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(142, '09:00', '10:00', 'Good Fri, NO SCHOOL, OFF', ALL));
+  icalEvents.push(ev(144, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(145, '09:00', '10:00', 'EASTER, No SCHOOL, Lisa OFF', ALL));
+  icalEvents.push(allDay(146, 1, 'André 1987', ALL));
+  icalEvents.push(ev(146, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(147, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(148, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(149, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(149, 1, 'Megan Latimer\'s birthday', ALL));
+  icalEvents.push(ev(151, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(153, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(154, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(allDay(155, 3, 'Grapevine', ALL));
+  icalEvents.push(ev(155, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(158, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(160, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(161, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(162, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(163, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(ev(164, '10:00', '11:00', 'Plan Maibaum?', ALL));
+  icalEvents.push(allDay(165, 1, 'Leona Armstrong birthday', ALL));
+  icalEvents.push(ev(165, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(167, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(168, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(169, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(172, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(173, '15:00', '16:00', 'Clara and Felix dentist 🦷', ['felix', 'clara']));
+  icalEvents.push(ev(174, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(175, 1, 'Suzanne birthday 1992', ALL));
+  icalEvents.push(ev(175, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(176, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(179, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(181, 1, 'Emil Birthday 2017', ALL));
+  icalEvents.push(ev(181, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(182, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(183, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(184, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(ev(186, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(188, 1, 'Léo Lessard birthday 2020', ALL));
+  icalEvents.push(ev(188, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(189, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(190, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(193, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(195, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(196, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(197, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(198, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(198, 1, 'Cynthia Birthday', ALL));
+  icalEvents.push(allDay(199, 1, 'Will & kat anniversary', ALL));
+  icalEvents.push(ev(200, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(202, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(203, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(204, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(207, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(209, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(210, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(211, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(214, 1, 'Cedric birthday 2018', ALL));
+  icalEvents.push(ev(214, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(allDay(215, 1, 'Ariel birthday', ALL));
+  icalEvents.push(ev(216, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(217, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(218, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(220, 1, 'Kris zanatta birthday', ALL));
+  icalEvents.push(allDay(220, 1, 'Emerson Theodore Chase birthday 2019', ALL));
+  icalEvents.push(ev(221, '10:00', '11:00', 'Kinder Judo', ALL));
+  icalEvents.push(ev(223, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(ev(224, '18:00', '19:00', 'Baton', ALL));
+  icalEvents.push(ev(225, '18:00', '19:00', 'Judo', ALL));
+  icalEvents.push(allDay(226, 1, 'NO SCHOOL', ALL));
+  icalEvents.push(allDay(233, 1, 'LAST DAY OF SCHOOL', ALL));
+  icalEvents.push(allDay(233, 1, 'F&L dating Anniversary 2011', ALL));
+  icalEvents.push(allDay(237, 1, 'Noah Journeay 2020', ALL));
+  icalEvents.push(allDay(250, 1, 'William pollabauer 2020', ALL));
+  icalEvents.push(allDay(262, 1, 'Suzanne Kyle 2021', ALL));
+  icalEvents.push(allDay(265, 1, 'Chantal 1984', ALL));
+  icalEvents.push(allDay(271, 1, 'Adolf\'s birthday', ALL));
+  icalEvents.push(allDay(272, 1, 'Thea Zanatta 2022', ALL));
+  icalEvents.push(ev(281, '11:00', '12:00', 'Twin shores WE 120', ALL));
+  icalEvents.push(allDay(288, 1, 'Our wedding Anniversary 2017', ALL));
+  icalEvents.push(allDay(290, 1, 'Kyle\'s birthday', ALL));
+  icalEvents.push(allDay(295, 1, 'tina\'s birthday', ALL));
+  icalEvents.push(allDay(295, 4, 'party PaPa', ['papa']));
+  icalEvents.push(allDay(311, 1, 'Dan birthday 1957', ALL));
+  icalEvents.push(allDay(317, 1, 'Johannas Birthday', ALL));
+  icalEvents.push(allDay(322, 1, 'TinaKris Zanatta anniversary 2018', ALL));
+  icalEvents.push(allDay(324, 1, 'Ethan pollabauer 2018', ALL));
+  icalEvents.push(allDay(326, 1, 'dan & joc Lessard anniversary', ALL));
+  icalEvents.push(allDay(326, 1, 'Journeay anniversary 2015', ALL));
+  icalEvents.push(ev(328, '09:00', '10:00', 'Orange shirt day reminder', ALL));
+  icalEvents.push(allDay(337, 1, 'Alec birthday 2020', ALL));
+  icalEvents.push(allDay(339, 1, 'FRANKS BDAY 1985', ALL));
+  icalEvents.push(allDay(352, 1, 'Félix’s birthday 2018', ['felix']));
+  icalEvents.push(allDay(396, 1, 'PREP ST NICHOLAUS BOOT', ALL));
+  icalEvents.push(allDay(423, 1, 'New year\'s Day hike', ALL));
+  icalEvents.push(allDay(495, 1, 'Viktoria Stührenberg 2025', ALL));
+  icalEvents.push(allDay(512, 1, 'André 1987', ALL));
+  icalEvents.push(ev(530, '10:00', '11:00', 'Plan Maibaum?', ALL));
+  icalEvents.push(allDay(603, 1, 'Noah Journeay 2020', ALL));
+  icalEvents.push(allDay(616, 1, 'William pollabauer 2020', ALL));
+  icalEvents.push(allDay(628, 1, 'Suzanne Kyle 2021', ALL));
+  icalEvents.push(allDay(631, 1, 'Chantal 1984', ALL));
+  icalEvents.push(allDay(638, 1, 'Thea Zanatta 2022', ALL));
+  icalEvents.push(ev(674, '11:00', '12:00', 'Lasik appt', ALL));
+  icalEvents.push(allDay(690, 1, 'Ethan pollabauer 2018', ALL));
+  icalEvents.push(ev(694, '09:00', '10:00', 'Orange shirt day reminder', ALL));
+  events = events.concat(icalEvents);
+
 
   // Extra events for the "overloaded day" demo
   var busyExtras = [

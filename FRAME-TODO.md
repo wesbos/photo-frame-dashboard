@@ -45,11 +45,22 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
   in `data.js` as real recurring events: an all-day event on Thursday (correct garbage-vs-
   recycling, anchored to a known real date — Oct 29 2026 was a garbage Thursday — so it never
   drifts) plus a Wednesday reminder the day before. See `GARBAGE_ANCHOR` / `isGarbageWeek()`.
-- **Judo schedule.** Tuesday + Thursday 6–7 PM for Papa/Clara/Félix (not Maman), plus Sunday
-  10–11 AM "Kinder Judo" for the same three. Currently synthetic/placeholder — see known issues,
-  the real recurring schedule from the family's actual calendar needs re-importing.
 - **Person ids renamed** throughout the demo dataset from upstream's `alex`/`jordan`/`maya`/
   `otto` to `papa`/`maman`/`clara`/`felix` for consistency with the French persona views.
+- **Real Google Calendar import, redone.** `data.js`'s `icalEvents` block has 234 real events
+  imported from the family's "Lessards" Google Calendar export, today through late 2028: the
+  real Judo (Tue/Thu 6–7 PM) + Kinder Judo (Sun 10–11 AM) schedule — all 4 family members, not
+  just papa/clara/félix as an earlier synthetic placeholder guessed — baton lessons, real
+  birthdays/anniversaries (deduped to one upcoming occurrence each, not repeated every year in
+  the expansion window), school closures, appointments, trips, etc. Name-matched to
+  Papa/Maman/Clara/Félix where the title mentions them (including "Frank" → Papa, his
+  calendar's own shorthand), whole-family fallback otherwise. See `scripts/ical-import.mjs` +
+  `scripts/ical-emit.mjs` to re-run this if the calendar changes — **the raw `.ics` file itself
+  is never committed** (personal data), only the reusable scripts.
+  - Only the "Lessards" calendar was imported so far — the user has 4 more exported calendars
+    (Family, Birthdays, plus personal/work ones that were deliberately excluded last time) not
+    yet brought in. Worth checking whether "Family"/"Birthdays" add anything "Lessards" doesn't
+    already cover before importing them too, to avoid duplicate events.
 
 ## Known issues / next steps
 
@@ -61,13 +72,6 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
   for every remaining word (Félix's ~48 theme words + however much of the ~900-word common bank
   is worth covering), adding each to `CLIPS`. Budget real time for this — it's roughly 1-2
   seconds per word but there are hundreds of them.
-- **Real Google Calendar import needs redoing.** The garbage/judo schedule above is real, but
-  the rest of `data.js`'s events are still upstream's generic demo placeholders (renamed to our
-  family's ids, but not the family's actual calendar). A previous round of work imported ~267
-  real events from 3 of the family's 5 exported `.ics` files (Lessards/Family/Birthdays
-  calendars) — that import was lost with everything else. Redoing it needs the user to re-export
-  and re-share those `.ics` files; see `dashboard/CLAUDE.md`'s "Pipelines" section for the
-  conversion rules (future-only, name-matching, DST-safe time conversion via `Date` getters).
 - **No RTC battery — clock resets on every power loss.** Breaks anything date-relative. Manual
   fix after every reboot/power event:
   ```sh

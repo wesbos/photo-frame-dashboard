@@ -102,16 +102,19 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
   Félix's spelling themes + the common "mot du jour" word bank) still needs generating. This is
   just a shell loop calling the script per word — straightforward but takes a while (roughly 1-2
   seconds per word including the ffmpeg conversion).
-- **iCal import** (not a committed script). A previous round of work imported real events from
-  the family's Google Calendar `.ics` exports using `node-ical` outside this repo, converting them
-  into `ev()`/`allDay()` calls appended to `js/data.js`. That imported data was lost along with
-  everything else (see FRAME-TODO.md) and has not been redone — `data.js` currently only has
-  synthetic/placeholder events plus the real garbage/recycling and judo schedules. If redoing
-  this: convert UTC → local time using `Date` getters (not raw UTC fields) so DST is handled
-  correctly; only import future events; name-match titles containing Papa/Maman/Félix/Clara to
-  tag that person specifically, default to the whole family (`ALL`) otherwise. Real recurring
-  data should supersede any hand-authored synthetic recurring block for the same activity — don't
-  keep both.
+- **`scripts/ical-import.mjs` + `scripts/ical-emit.mjs`** — parses a Google Calendar `.ics`
+  export (via `node-ical`, NOT a `dashboard/package.json` dependency — see the usage comment at
+  the top of `ical-import.mjs` for how to install it standalone) into `/tmp/ical-out.json`, then
+  emits `ev()`/`allDay()` calls ready to paste into `js/data.js`'s `icalEvents` array. Rules
+  baked into the script: only future events (2-year expansion cap); UTC → local time via `Date`
+  getters (DST-safe); name-match titles containing Papa/Maman/Félix/Clara (plus "Frank" → Papa,
+  this family's own calendar shorthand) to tag that person, whole-family fallback otherwise;
+  annual birthdays/anniversaries deduped to their single nearest upcoming occurrence rather than
+  repeating every year across the expansion window; long multi-line SUMMARY fields (some Google
+  Calendar entries stuff a date/location line into the title itself) trimmed to just the first
+  line. **Never commit the raw `.ics` file** — it's personal family data, not app source; only
+  the scripts are checked in. Real recurring data from a fresh import should supersede any
+  hand-authored synthetic recurring block for the same activity — don't keep both.
 
 ## Build / deploy loop
 
