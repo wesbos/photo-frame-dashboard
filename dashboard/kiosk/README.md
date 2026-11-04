@@ -99,56 +99,18 @@ fails to load at boot because Wi-Fi isn't up yet, the kiosk keeps retrying. In t
 **Open launcher** skips the kiosk and opens another Home app. To undo, pick another Home app in
 Settings → Apps → Default apps, then run the first command with `--ez home false`.
 
-## Optional touch-responsive night view
+## Returning from Android Settings or another app
 
-Home HQ can show a static native black window at minimum per-window brightness. The display
-stays awake so a tap can return to the dashboard; Back, keyboard activation and accessibility
-clicks use the same return action. Leaving the window restores the normal brightness setting.
-The optional floating navigation buttons are hidden while this window is active.
+While MainActivity is paused, Home HQ pauses WebView lifecycle and page timers, plus native
+retries and captive-portal checks. Timer pausing affects all WebViews in this app process;
+it does not stop every network request or servers supplying the dashboard. An existing portal
+probe may finish within its timeouts but cannot open a sign-in page while the kiosk is paused.
+Returning resumes pending offline/sign-in recovery without reloading a healthy dashboard.
 
-This is a dim, awake display. It may still glow and uses more power than true Android sleep.
-It does not add touchscreen-driver wake support, and power savings have not been measured.
-Installation alone does not activate it. There is no built-in schedule or automatic morning
-return: a separately configured trusted controller must request either activity explicitly.
-
-```sh
-adb shell am start -n com.wesbos.homehq/.NightActivity
-adb shell am start -n com.wesbos.homehq/.MainActivity   # leave night view immediately
-```
-
-The exported night activity requires `android.permission.DUMP`, held by shell/system and any
-other caller explicitly granted that permission; ordinary unprivileged apps cannot launch it.
-There is no web/JavaScript bridge, new network endpoint, URL parameter or root command in this
-feature. Returning opens the existing dashboard without replacing its saved URL. If another
-activity covers the night view, its task is removed rather than left behind for a later Back.
-
-While MainActivity is paused (including behind night view or Android Settings), Home HQ calls
-WebView's lifecycle and timer pause methods. Timer pausing affects **all WebViews in this app
-process**, not other apps. It pauses page timers, layout and parsing, not every possible network
-request. Native dashboard retries and captive-portal checks also wait until MainActivity resumes;
-one already-running probe may finish within its existing timeouts, but cannot open a sign-in page
-while paused. Returning resumes the page and any pending offline/sign-in recovery without forcing
-a successfully loaded dashboard to reload. Servers supplying the dashboard keep running.
-
-The original local implementation was tested on an SSA RK3326 / Android 8.1 frame with WebView
-106: actual backlight changed from 179 to 20 with stored brightness 179 unchanged, page timers
-stopped and resumed, and the owner verified one-tap return plus Settings/app-list/Dashboard
-recovery. Faint glow remained. A scheduled overnight dim/return cycle was corroborated by alarm
-and companion logs, not continuous display observation. That separate scheduler is not included
-here.
-
-On 2026-10-29 the shared Java, manifest and string resources were also tested on that frame in
-a local 1.3/code 5 build. A bounded native alarm trial verified dimming to 20 without changing
-stored brightness, paused/resumed page timers, and automatic dashboard/brightness restoration.
-The owner verified one-tap return and the Settings/app-list/Dashboard recovery route. Host
-regression checks cover click/Back return, task cleanup and pause/resume/retry behavior.
-Failed-page/captive-portal recovery on this revision, other Android versions, keyboard and
-accessibility activation, and permission rejection by ordinary apps remain untested on hardware.
-
+The contributor observed paused/resumed timers on one RK3326 Android 8.1 frame with WebView 106.
+Host regression checks cover late errors, probe completion and retry ordering. Failed-page and
+captive-portal recovery on this revision, and other Android versions, remain untested on hardware.
 Keep a working Settings route and the existing signing key when updating an installed kiosk.
-Undo night view with the MainActivity command above and disable its requests in your external
-controller. For a binary rollback, rebuild the previous source with the same signing key and a
-version code above the installed APK; do not uninstall the only working Home/Settings route.
 
 ## Screen density
 
@@ -310,13 +272,13 @@ Host-only navigation regression checks need Python 3 and a JDK on `PATH`:
 
 ```sh
 python3 kiosk/test-navigation.py
-python3 kiosk/test-night.py
+python3 kiosk/test-lifecycle.py
 ```
 
 Run from `dashboard/`. The navigation test compiles the actual repair method with settings and
-permission fakes. The night test compiles the actual night activity and dashboard lifecycle/retry
+permission fakes. The lifecycle test compiles the actual dashboard lifecycle/retry
 methods with Android fakes. Neither proves Android service binding, real gesture delivery,
-brightness, WebView implementation behavior, permission enforcement or reboot behavior.
+WebView implementation behavior or reboot behavior.
 
 Use JDK 17, Android build-tools 34.0.0, and platform 34. On Ubuntu 24.04, the apt packages listed
 at the top of `build.sh` install all three, with `ANDROID_HOME=/usr/lib/android-sdk`. From `dashboard/`:

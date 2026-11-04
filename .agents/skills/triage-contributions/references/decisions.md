@@ -52,6 +52,8 @@ the date.
 
 ## Kiosk app
 
+- Keep #274's pause/resume and recovery compatibility fixes; leave the optional native night
+  screen in the contributor's fork. (2026-11-04.)
 - Home app is **opt-in** (`--ez home true` enables a disabled activity-alias). Never add
   `CATEGORY_HOME` to the main launcher filter.
 - The saved URL comes only from `--es url` and only `http`/`https`. Links opened by other apps

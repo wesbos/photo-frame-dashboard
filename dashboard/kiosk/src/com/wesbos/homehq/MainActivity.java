@@ -266,7 +266,7 @@ public class MainActivity extends Activity {
             || error.hasError(SslError.SSL_DATE_INVALID)) {
           offlineTitle.setText("Setting the clock\u2026");
           offlineText.setText("The frame's date is wrong after a power cut. It reloads once the time is set.");
-          nudgeNetworkTime();
+          if (resumed) nudgeNetworkTime();
         }
         retryUrl = error.getUrl() != null ? error.getUrl() : savedUrl();
         handler.removeCallbacks(retry);

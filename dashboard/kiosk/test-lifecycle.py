@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise actual kiosk lifecycle/retry methods and NightActivity with host Android fakes.
+"""Exercise actual kiosk lifecycle/retry methods with host Android fakes.
 
 Needs Python 3 and JDK 17 on PATH, no SDK/device/network. These checks model callback ordering;
 they do not prove real Android gestures, WebView internals, brightness or permission enforcement.
@@ -7,7 +7,6 @@ they do not prove real Android gestures, WebView internals, brightness or permis
 from pathlib import Path
 import subprocess
 import tempfile
-import xml.etree.ElementTree as ET
 
 
 KIOSK = Path(__file__).resolve().parent
@@ -41,7 +40,7 @@ MEMBERS = "\n".join(member(marker) for marker in (
     "  private void onProbe(int result)",
 ))
 
-# Tiny framework fakes shared by the actual night activity and extracted dashboard methods.
+# Tiny framework fakes for extracted dashboard methods.
 SOURCES = {
     "android/content/Context.java": "package android.content; public class Context {}",
     "android/content/Intent.java": """package android.content;
@@ -54,56 +53,20 @@ public class Intent {
     "android/content/BroadcastReceiver.java": """package android.content;
 public abstract class BroadcastReceiver { public abstract void onReceive(Context c, Intent i); }""",
     "android/os/Bundle.java": "package android.os; public class Bundle {}",
-    "android/graphics/Color.java": "package android.graphics; public class Color { public static final int BLACK=0; }",
-    "android/view/WindowManager.java": """package android.view;
-public class WindowManager { public static class LayoutParams {
-  public static final int FLAG_KEEP_SCREEN_ON=1, FLAG_FULLSCREEN=2;
-  public static final float BRIGHTNESS_OVERRIDE_OFF=0;
-  public float screenBrightness=-1, buttonBrightness=-1;
-}}""",
     "android/view/View.java": """package android.view;
 import android.content.Context;
 public class View {
-  public static final int VISIBLE=0, GONE=8, SYSTEM_UI_FLAG_FULLSCREEN=1,
-    SYSTEM_UI_FLAG_HIDE_NAVIGATION=2, SYSTEM_UI_FLAG_IMMERSIVE_STICKY=4,
-    SYSTEM_UI_FLAG_LAYOUT_STABLE=8, SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN=16,
-    SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION=32;
-  public interface OnClickListener { void onClick(View v); }
-  public OnClickListener click; public int visibility=GONE, color, systemUi;
-  public String description; public boolean focusable;
-  public View(Context c) {} public void setBackgroundColor(int v) { color=v; }
-  public void setContentDescription(String v) { description=v; }
-  public void setFocusable(boolean v) { focusable=v; }
-  public void setOnClickListener(OnClickListener v) { click=v; }
-  public boolean performClick() { if(click==null) return false; click.onClick(this); return true; }
-  public void setSystemUiVisibility(int v) { systemUi=v; }
-  public int getVisibility() { return visibility; }
-} """,
-    "android/view/Window.java": """package android.view;
-public class Window {
-  public int flags; public final View decor=new View(null);
-  public WindowManager.LayoutParams attrs=new WindowManager.LayoutParams();
-  public void addFlags(int f) { flags |= f; }
-  public WindowManager.LayoutParams getAttributes() { return attrs; }
-  public void setAttributes(WindowManager.LayoutParams v) { attrs=v; }
-  public View getDecorView() { return decor; }
+  public static final int VISIBLE=0, GONE=8;
+  public int visibility=GONE;
+  public View(Context c) {} public int getVisibility() { return visibility; }
 }""",
     "android/app/Activity.java": """package android.app;
-import android.content.*; import android.os.Bundle; import android.view.*;
+import android.content.Context;
 public class Activity extends Context {
-  public final Window window=new Window(); public View content; public Intent launched;
-  public int launches, finishes; public boolean destroyed;
-  protected void onCreate(Bundle s) {} protected void onResume() {}
-  protected void onPause() {} protected void onStop() {}
-  public void onBackPressed() {} public void onWindowFocusChanged(boolean f) {}
-  public Window getWindow() { return window; }
-  public String getString(int id) { return "Night view. Tap to return to the dashboard."; }
-  public void setContentView(View v) { content=v; }
-  public void startActivity(Intent i) { launches++; launched=i; }
-  public void finishAndRemoveTask() { finishes++; }
+  public boolean destroyed;
+  protected void onResume() {} protected void onPause() {}
   public boolean isDestroyed() { return destroyed; }
 }""",
-    str(PACKAGE / "R.java"): "package com.wesbos.homehq; class R { static class string { static final int night_description=1; }}",
     str(PACKAGE / "Fakes.java"): """package com.wesbos.homehq;
 import java.util.*;
 class NavigationService { static boolean visible; static void setDashboardVisible(boolean v) { visible=v; }}
@@ -145,7 +108,8 @@ public class MainActivity extends Activity {
   final Label portalText=new Label(), offlineTitle=new Label(), offlineText=new Label();
   final Runnable portalCheck=this::checkPortal;
   boolean resumed, retryPending, probing, portalMode, portalFound, portalDismissed, portalFailed, pageFailed;
-  long portalSince; String retryUrl, mainUrl; boolean wifi=true; int loads, opened, left;
+  long portalSince; String retryUrl, mainUrl; boolean wifi=true; int loads, opened, left, clockNudges;
+  void nudgeNetworkTime() { clockNudges++; }
   void cancelExit() {} void load(String url) { loads++; }
   boolean wifiConnected() { return wifi; } void showOffline() { checkPortal(); }
   static int probePortal() { return PROBE_PORTAL; }
@@ -155,93 +119,64 @@ __MEMBERS__
   public static void test() {
     MainActivity a=new MainActivity();
     a.onResume();
-    NightHarness.check(!a.web.paused && !a.web.timersPaused && NavigationService.visible,
+    LifecycleHarness.check(!a.web.paused && !a.web.timersPaused && NavigationService.visible,
         "visible dashboard resumed");
     a.retryUrl="http://example.invalid/"; a.offline.visibility=View.VISIBLE;
     a.handler.post(a.retry); a.handler.post(a.stall); a.handler.post(a.portalCheck);
     a.onPause();
-    NightHarness.check(a.handler.tasks.isEmpty() && a.web.paused && a.web.timersPaused,
+    LifecycleHarness.check(a.handler.tasks.isEmpty() && a.web.paused && a.web.timersPaused,
         "covering dashboard pauses page and native recovery callbacks");
     a.retry.run(); a.stall.run(); a.networkChange.onReceive(a, new Intent()); a.checkPortal();
     a.onProbe(PROBE_PORTAL);
-    NightHarness.check(a.loads==0 && a.opened==0 && a.handler.tasks.isEmpty() && !a.probing,
-        "late retry, network broadcast and probe cannot run behind night view");
+    LifecycleHarness.check(a.loads==0 && a.opened==0 && a.handler.tasks.isEmpty() && !a.probing,
+        "late retry, network broadcast and probe cannot run while the kiosk is paused");
     a.onReceivedError(a.web, -2, "offline", "http://example.invalid/");
-    NightHarness.check(a.retryPending && a.handler.tasks.isEmpty(),
+    LifecycleHarness.check(a.retryPending && a.handler.tasks.isEmpty(),
         "late page failure retains retry intent without starting background work");
     SslErrorHandler ssl=new SslErrorHandler();
     a.onReceivedSslError(a.web, ssl, new SslError());
-    NightHarness.check(ssl.cancelled && a.retryPending && a.handler.tasks.isEmpty(),
+    LifecycleHarness.check(ssl.cancelled && a.retryPending && a.handler.tasks.isEmpty() && a.clockNudges==0,
         "late TLS failure stays blocked and waits for visible retry");
     a.onResume(); a.handler.runNext();
-    NightHarness.check(a.loads==1 && !a.web.timersPaused && a.handler.tasks.contains(a.stall),
+    LifecycleHarness.check(a.loads==1 && !a.web.timersPaused && a.handler.tasks.contains(a.stall),
         "offline recovery resumes on return");
     a.onPause(); a.offline.visibility=View.GONE; a.onResume();
-    NightHarness.check(a.loads==1 && a.handler.tasks.isEmpty(), "healthy page returns without reload");
+    LifecycleHarness.check(a.loads==1 && a.handler.tasks.isEmpty(), "healthy page returns without reload");
     a.offline.visibility=View.VISIBLE; a.checkPortal();
     Runnable background=Thread.pending; a.onPause(); background.run(); a.handler.runNext();
-    NightHarness.check(!a.probing && a.opened==0 && a.handler.tasks.isEmpty(),
+    LifecycleHarness.check(!a.probing && a.opened==0 && a.handler.tasks.isEmpty(),
         "probe completing while hidden cannot open sign-in or schedule another probe");
     a.portalMode=true; a.onResume(); a.handler.runNext();
-    NightHarness.check(a.probing, "Wi-Fi sign-in recovery restarts on return");
+    LifecycleHarness.check(a.probing, "Wi-Fi sign-in recovery restarts on return");
     Thread.pending.run(); a.handler.runNext();
-    NightHarness.check(a.handler.tasks.contains(a.portalCheck), "visible sign-in keeps checking");
+    LifecycleHarness.check(a.handler.tasks.contains(a.portalCheck), "visible sign-in keeps checking");
     a.onPause(); a.portalMode=false; a.offline.visibility=View.GONE; a.onResume();
     a.checkPortal(); a.destroyed=true; Thread.pending.run(); a.handler.runNext();
-    NightHarness.check(a.opened==0, "destroyed dashboard ignores late probe result");
+    LifecycleHarness.check(a.opened==0, "destroyed dashboard ignores late probe result");
   }
 }
 """.replace("__MEMBERS__", MEMBERS),
-    str(PACKAGE / "NightHarness.java"): """package com.wesbos.homehq;
-import android.view.WindowManager;
-public class NightHarness {
+    str(PACKAGE / "LifecycleHarness.java"): """package com.wesbos.homehq;
+public class LifecycleHarness {
   static void check(boolean ok, String name) {
     if(!ok) throw new AssertionError(name); System.out.println("PASS " + name);
   }
   public static void main(String[] args) {
     MainActivity.test();
-    NightActivity n=new NightActivity(); n.onCreate(null); n.onResume();
-    check(n.getWindow().attrs.screenBrightness==0 && n.getWindow().attrs.buttonBrightness==0
-        && (n.getWindow().flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)!=0,
-        "night view uses window brightness and keeps touch/display awake");
-    check(NavigationService.visible && n.content.focusable && n.content.click!=null,
-        "night view hides navigation and offers standard accessible click");
-    n.content.performClick(); n.onBackPressed(); n.content.performClick();
-    check(n.launches==1 && n.launched.target==MainActivity.class && n.launched.flags==3,
-        "click/Back returns once to existing dashboard without URL replacement");
-    n.onPause(); n.onStop();
-    check(!NavigationService.visible && n.finishes>=1, "leaving night view removes its task");
-    NightActivity back=new NightActivity(); back.onCreate(null); back.onBackPressed();
-    check(back.launches==1 && back.finishes==1, "Back returns without requiring a touch");
-    NightActivity morning=new NightActivity(); morning.onCreate(null); morning.onStop();
-    check(morning.launches==0 && morning.finishes==1,
-        "external morning return removes night task without launching dashboard again");
+
   }
 }
 """,
 }
 
 
-# These are packaging invariants: host Activity fakes cannot enforce Android permissions.
-android = "{http://schemas.android.com/apk/res/android}"
-manifest = ET.parse(KIOSK / "AndroidManifest.xml").getroot()
-night = manifest.find("application/activity[@" + android + "name='.NightActivity']")
-assert night is not None
-assert night.get(android + "permission") == "android.permission.DUMP"
-assert night.get(android + "exported") == "true"
-assert night.get(android + "excludeFromRecents") == "true"
-assert night.find("intent-filter") is None
-print("PASS night activity requires DUMP and has no implicit intent filter", flush=True)
-
-with tempfile.TemporaryDirectory(prefix="homehq-night-") as directory:
+with tempfile.TemporaryDirectory(prefix="homehq-lifecycle-") as directory:
     root = Path(directory)
     for name, source in SOURCES.items():
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(source, encoding="utf-8")
-    target = root / PACKAGE / "NightActivity.java"
-    target.write_text((KIOSK / "src" / PACKAGE / "NightActivity.java").read_text(encoding="utf-8"), encoding="utf-8")
     subprocess.run(["javac", "--release", "8", "-d", str(root)] +
                    [str(file) for file in root.rglob("*.java")], check=True, timeout=30)
-    subprocess.run(["java", "-cp", str(root), "com.wesbos.homehq.NightHarness"],
+    subprocess.run(["java", "-cp", str(root), "com.wesbos.homehq.LifecycleHarness"],
                    check=True, timeout=30)
