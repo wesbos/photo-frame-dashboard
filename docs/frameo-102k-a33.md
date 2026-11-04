@@ -18,7 +18,7 @@ page.
 and fingerprint and has a byte-identical boot partition. It differs in eMMC size. See
 [Units sold as 112K](#units-sold-as-112k).
 
-**On a Mac, unplug the DC adapter first.** A fourth unit, from the same Amazon.ca listing, only
+**If USB fails on a Mac, try the connection with the DC adapter unplugged.** A fourth unit, from the same Amazon.ca listing, only
 connected to a Mac with its DC adapter unplugged. See
 [Unit 4](#unit-4-amazonca-macos-host).
 
@@ -497,7 +497,8 @@ Every partition except UDISK and cache, read with
 `misc` and `frp` (see [Root](#root)). For each image, the size matched
 `/sys/class/block/<dev>/size`, the MD5 matched `md5sum` on the frame, and the last 4 KiB was not
 `0xCC` filler. Second reads of `bootloader`, `env` and `boot` matched by SHA-256. The images were
-kept uncompressed, so there was no gzip readback.
+kept uncompressed, so there was no gzip readback. This partial backup excludes userdata and
+cache and does not meet the full-device backup rule.
 
 ### What was set up (approved writes, all in `/data`)
 

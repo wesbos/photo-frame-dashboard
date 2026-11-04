@@ -213,8 +213,8 @@ frame's own shell to its Wi-Fi address, got a `CNXN` reply with the device banne
 adb shell 'printf "CNXN\x01\x00\x00\x01\x00\x00\x04\x00\x07\x00\x00\x00\x32\x02\x00\x00\xbc\xb1\xa7\xb1host::\x00" | timeout 4 nc <frame-ip> 9815 | head -c 64 | od -c'
 ```
 
-So any device on the same network can get a root shell with `adb connect <frame-ip>:9815`. This was
-not tested from a second computer. From the Mac, `adb connect` and a Python socket both failed with
+The listener accepted an unauthenticated handshake locally. Treat reachable port 9815 as a
+root-access risk, but a complete external ADB session was not verified from a second computer. From the Mac, `adb connect` and a Python socket both failed with
 `No route to host` while `ping` and `nc -z <frame-ip> 9815` succeeded. TCP `0.0.0.0:14035` was also
 listening, owned by `/vendor/bin/hw/android.hardware.audio@2.0-service`; what it serves was not
 checked.

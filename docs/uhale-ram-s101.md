@@ -71,6 +71,9 @@ no drops.
   back identical, no aligned 4 KiB block was all `0xCC`, and independent re-reads of all of boot,
   all of recovery and a 64 MiB system sample matched.
 
+This is a partial backup excluding userdata and does not meet the full-device backup rule.
+Restore was not tested.
+
 Wi-Fi was switched off (`svc wifi disable`) before the backup, because both updaters were enabled
 and the frame was already online. It was switched back on after the updaters were disabled.
 
@@ -84,7 +87,7 @@ Each change was recorded with its undo before it was made.
 | Disable Rockchip updater | `pm disable-user --user 0 android.rockchip.update.service` | `pm default-state --user 0 android.rockchip.update.service` |
 | Install fallback launcher | `adb install` Rootless Pixel Launcher 3.9.1 (F-Droid, SHA-256 `7fa44d56…404a`, the pin in [biuframe-setup-guide.md](biuframe-setup-guide.md)) | `adb uninstall amirz.rootless.nexuslauncher` (while it is not HOME) |
 | Install Home HQ | `adb install` the kiosk built with `dashboard/kiosk/build.ps1` (JDK 17, build-tools 34) | `adb uninstall com.wesbos.homehq` (set another HOME first) |
-| Navigation service | `pm grant com.wesbos.homehq android.permission.WRITE_SECURE_SETTINGS`, then enable the service as in the [AMABOO table](amaboo-gbzk-y1000.md#setup-performed) | `pm revoke` the permission, `settings delete secure enabled_accessibility_services`, `settings put secure accessibility_enabled 0` |
+| Navigation service | `pm grant com.wesbos.homehq android.permission.WRITE_SECURE_SETTINGS`, then enable the service as in the [AMABOO table](amaboo-gbzk-y1000.md#setup-performed) | Revoke only the optional Home HQ permission grant and restore the saved accessibility settings; remove only Home HQ's service, preserving any other enabled services |
 | Home HQ as HOME | `am start -n com.wesbos.homehq/.MainActivity --ez home true`<br>`cmd package set-home-activity com.wesbos.homehq/.Home` | `cmd package set-home-activity` back to the Uhale activity, then `--ez home false` |
 | Disable Uhale | `pm disable-user --user 0 com.zeasn.frame` | `pm default-state --user 0 com.zeasn.frame` |
 | Disable HardInfo | `pm disable-user --user 0 com.cross.browser.info` | `pm default-state --user 0 com.cross.browser.info` |

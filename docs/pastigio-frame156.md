@@ -367,7 +367,7 @@ was used for everything else.
 
 ### Backup of everything before userdata (verified)
 
-Sectors 0-5,612,544 (2,873,622,528 bytes) were captured with the base64 method from
+Sectors 0–5,612,543 (2,873,622,528 bytes) were captured with the base64 method from
 [Backup](#backup-2026-10-09-verified):
 
 ```sh
@@ -436,15 +436,16 @@ there through the shipped root shell is the equivalent; this unit already had it
 Port 5555 was closed before `adb tcpip 5555`. After it, `service.adb.tcp.port=5555` and the port was
 open. Setting `persist.adb.tcp.port=5555` kept it open after a reboot; `persist.internet_adb_enable=1`
 was set too, but the Rockchip init hook described for the RK3326 S101 build was not found under
-`/vendor/etc/init/` on this unit. `ro.adb.secure=1`, so the stored key is required. USB did not
+`/vendor/etc/init/` on this unit. `ro.adb.secure=1` was reported and the authorized host reconnected;
+rejection of a fresh key was not tested. USB did not
 re-enumerate within the post-reboot wait; Wi-Fi ADB on 5555 did.
 
 ### Backup and kiosk setup
 
-Sectors 0-5,612,544 (2,873,622,528 bytes) were captured with the base64 method from
+Sectors 0–5,612,543 (2,873,622,528 bytes) were captured with the base64 method from
 [Backup](#backup-2026-10-09-verified). `boot`, `recovery` and `vendor` hashes matched fresh device
 reads; the whole-disk hash and identifiers stayed private. `userdata`, `mmcblk2boot0/1` and `rpmb`
-were not captured.
+were not captured. This is a partial backup and does not meet the full-device backup rule.
 
 The kiosk (`homehq.apk` 1.2) was installed, its URL saved, `WRITE_SECURE_SETTINGS` granted, the
 accessibility navigation service enabled, `stay_on_while_plugged_in=7` set, the timezone set to
@@ -456,7 +457,8 @@ survived, and ADB returned over Wi-Fi.
 
 ### User CA store for a self-hosted HTTPS dashboard
 
-The kiosk targets SDK 23, so it trusts user-installed CAs. The dashboard server's local root CA plus
+The current kiosk targets SDK 28 and explicitly trusts user-installed CAs through its
+[network security configuration](../dashboard/kiosk/res/xml/network_security_config.xml). The dashboard server's local root CA plus
 ISRG Root X1 and GTS Root R4 were installed in `/data/misc/user/0/cacerts-added/` as
 `<subject_hash_old>.0`, owned `system:everybody`, mode `0644`. Deleting the three files undoes it.
 The server certificate's SAN included its LAN IP, so hostname verification passed. This path worked

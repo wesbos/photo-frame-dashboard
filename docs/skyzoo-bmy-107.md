@@ -12,7 +12,8 @@ ADB verified across reboots, WebView 44 replaced with 106, Home HQ as Home with 
 as fallback, Frameo and the vendor updaters disabled. The owner physically confirmed the way back
 (controls → Android settings → Apps → floating Dashboard button) before Frameo was disabled.
 No boot patch, Loader access or firmware update was needed. **No full eMMC backup was taken**
-(the owner declined); only the original WebView files were saved.
+(the owner declined); only the original WebView files were saved. This does not meet the
+repository's full-device backup rule. The system-file changes below are a record, not a procedure.
 
 ## Identity
 
@@ -81,6 +82,9 @@ profile for this fingerprint; its steps were run by hand.
 
 ## Persistent Wi-Fi ADB (tested)
 
+Rejection of an unfamiliar host key was not tested. ADB provides access to the shipped root
+command; keep this root-capable listener on an isolated, trusted LAN and never expose it publicly.
+
 ```sh
 adb -s <serial> tcpip 5555
 adb connect <frame-ip>:5555
@@ -101,7 +105,7 @@ then `adb usb`.
 
 ## WebView 44 to 106
 
-Same method as the [BIUFRAME guide](biuframe-setup-guide.md) step 4, run by hand because no
+**Record, not a procedure.** The [BIUFRAME guide](biuframe-setup-guide.md) step 4 was adapted by hand because no
 setup profile matches. The original `/system/app/webview/` (APK and `oat/arm/webview.odex`) was
 pulled to the computer first, and kept on the frame as `webview.apk.bak` and `oat.bak/`.
 `/system` had 520 MB free.
@@ -138,9 +142,10 @@ the kiosk process used about 35% CPU.
 
 ## Clock
 
-There is no clock battery. After a reboot the frame came up at **2021-05-15 02:00**, and network
+After a reboot the frame came up at **2021-05-15 02:00**, and network
 time corrected Android's clock within about 1.5 minutes. A MagicMirror² page that had already
 loaded kept showing the 2021 date until the kiosk was restarted (`am force-stop` and start).
+The reset suggests a missing or nonworking RTC backup; the battery hardware was not checked.
 
 ## Not tested
 

@@ -109,6 +109,9 @@ range in the image. The backup GPT is the last 33 sectors (from 61063135).
 ## Second unit: WebView 155 and the kiosk
 
 Everything in this section is from the second unit, which isn't the unit the sections above describe.
+The `/product` and init-file changes below are **records, not procedures**: manual changes with
+local checks, not guarded tools supplied by this repo. The backup excluded userdata, so it does
+not meet the full-device backup rule.
 
 ### How it differs from the first unit
 
@@ -157,47 +160,28 @@ Checked read-only before any write:
 
 ### The swap that worked
 
-1. **Fetch LineageOS WebView 155**: [`android_external_chromium-webview_prebuilt_arm`](https://github.com/LineageOS/android_external_chromium-webview_prebuilt_arm)
-   at `170e8996e41ef542769b5479297ab91072b487e2` (the same commit the C-2 and C-3 used), `webview.apk`,
-   SHA-256 `e744cd81ea83cfa6bda3da471ce58a5d9eac5d32260ad0ef98b8c9f49348f20e`, 97638829 bytes.
-   Without `git-lfs`, the LFS batch API on the server in the repo's `.lfsconfig` returns a download link:
+The owner used LineageOS WebView 155 from
+[`android_external_chromium-webview_prebuilt_arm`](https://github.com/LineageOS/android_external_chromium-webview_prebuilt_arm)
+at `170e8996e41ef542769b5479297ab91072b487e2`, the same commit used by the C-2 and C-3.
+The `webview.apk` was 97,638,829 bytes with SHA-256
+`e744cd81ea83cfa6bda3da471ce58a5d9eac5d32260ad0ef98b8c9f49348f20e`.
+LineageOS's Git LFS index provides that object identifier and size.
 
-   ```sh
-   curl -s -X POST -H 'Accept: application/vnd.git-lfs+json' -H 'Content-Type: application/vnd.git-lfs+json' \
-     -d '{"operation":"download","transfers":["basic"],"objects":[{"oid":"e744cd81ea83cfa6bda3da471ce58a5d9eac5d32260ad0ef98b8c9f49348f20e","size":97638829}]}' \
-     https://review.lineageos.org/LineageOS/android_external_chromium-webview_prebuilt_arm.git/info/lfs/objects/batch
-   ```
+On this firmware, PackageManager accepted the APK's new signer without re-signing it. The APK
+uses Signature Scheme v2 and has no v1 `META-INF`. This observation does not establish that
+other firmware accepts arbitrary replacement signers.
 
-2. **Don't re-sign it.** It's signed with APK Signature Scheme v2 (no v1 `META-INF`). Any valid
-   signature works, because PackageManager accepts a new signer for a package on a system partition.
-3. **Its libraries aren't page-aligned** (`libwebviewchromium.so` at offset 13749120), so Android
-   can't load them from inside the APK. It also doesn't extract libraries for an app on a read-only
-   partition. So the extracted libraries go next to the APK, in `lib/arm/`, where PackageManager
-   already looks (`legacyNativeLibraryDir=/product/app/webview/lib`):
+Its `libwebviewchromium.so` was not page-aligned (offset 13,749,120), so Android could not load it
+from inside the APK. Libraries were extracted to `/product/app/webview/lib/arm/`, where
+PackageManager's `legacyNativeLibraryDir=/product/app/webview/lib` points. The original APK and
+`oat` tree were saved before the change. The replacement APK and libraries were installed with
+root ownership and `system_file` labels; the old `oat` was removed. Each copied file's SHA-256
+was checked, and `/product` was returned to read-only before reboot. It had 36,208 KiB free.
 
-   ```sh
-   unzip -j webview.apk 'lib/armeabi-v7a/*' -d webview-155-lib-arm
-   adb push webview.apk /data/local/tmp/webview155.apk
-   adb push webview-155-lib-arm /data/local/tmp/webview155-lib-arm
-   adb shell cp /product/app/webview/webview.apk /data/local/tmp/webview74-stock.apk   # for undo
-   adb shell cp -a /product/app/webview/oat /data/local/tmp/webview74-oat              # for undo
-   adb shell mount -o remount,rw /product
-   adb shell 'set -e
-     W=/product/app/webview
-     cp /data/local/tmp/webview155.apk $W/webview.apk
-     rm -r $W/oat
-     mkdir -p $W/lib/arm
-     cp /data/local/tmp/webview155-lib-arm/*.so $W/lib/arm/
-     chown -R root:root $W
-     chmod 755 $W $W/lib $W/lib/arm $W/lib/arm/*.so
-     chmod 644 $W/webview.apk
-     chcon -R u:object_r:system_file:s0 $W
-     sync'
-   adb shell mount -o remount,ro /product
-   adb reboot
-   ```
-
-   Check every file's SHA-256 after copying. This left 36208 KiB free on `/product`.
+This report does not supply compare-before-write, payload-verification and failure-cleanup tools.
+Do not reproduce the file replacement from these observations alone. A supported procedure
+would need to check current stock bytes, verify the payload on the device before copying,
+read back every written file, return the filesystem read-only even after failure, and guard undo.
 
 **Result after the reboot:** `ro.boot.verifiedbootstate` was still `green`. `dumpsys webviewupdate`
 reported `com.android.webview` 155.0.8059.39 as current and preferred, with 1 of 1 relro finished.
@@ -205,9 +189,11 @@ PackageManager logged `System package com.android.webview signature changed; ret
 the built-in HTML viewer, `oklch()`, `color-mix()`, `aspect-ratio` and flex `gap` rendered. That
 viewer always turns JavaScript off; the kiosk below showed JavaScript working.
 
-**Undo:** remount `/product` read-write, copy `webview74-stock.apk` back to `webview.apk` and
-`webview74-oat` back to `oat`, delete `lib/`, set labels again, remount read-only and reboot. Not tested.
-A saved image of p6 restores it exactly; it's the range 5169152–5906431 of the [backup](#backup).
+**Undo was not tested.** The retained stock APK, `oat` tree and product-partition image are the
+recovery material. The product image is sectors 5169152–5906431 in the [backup](#backup).
+A restoration must verify the current modified state and the saved original bytes/metadata,
+restore the complete original tree and remove only verified replacement files. This is not a
+published restore procedure.
 
 ### Vendor updaters
 
@@ -286,24 +272,19 @@ this firmware's `/system/framework/services.jar`:
 - So the firmware leaves ending the animation to the Home app, which is Frameo (it has root through
   the shipped `su`). Any other Home app leaves the logo up.
 
-`adb shell setprop service.bootanim.exit 1` clears it until the next reboot. The permanent fix that
-worked was a two-line init file. `/system` (`mmcblk0p4`, mounted as `/`) has no dm-verity, and its
-ext4 has no `shared_blocks`:
+Setting `service.bootanim.exit=1` cleared the animation until the next reboot. The permanent
+change reported on this unit was `/system/etc/init/homehq-bootanim.rc`, containing an init
+trigger for `sys.boot_completed=1` that sets `service.bootanim.exit` to `1`. The file used
+root ownership, mode 0644 and the `system_file` label. `/system` (`mmcblk0p4`, mounted as `/`)
+had no dm-verity and no ext4 `shared_blocks` feature.
 
-```sh
-adb shell mount -o remount,rw /
-adb shell 'printf "on property:sys.boot_completed=1\n    setprop service.bootanim.exit 1\n" > /system/etc/init/homehq-bootanim.rc
-  chown root:root /system/etc/init/homehq-bootanim.rc
-  chmod 644 /system/etc/init/homehq-bootanim.rc
-  chcon u:object_r:system_file:s0 /system/etc/init/homehq-bootanim.rc
-  sync'
-adb shell mount -o remount,ro /
-```
-
-Check `/system` against your backup first. After a reboot with no manual step:
-`init.svc.bootanim=stopped`, `service.bootanim.exit=1`, verified boot `green`, and the dashboard on
-screen. Undo: remount `/` read-write and delete the file. The PF1506's stuck boot animation (#104,
-#118) may have the same cause; not checked.
+This is another **one-unit record, not an installation or undo procedure**. The author reported
+comparing the partition with its backup before the change and checking the file afterward;
+no guarded tool is supplied here. After returning the filesystem read-only and rebooting,
+`init.svc.bootanim=stopped`, `service.bootanim.exit=1`, verified boot remained `green`, and the
+dashboard appeared without a manual step. Undo would remove only that exact added file after
+verifying its contents and confirming no earlier file was replaced; it was not reported as
+tested. The PF1506's stuck boot animation (#104, #118) may have the same cause; not checked.
 
 ## Guesses, not tested
 

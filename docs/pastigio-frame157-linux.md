@@ -3,7 +3,8 @@
 Report from one unit, 2026-10-15 to 2026-10-26, built and flashed from an Apple
 silicon Mac. The kernel patches, device tree, boot chain, scripts and logs are in
 [lachieh/framarchy](https://github.com/lachieh/framarchy). This page summarises
-what works and how the frame boots. Follow that repo for the steps.
+what works and how the frame boots. This is a one-unit record, not a flashing procedure.
+The external tools are not reviewed or supplied by this repository.
 
 **Verified result:** mainline Linux 6.18 and Arch Linux ARM (aarch64) boot by
 default, with [Omarchy](https://github.com/basecamp/omarchy) (Hyprland) on the
@@ -44,8 +45,9 @@ BootROM → stock idbloader/TF-A → stock U-Boot (unchanged)
   → Linux 6.18 with a FRAME157 device tree, root filesystem on microSD
 ```
 
-The chain-loading U-Boot has no PMIC or regulator drivers and no saved
-environment, so it cannot change a voltage rail or write the eMMC.
+The author reports that the chain-loading U-Boot omits PMIC/regulator drivers
+and a saved environment. Those choices alone do not prove it cannot write the
+eMMC; this report does not establish a read-only write guard.
 
 ## What it needed
 
@@ -72,9 +74,11 @@ environment, so it cannot change a voltage rail or write the eMMC.
   [loader-research.md](loader-research.md)). The restore source was a
   per-partition backup over root ADB, each image checked against a hash taken on
   the frame.
-- Only the eMMC `boot` partition holds the chain loader. To return to Android,
-  write the backed-up `boot` image from Loader mode. The framarchy scripts check
-  the GPT and refuse images larger than the partition.
+- Only the eMMC `boot` partition holds the chain loader. The recorded recovery
+  plan was to restore the backed-up `boot` image from Loader mode; this is not a
+  reviewed restore procedure. The author reports GPT and size checks in the
+  framarchy writer, which do not by themselves establish compare-before-write
+  and readback guards. A complete-device backup/restore test was not reported.
 - An early test wrote an image larger than `boot` with plain
   `rkdeveloptool wlx`, which does not check sizes. A later check against the
   backup found the following partitions intact, but use a writer that checks

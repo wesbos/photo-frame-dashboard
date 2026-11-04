@@ -245,21 +245,23 @@ unit only.
 
 ### What fixed it
 
-Move the whole overlay tree to `scratch`, then set the `/cache` copy aside so only one overlay is found:
+**Record, not a procedure.** This was a manual change on one unit, with an initially empty
+`/mnt/scratch/overlay`. The tools that performed the checks are not in this repo.
 
-```sh
-adb shell 'for d in system vendor product; do cp -a --preserve=motcx /cache/overlay/$d /mnt/scratch/overlay/; done'
-# toybox cp gave every copied directory the overlayfs_file label; copy each directory's label across:
-adb shell 'cd /cache/overlay && find . -type d | while read d; do chcon "$(ls -dZ "$d" | cut -d" " -f1)" "/mnt/scratch/overlay/$d"; done'
-# compare path, label, mode and owner of every entry, and the file hashes, before going on
-adb shell 'mv /cache/overlay /cache/overlay.moved-to-scratch'
-```
+The owner copied the `system`, `vendor` and `product` overlay trees from `/cache` to `scratch`.
+Toybox's copy assigned `overlayfs_file` to every directory, so each source directory's SELinux
+label was restored on its copy. Paths, labels, modes, owners and file hashes were compared before
+the `/cache` tree was renamed to `/cache/overlay.moved-to-scratch`.
 
-After a cold boot `mount` showed `upperdir=/mnt/scratch/overlay/...`, `init` logged the edited line numbers,
-`service.adb.tcp.port` was empty, nothing listened on 5555, the 14035 `iptables` action ran (twice, as above),
-and both ports were closed when probed from another machine. The factory files were still visible under
-`/system`. Undo: `rm -rf /mnt/scratch/overlay/{system,vendor,product}` and
-`mv /cache/overlay.moved-to-scratch /cache/overlay`.
+After a cold boot `mount` showed `upperdir=/mnt/scratch/overlay/...`, `init` logged the edited
+line numbers, `service.adb.tcp.port` was empty, nothing listened on 5555, the 14035 `iptables`
+action ran (twice, as above), and both ports were closed when probed from another machine.
+The factory files remained visible under `/system`.
+
+The recorded undo would restore the saved cache tree and remove only the verified copies added
+in this operation. Undo was not reported as tested. A reusable procedure must first verify the
+backup, the current source contents and an empty destination, and preserve any later changes;
+a broad deletion of the scratch overlay can destroy unrelated files.
 
 ### Other notes from this unit
 
@@ -272,7 +274,9 @@ and both ports were closed when probed from another machine. The factory files w
   Hash the chunk on the frame *after* the transfer: the chunk holding the start of `UDISK` changed between a
   hash taken before the transfer and the transfer itself, while Android was running. Afterwards: exact byte
   count, no `0xCC` filler, `gzip -t` on every chunk, and `boot`/`recovery`/`dtbo` hashes from the backup
-  matching the table. Restore was not tested.
+  matching the table. Restore was not tested. Matching a live userdata chunk after transfer does
+  not establish a coherent filesystem snapshot; the changing filesystem can still be
+  crash-inconsistent. Static firmware verification does not prove userdata can be restored.
 
 ## What did not work / open
 

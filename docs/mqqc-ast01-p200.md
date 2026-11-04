@@ -125,7 +125,7 @@ against the frame).
 | --- | --- | --- |
 | Stop and remove `iotv` | `kill <pid from ps>` (not `pidof`; see the Runxion pitfall); `mount -o rw,remount /system`; `rm /system/bin/iotv` | Copy the saved file back (`chmod 755`, owner `root:shell`), or write `system` back from the backup |
 | Neutralize the start script | `run_iotv.sh` replaced (not deleted) with `#!/system/bin/sh` + `exit 0`, mode 755; then `mount -o ro,remount /system` | Copy the saved `run_iotv.sh` back |
-| Updaters off | `pm disable com.adups.fota com.adups.fota.sysoper android.rockchip.update.service` (as root). `enabled="2"` reached `package-restrictions.xml` a few seconds later; checked before rebooting | `pm enable` each |
+| Updaters off | Disabled `com.adups.fota`, `com.adups.fota.sysoper` and `android.rockchip.update.service` individually with root `pm disable` (one package per command). `enabled="2"` reached `package-restrictions.xml` a few seconds later; checked before rebooting | `pm enable` each |
 
 Verified after a reboot: no `iotv` process; `init.svc.run_iotv=stopped` (the no-op ran); the
 updaters are still disabled; `su` works; Frameo starts as before.

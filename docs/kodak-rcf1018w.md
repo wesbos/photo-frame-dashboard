@@ -43,39 +43,52 @@ Follow the repository's [backup rules](../README.md#rules-we-learned-the-hard-wa
 
 Checks passed: exact byte count, stream/readback SHA-256, gzip readback, filler scan, and independent matching reads of uboot, boot, recovery, and a 16 MiB system-data sample. Original system files and package state were saved separately.
 
-The backup excludes photos and most app data. Offline restoration remains untested. Keep dumps private.
+The backup excludes userdata, including photos and most app data. It is a partial firmware backup
+and does not meet the full-device backup rule. Offline restoration remains untested. Keep dumps private.
 
-## 3. Upgrade WebView
+## 3. WebView replacement record
 
-Use ARMv7 standalone **106.0.5249.126**:
+**Record, not a procedure.** The following system-file changes were performed manually on one
+unit. No guarded Kodak WebView or low-memory writer is supplied by this repository.
+
+The owner used ARMv7 standalone **106.0.5249.126**:
 
 - [Pinned LineageOS APK](https://raw.githubusercontent.com/LineageOS/android_external_chromium-webview_prebuilt_arm/4b0ae494a7dd/webview.apk)
 - SHA-256: `e2edc1f89ec1608b169da9e7ffc037190b70c7825f0be29694f4cae719980580`
 
-The signing certificate differs from stock. After backup and approval:
+Its signing certificate differs from stock. The original `/system/app/webview/webview.apk` was
+kept as `webview.apk.bak`. The replacement APK and its three `lib/armeabi-v7a` libraries were
+placed in the WebView tree (`lib/arm/` on the frame), with root ownership, files 0644,
+directories 0755 and `system_file` labels. Generated `oat` was removed. File hashes were checked
+by independent readback and `/system` returned to read-only before reboot. Logcat then reported
+`WebViewFactory: Loading com.android.webview version 106.0.5249.126`.
 
-1. Preserve `/system/app/webview/webview.apk` as `webview.apk.bak`.
-2. Replace the APK. Extract its three `lib/armeabi-v7a/*.so` files into `/system/app/webview/lib/arm/`.
-3. Set root:root ownership, files `0644`, directories `0755`, and `system_file` labels. Remove generated `oat`.
-4. Verify complete file hashes by independent readback, remount `/system` read-only, and reboot.
-5. Confirm package version and `WebViewFactory: Loading com.android.webview version 106.0.5249.126` in logcat.
+See the [native-library explanation](biuframe-setup-guide.md#why-the-non-obvious-parts-are-needed).
+SuperSU may remount concurrently. ISRG Root X1/X2 were already correct; no certificate changes
+were required.
 
-See the [native-library explanation](biuframe-setup-guide.md#why-the-non-obvious-parts-are-needed). Check each remount/write: SuperSU may remount concurrently. ISRG Root X1/X2 were already correct; no certificate changes were required.
+A reusable writer must compare the current files to the verified stock backup, verify each
+incoming payload on the frame before writing, read back the result and return `/system` to
+read-only on failure. An APK-only `.bak` is not a complete undo: preserve the entire original
+WebView tree, including any libraries, `oat`, owners, modes and labels, before replacement.
+Complete tree restoration was not tested on this unit.
 
-## 4. Fix navigation
+## 4. Low-memory and navigation findings
 
-With `ro.config.low_ram=true`, this firmware kills non-exempt apps when switching tasks. Logs showed Home HQ killed immediately after `onPause` with `user request after error`, taking its navigation service down too.
+With `ro.config.low_ram=true`, this firmware kills non-exempt apps when switching tasks. Logs
+showed Home HQ killed immediately after `onPause` with `user request after error`, taking its
+navigation service down too.
 
-Back up `/system/etc/lowmem_package_filter.xml` as `.bak`. Add these entries beside the corresponding sections, preserving all existing entries:
+The owner saved `/system/etc/lowmem_package_filter.xml` as `.bak`, then added Home HQ to the
+`prev` and `empty` sections while preserving other entries. The file had root ownership, mode
+0644 and its SELinux label restored; XML readback was checked, `/system` returned read-only,
+and the frame rebooted. See [Rockchip low-memory behavior](denver-pff-1015.md#low-ram-mode-kills-every-app-you-leave).
+This is part of the manual record, not a supported edit/undo script. A guarded implementation
+would need the same before/after checks as the WebView replacement.
 
-```xml
-<prev package="com.wesbos.homehq"/>
-<empty package="com.wesbos.homehq"/>
-```
-
-Set root:root, `0644`, and the correct SELinux label. Verify the XML readback, remount read-only, and reboot. See [Rockchip low-memory behavior](denver-pff-1015.md#low-ram-mode-kills-every-app-you-leave).
-
-Enable **Settings → Accessibility → Home HQ navigation**. Check on the panel that Home HQ reaches **Settings → Apps** and returns using **Dashboard** before disabling Kodak. This unit did not need `WRITE_SECURE_SETTINGS`.
+Enable **Settings → Accessibility → Home HQ navigation**. Check on the panel that Home HQ
+reaches **Settings → Apps** and returns using **Dashboard** before disabling Kodak. This unit
+did not need `WRITE_SECURE_SETTINGS`.
 
 ## 5. Set startup and disable optional apps
 
@@ -114,8 +127,11 @@ Verified after the final reboot: automatic dashboard startup, Wi-Fi, Settings/na
 
 - Restore an app: root `pm enable PACKAGE`.
 - Change Home: select Launcher3 in Settings → Home before disabling Home HQ's Home alias with `--ez home false`.
-- Restore WebView: copy its `.bak` over the APK, remove the added `lib` directory and generated `oat`, restore file metadata, and reboot.
-- Restore low-memory rules: copy their `.bak` over the XML, restore metadata, and reboot.
+- System-file undo was not tested. A restoration must first match the current modified files
+  to the expected state, then restore the complete original WebView tree or low-memory XML
+  from a verified backup, including metadata. Remove only verified replacement-only files.
+  Verify payloads before writing and read back afterward, with `/system` returned read-only.
+  Do not infer complete WebView recovery from an APK-only `.bak`.
 
 ## Change the dashboard or app
 
