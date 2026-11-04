@@ -186,7 +186,14 @@ screen. The error page would print the full URL, including any token in it.
 - **Certificate error:** never bypassed. If the error is about the date, the screen says
   "Setting the clock…". Frames with no clock battery start with an old date after a power cut
   (a Runxion SSA ZN-DP1002 came up on May 14, 2021), so every HTTPS certificate fails until
-  network time arrives, about 20 seconds after Wi-Fi joins.
+  network time arrives, about 20 seconds after Wi-Fi joins. Android 6 can give up instead: if its
+  boot-time attempts fail, it waits 24 hours before trying again, and the frame stays in 1969
+  (seen on an RK3126 Frameo frame, still 1969 four minutes after Wi-Fi joined). With the optional
+  `WRITE_SECURE_SETTINGS` grant (see
+  [Frames without Home or Back buttons](#frames-without-home-or-back-buttons)), Home HQ then asks
+  Android for network time again, by turning automatic time off and on, at most once a minute
+  while the date error lasts and Wi-Fi is connected. It leaves automatic time alone if it was
+  turned off. By hand: `adb shell settings put global auto_time 0`, then `1`.
 
 Home HQ keeps retrying every 5 seconds, and retries at once when Wi-Fi connects or the clock
 changes. The screen disappears once a load succeeds. Wi-Fi settings open only when tapped,
