@@ -307,14 +307,21 @@
   App.resetIdle = function () { idleSec = 0; };
 
   // ------------------------------------------------------------ stage scaling
-  // Designed at 1280×800. Screens wider than 16:10 (e.g. 1920×1080 frames) widen the stage to their
-  // aspect instead of pillarboxing; narrower screens letterbox as before.
-  var STAGE_H = 800, STAGE_MIN_W = 1280;
+  // Designed at 1280×800 (16:10). Screens wider than that (e.g. 1920×1080 frames) widen the
+  // stage to their aspect; screens narrower than that (e.g. 1440×1080, ~4:3) grow the stage
+  // TALLER to their aspect instead — either way the stage always matches the screen's own
+  // aspect ratio, so it fills edge to edge with no letterboxing/pillarboxing.
+  var STAGE_MIN_W = 1280, STAGE_MIN_H = 800;
   function fit() {
     var stage = $('#stage');
-    var w = Math.max(STAGE_MIN_W, Math.round(STAGE_H * window.innerWidth / window.innerHeight));
+    var screenAspect = window.innerWidth / window.innerHeight;
+    var baseAspect = STAGE_MIN_W / STAGE_MIN_H;
+    var w = STAGE_MIN_W, h = STAGE_MIN_H;
+    if (screenAspect > baseAspect) w = Math.round(STAGE_MIN_H * screenAspect);
+    else if (screenAspect < baseAspect) h = Math.round(STAGE_MIN_W / screenAspect);
     stage.style.setProperty('--stage-w', w + 'px');
-    var s = Math.min(window.innerWidth / w, window.innerHeight / STAGE_H);
+    stage.style.setProperty('--stage-h', h + 'px');
+    var s = Math.min(window.innerWidth / w, window.innerHeight / h);
     stage.style.transform = Math.abs(s - 1) < 0.01 ? '' : 'scale(' + s + ')';
   }
 

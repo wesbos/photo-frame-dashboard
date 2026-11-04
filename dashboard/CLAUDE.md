@@ -97,6 +97,16 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
 - **`App.isFamily(e)` checks `e.people.length >= D.people.length`** (currently 4) — an event
   tagged with all four people renders in the "whole family" lane/style rather than per-person
   lanes. `ALL` (all 4 ids) triggers family styling, a subset doesn't.
+- **This frame's real screen is 1440×1080** (`wm size`/`dumpsys display` both confirm — it's the
+  hardware's actual native mode, not a wrong override), a narrower-than-16:10 aspect than the
+  dashboard's designed 1280×800. `App.fit()` in `app.js` (and `.stage`'s `--stage-w`/`--stage-h`
+  CSS vars in `base.css`) grows the stage to match the screen's own aspect in EITHER direction —
+  wider screens widen the stage, narrower screens make it taller — so it always fills edge to
+  edge with no letterboxing/pillarboxing, on this frame or any other aspect ratio. If black bars
+  reappear, check this logic first before assuming it's an Android fullscreen/immersive-mode
+  problem — `dumpsys window` on this frame showed the Android window layer was genuinely already
+  fullscreen with zero insets; the black bars were the app's own CSS stage not filling a
+  narrower screen, not a system-chrome issue.
 
 ## Pipelines that exist but aren't part of the app's runtime
 

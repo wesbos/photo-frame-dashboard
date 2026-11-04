@@ -37,12 +37,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 .label--light { color: rgba(255, 255, 255, .72); }
 .label--on { color: var(--c-ink); opacity: .8; }
 
-/* ---------------------------------------------------------------- stage (800 tall; width set by fit() in app.js, min 1280) */
+/* ---------------------------------------------------------------- stage (size set by fit() in app.js, min 1280x800) */
 .stage {
   position: absolute;
   left: 50%; top: 50%;
-  width: var(--stage-w, 1280px); height: 800px;
-  margin: -400px 0 0 calc(var(--stage-w, 1280px) / -2);
+  width: var(--stage-w, 1280px); height: var(--stage-h, 800px);
+  margin: calc(var(--stage-h, 800px) / -2) 0 0 calc(var(--stage-w, 1280px) / -2);
   transform-origin: 50% 50%;
   background: var(--paper);
   overflow: hidden;
@@ -68,7 +68,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 .rail-item.is-active { background: var(--ink); color: var(--paper); }
 .rail-item:active { background: var(--paper-2); }
 .rail-item.is-active:active { background: var(--ink-2); }
-.rail-clock { margin-top: auto; padding: 10px 0; text-align: center; line-height: 1; position: relative; overflow: hidden; }
+/* Persona links (Papa/Maman/Clara/Félix) sit in their own cluster, vertically centered in the
+   space between the fixed top item (Aujourd'hui) and the fixed bottom items + clock. Only this
+   one element grows/centers — .rail-bottom and .rail-clock stay in normal flow right after it,
+   so there's exactly one flexible gap instead of two auto-margins competing for space. */
+.rail-personas { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.rail-clock { padding: 10px 0; text-align: center; line-height: 1; position: relative; overflow: hidden; }
 .rail-clock.is-holding { background: var(--paper-2); }
 .rail-clock b { display: block; font-size: 24px; font-weight: 800; font-stretch: 62%; font-variant-numeric: tabular-nums; }
 .rail-clock span { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--mute); }
