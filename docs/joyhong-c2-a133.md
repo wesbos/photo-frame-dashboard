@@ -5,7 +5,8 @@
 A record of **one unit**, bought from Amazon UK (listing not recorded), tested on 2026-10-16 from a Linux host
 (CachyOS) over a USB-A to USB-C cable.
 Frames sold under the same name can use different boards and firmware. Check every identity value below
-before you copy anything from this page.
+before you copy anything from this page. A [second unit](#second-unit-macos-2026-10-26) with the same
+firmware had a smaller eMMC and its remount overlay in a different place, which changes the network-ADB fix.
 
 Closest relatives in this repo: the [LOOFII C-3](allwinner-a133-loofii-c3.md) (same A133 platform, same
 partition names and order, same vendor calendar/FOTA apps) and the PF1506 (A133, AiMOR) in #104 and #118.
@@ -146,6 +147,9 @@ Undo: delete the copy under `/mnt/scratch/overlay/{vendor,system}/upper/...` and
 scratch overlay (reflashing `super`, `adb enable-verity`) also undoes it. `init` reported line numbers from the
 overlay copy, so the overlay is in place before `init` parses `/vendor/etc/init`.
 
+**Check where your overlay is first.** On the [second unit](#second-unit-macos-2026-10-26) the factory overlay
+was on `/cache/overlay`, which mounts too late for this fix: run `mount | grep overlay` and look at `upperdir`.
+
 ## TCP 14035: AOSP's test sound-trigger HAL
 
 The audio HAL process listens on `0.0.0.0:14035`. The socket belongs to
@@ -211,6 +215,64 @@ On 155, `oklch()`, `color-mix()`, `:has()`, CSS nesting, flex `gap` and `aspect-
 - `--ez home true`, then `cmd package set-home-activity com.wesbos.homehq/.Home`. The two-finger menu reached
   Android Settings → Apps by hand.
 - The repo's demo on `*.workers.dev` loaded over HTTPS on stock certificates.
+
+## Second unit (macOS, 2026-10-26)
+
+A second C-2, tested from macOS (Apple silicon) over USB-C, powered from the DC jack. Observations from this
+unit only.
+
+### Same as the first unit
+
+- Firmware `C-2_A1339365080625_V05`, the same `ro.build.fingerprint` and vendor fingerprint, USB `1f3a:1007`,
+  root USB ADB with no prompt, adbd on TCP 5555, the sound-trigger HAL on TCP 14035, stock WebView 74.
+- `boot`, `recovery` and `dtbo` SHA-256 identical to the [table above](#identity), at the same start sectors.
+- The WebView 155 route, the FOTA `.MessageService`-only disable, the vendor-app and awlog list, the kiosk,
+  `wm density 160` and disabling `com.fujia.calendar` all worked as written. After three cold boots the
+  only crashes were the one-off `FallbackHome` and SystemUI ones listed under "What did not work / open".
+- `adb reboot` worked every time.
+
+### Different from the first unit
+
+- **eMMC 61,063,168 sectors** (31,264,342,016 bytes), 16,384 sectors fewer. Every partition start matches;
+  only `UDISK` (p17) is shorter, at 54,585,551 sectors.
+- **The factory remount overlay was on `/cache`, not `scratch`.** `mount` showed
+  `upperdir=/cache/overlay/{system,vendor,product}/upper`, holding the factory's `fullja_test/` and
+  `fullja_license/` files; `/mnt/scratch/overlay` existed but was empty. The [network ADB fix](#network-adb-is-switched-on-in-two-places)
+  written through that overlay had **no effect**: after a cold boot 5555 was open again, and `init` logged
+  `init.device.rc` actions at the stock file's line numbers (the edited copy's lines were never seen).
+  Reading of the cause (not confirmed in source): `/cache` is mounted by `mount_all` in second-stage init,
+  after `prop.default` is loaded and the `.rc` files are parsed, while `scratch` is mounted in first stage.
+
+### What fixed it
+
+Move the whole overlay tree to `scratch`, then set the `/cache` copy aside so only one overlay is found:
+
+```sh
+adb shell 'for d in system vendor product; do cp -a --preserve=motcx /cache/overlay/$d /mnt/scratch/overlay/; done'
+# toybox cp gave every copied directory the overlayfs_file label; copy each directory's label across:
+adb shell 'cd /cache/overlay && find . -type d | while read d; do chcon "$(ls -dZ "$d" | cut -d" " -f1)" "/mnt/scratch/overlay/$d"; done'
+# compare path, label, mode and owner of every entry, and the file hashes, before going on
+adb shell 'mv /cache/overlay /cache/overlay.moved-to-scratch'
+```
+
+After a cold boot `mount` showed `upperdir=/mnt/scratch/overlay/...`, `init` logged the edited line numbers,
+`service.adb.tcp.port` was empty, nothing listened on 5555, the 14035 `iptables` action ran (twice, as above),
+and both ports were closed when probed from another machine. The factory files were still visible under
+`/system`. Undo: `rm -rf /mnt/scratch/overlay/{system,vendor,product}` and
+`mv /cache/overlay.moved-to-scratch /cache/overlay`.
+
+### Other notes from this unit
+
+- **Wait before rebooting after `pm disable-user`.** Rebooting immediately lost the `com.fujia.calendar`
+  disable: the package state hadn't been written to `/data/system/users/0/package-restrictions.xml` yet. Wait
+  about 30 s and check that the package's entry shows `enabled="3"` before rebooting.
+- **Backup over ADB:** a single `adb exec-out dd … | gzip` stream of the whole eMMC stalled for good after
+  12.3 GB when the Mac went to sleep. 1 GiB chunks (`dd bs=4M skip=… count=256`), each hashed on the frame
+  with `sha256sum` and on the host, with a retry when a chunk stops growing, finished in about an hour.
+  Hash the chunk on the frame *after* the transfer: the chunk holding the start of `UDISK` changed between a
+  hash taken before the transfer and the transfer itself, while Android was running. Afterwards: exact byte
+  count, no `0xCC` filler, `gzip -t` on every chunk, and `boot`/`recovery`/`dtbo` hashes from the backup
+  matching the table. Restore was not tested.
 
 ## What did not work / open
 
