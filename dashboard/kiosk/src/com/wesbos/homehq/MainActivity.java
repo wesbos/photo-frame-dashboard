@@ -29,6 +29,7 @@ import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -66,6 +67,10 @@ import java.util.Map;
  *     adb shell cmd package set-home-activity com.wesbos.homehq/.Home
  * - Wi-Fi with a sign-in page (captive portal): when the dashboard can't load on Wi-Fi, the kiosk
  *   checks for one and shows it, so the terms can be accepted; then it returns to the dashboard.
+ * - Backlight from the dashboard (off by default; --ez bridge false removes it):
+ *     adb shell am start -n com.wesbos.homehq/.MainActivity --ez bridge true
+ *   The saved dashboard's origin can then call HomeHQ.setBrightness(0..1), or a negative value to
+ *   go back to the system brightness. Calls from any other page are ignored.
  */
 public class MainActivity extends Activity {
   static final String TAG = "HomeHQ";
@@ -73,6 +78,9 @@ public class MainActivity extends Activity {
   static final String PREFS = "kiosk";
   static final String PREF_URL = "url";
   static final String PREF_MENU_BUTTON = "menu_button";
+  static final String PREF_BOOTANIM_EXIT = "bootanim_exit";
+  static final String PREF_BRIDGE = "bridge";
+  static final float MIN_BRIGHTNESS = 0.01f; // the page can dim the screen but never black it out
   static final long EXIT_HOLD_MS = 1500;
   static final int CANCEL_POINTER_IDS = 10; // touch ids 0-9
   static final long RETRY_MS = 5000;
@@ -94,6 +102,7 @@ public class MainActivity extends Activity {
 
   private WebView web;
   private Button menuButton;
+  private boolean bridgeOn;
   private final Handler handler = new Handler(Looper.getMainLooper());
   // Not cleared in onDestroy, so a navigation rebind that has started always finishes.
   private final Handler rebindHandler = new Handler(Looper.getMainLooper());
@@ -181,6 +190,7 @@ public class MainActivity extends Activity {
     super.onCreate(state);
     applyDebugFlag(getIntent());
     applyHomeFlag(getIntent());
+    applyBootanimFlag(getIntent());
     keepNavigationEnabled();
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -298,6 +308,7 @@ public class MainActivity extends Activity {
     menuPosition.setMargins(dp(12), dp(12), dp(12), dp(12));
     root.addView(menuButton, menuPosition);
     applyMenuButtonFlag(getIntent());
+    applyBridgeFlag(getIntent());
     setContentView(root);
 
     String url = urlFrom(getIntent());
@@ -328,6 +339,8 @@ public class MainActivity extends Activity {
     applyDebugFlag(intent);
     applyHomeFlag(intent);
     applyMenuButtonFlag(intent);
+    applyBootanimFlag(intent);
+    applyBridgeFlag(intent);
     String url = urlFrom(intent);
     if (url != null) {
       closePortal();
@@ -780,6 +793,112 @@ public class MainActivity extends Activity {
     }
     menuButton.setVisibility(getSharedPreferences(PREFS, MODE_PRIVATE)
         .getBoolean(PREF_MENU_BUTTON, false) ? View.VISIBLE : View.GONE);
+  }
+
+  /**
+   * A saved opt-in for frames whose vendor boot animation keeps covering the kiosk after a power
+   * cut. sys.bootanim.exit is a per-boot property, so it has to be set again on every start. It
+   * works without root only where SELinux is permissive or the app runs as system; where it is
+   * refused, setprop fails, the failure is logged and nothing else changes.
+   */
+  private void applyBootanimFlag(Intent intent) {
+    if (intent != null && intent.hasExtra(PREF_BOOTANIM_EXIT)) {
+      getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+          .putBoolean(PREF_BOOTANIM_EXIT, intent.getBooleanExtra(PREF_BOOTANIM_EXIT, false)).apply();
+    }
+    boolean enabled = getSharedPreferences(PREFS, MODE_PRIVATE)
+        .getBoolean(PREF_BOOTANIM_EXIT, false);
+    Log.i(TAG, "Boot animation exit " + (enabled ? "on" : "off"));
+    if (!enabled) return;
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        // The property service may not be ready at the first start after a power cut, so try
+        // twice. Both attempts are cheap and setting it when the animation is already gone is
+        // harmless.
+        for (int attempt = 0; attempt < 2; attempt++) {
+          try {
+            Process p = Runtime.getRuntime().exec(
+                new String[] {"/system/bin/setprop", "sys.bootanim.exit", "1"});
+            int rc = p.waitFor();
+            if (rc != 0) Log.w(TAG, "setprop sys.bootanim.exit exited " + rc);
+          } catch (IOException | InterruptedException e) {
+            Log.w(TAG, "Could not set sys.bootanim.exit: " + e);
+            return;
+          }
+          try {
+            Thread.sleep(RETRY_MS);
+          } catch (InterruptedException e) {
+            return;
+          }
+        }
+      }
+    }, "bootanim-exit").start();
+  }
+
+  /**
+   * A saved opt-in that exposes window.HomeHQ to the dashboard, so it can dim the backlight by
+   * itself (at night, in an idle mode). A JavaScript interface only appears on the next page load,
+   * so a change reloads the page.
+   */
+  private void applyBridgeFlag(Intent intent) {
+    if (intent != null && intent.hasExtra(PREF_BRIDGE)) {
+      getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+          .putBoolean(PREF_BRIDGE, intent.getBooleanExtra(PREF_BRIDGE, false)).apply();
+    }
+    boolean enabled = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_BRIDGE, false);
+    if (enabled == bridgeOn) return;
+    bridgeOn = enabled;
+    if (enabled) {
+      web.addJavascriptInterface(new Bridge(), "HomeHQ");
+    } else {
+      web.removeJavascriptInterface("HomeHQ");
+      setBrightness(-1);
+    }
+    Log.i(TAG, "JavaScript bridge " + (enabled ? "on" : "off"));
+    if (web.getUrl() != null) web.reload();
+  }
+
+  /** window.HomeHQ. Methods run on a WebView binder thread, so they post to the UI thread. */
+  private class Bridge {
+    /** 0..1 dims the screen (never below MIN_BRIGHTNESS); a negative value hands it back to the system. */
+    @JavascriptInterface
+    public void setBrightness(final double level) {
+      handler.post(new Runnable() {
+        @Override
+        public void run() {
+          // The WebView can follow links off the dashboard; only the saved dashboard may call in.
+          if (isDestroyed() || !sameOrigin(web.getUrl(), savedUrl())) return;
+          MainActivity.this.setBrightness(level);
+        }
+      });
+    }
+  }
+
+  /** Sets this window's backlight override. It lasts while the kiosk is on screen, never saved. */
+  private void setBrightness(double level) {
+    if (Double.isNaN(level)) return;
+    float value = level < 0 ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        : (float) Math.max(MIN_BRIGHTNESS, Math.min(1, level));
+    WindowManager.LayoutParams lp = getWindow().getAttributes();
+    if (lp.screenBrightness == value) return;
+    lp.screenBrightness = value;
+    getWindow().setAttributes(lp);
+    Log.i(TAG, "Brightness " + (value < 0 ? "system" : String.format(Locale.US, "%.2f", value)));
+  }
+
+  /** Same scheme, host and port; a URL without a port uses its scheme's default. */
+  static boolean sameOrigin(String a, String b) {
+    if (a == null || b == null) return false;
+    Uri x = Uri.parse(a), y = Uri.parse(b);
+    return x.getScheme() != null && x.getScheme().equalsIgnoreCase(y.getScheme())
+        && x.getHost() != null && x.getHost().equalsIgnoreCase(y.getHost())
+        && port(x) == port(y);
+  }
+
+  private static int port(Uri u) {
+    if (u.getPort() != -1) return u.getPort();
+    return "https".equalsIgnoreCase(u.getScheme()) ? 443 : 80;
   }
 
   /** Turns the Home alias on or off. The shell can't enable a component of a release app. */
