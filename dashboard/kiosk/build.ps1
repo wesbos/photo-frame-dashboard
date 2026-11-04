@@ -45,6 +45,13 @@ Run "$bt\d8.bat" (@('--min-api', '23', '--lib', $jar, '--output', 'build') + $cl
 # Add classes.dex to the APK (it is a zip).
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::Open((Resolve-Path build\base.apk), 'Update')
+# aapt2 on Windows names nested assets with backslashes (assets/site\index.html), which Android
+# can't find. Rewrite them with forward slashes.
+foreach ($e in @($zip.Entries | Where-Object { $_.FullName.Contains('\') })) {
+  $n = $zip.CreateEntry($e.FullName.Replace('\', '/'))
+  $in = $e.Open(); $out = $n.Open(); $in.CopyTo($out); $out.Dispose(); $in.Dispose()
+  $e.Delete()
+}
 [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Resolve-Path build\classes.dex), 'classes.dex') | Out-Null
 $zip.Dispose()
 
