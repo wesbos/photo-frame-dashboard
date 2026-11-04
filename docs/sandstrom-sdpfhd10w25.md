@@ -1,11 +1,10 @@
 # Sandstrom SDPFHD10W25 10.1" (Frameo, Currys own brand)
 
-One unit, bought new from Currys (UK). Host: Windows 11, USB, platform-tools 37.0.1. The frame had
-**not** been on Wi-Fi at any point in this record.
+One unit, bought new from Currys (UK). Host: Windows 11, USB, platform-tools 37.0.1. Initial investigation was offline; the later Firefox dashboard test used Wi-Fi.
 
 Status: root ADB over USB with no flash writes. Partitions backed up over ADB; updaters and Frameo
-disabled. All changes are in `/data` and can be undone. **WebView can't render on this firmware**
-(any version; see below), so the Home Assistant app hangs. The working result is **Firefox showing
+disabled. No raw partition or system-file writes were reported. **WebView can't render on this firmware**
+(stock 91 and tested 156; see below), so the Home Assistant app hangs. The working result is **Firefox showing
 the Home Assistant dashboard full screen at boot**, started by a small Home app
 ([`scripts/firefox-home`](../scripts/firefox-home/README.md)).
 
@@ -47,26 +46,22 @@ After the next reboot it was disabled (`enabled="2"`) with Frameo still enabled,
 build never creates a status bar or navigation bar window. That probably explains why no ADB prompt appeared
 earlier.
 
-`/data/misc/adb/adb_keys` holds two keys: this host's, and one with the comment `tobalr@…` that
-was there before. It is probably the factory's. Anyone holding it gets root over USB. Check yours:
+An additional preinstalled key was found in `/data/misc/adb/adb_keys`. Its origin and holder
+were not verified. A holder of an authorized key may obtain root USB access on this build.
 
-```sh
-adb shell "cut -d' ' -f2 /data/misc/adb/adb_keys"
-```
+#### Key-store finding (record, not a removal procedure)
 
-#### Removing the factory key
+Android 12 also stores authorized keys in `/data/misc/adb/adb_temp_keys.xml` (binary XML).
+The contributor observed the extra key in both stores: editing only `adb_keys` did not persist,
+and a normal reboot could restore the framework's cached copy. Removal from both stores and a
+framework restart reportedly retained the owner's access across a full reboot on this unit.
 
-On Android 12, system_server keeps its own keystore in `/data/misc/adb/adb_temp_keys.xml` (binary
-XML) and regenerates `adb_keys` from it. Keys found in `adb_keys` get imported into it, so the
-factory key was in both. Editing only `adb_keys` doesn't last, and a clean reboot lets
-system_server write its in-memory copy back. What worked (after backing up both files):
-
-1. `settings put global adb_allowed_connection_time 0` (see below).
-2. `adb_keys`: `grep -v tobalr@` into a temp file, then `cat` it back over the original. This keeps
-   the owner (`system:shell`), mode and SELinux context.
-3. `adb_temp_keys.xml`: `abx2xml`, `grep -v tobalr@`, `xml2abx`, then `cat` it back the same way.
-4. `kill -9 $(pidof system_server)`. The framework restarts without saving its old keystore.
-   ADB survived the framework restart and a full reboot afterwards, with only the host's key.
+No reusable key-removal tool or independently verified recovery route accompanies this report.
+Do not match keys by their comment or delete an entire line from binary-converted XML. Before
+any key-store change, back up both stores privately, identify the exact key material, preserve
+ownership, mode and SELinux context, and verify a physical Settings/ADB reauthorization route.
+The observation does not establish which keys a different unit has or whether it rejects an
+unknown host key; `ro.adb.secure=1` alone does not prove that.
 
 #### Turn off key expiry before the frame goes online
 
@@ -127,6 +122,9 @@ authorization timeout") keeps keys until they are revoked.
 
 ## Backup (read-only)
 
+**This is a partial backup and does not meet README rule 2 for a verified full-device backup.**
+Do not treat it as authorization for later writes.
+
 Every partition except `userdata` (26 GiB, freshly set up), plus the 36 MiB before `mmcblk0p1`,
 streamed over `adb exec-out dd ... | gzip`. Each was checked three ways: `sha256sum` on the frame, the
 hash of the stream on the host, and a gzip readback, with exact byte counts. `boot_a`,
@@ -142,7 +140,9 @@ unused B slot). No `mmcblk0boot0`/`boot1` hardware partitions are exposed.
 
 ## What was done (owner-approved, in order)
 
-All changes are in `/data`; no partition was written.
+Historical one-unit configuration record, not a setup procedure. These changes wrote app and
+settings data; no raw partition or system-file write was reported. Before reproducing changes,
+meet the README backup rule, confirm the device identity and test the recovery route.
 
 | # | Change | Command | Undo | Result |
 | --- | --- | --- | --- | --- |
@@ -190,7 +190,7 @@ No `apksigner` or Java was on the host, so a short stdlib Python v2 signer (with
 
 ### WebView can't render anything on this firmware
 
-Installing WebView 156 worked, but **no WebView renderer can start on this firmware, with 156 or the
+Installing WebView 156 worked, but **renderers failed with both tested versions, 156 and
 stock 91**. When the Home Assistant app opened its login page, it hung on the logo. Each time, the
 renderer forked from `webview_zygote` aborted at once:
 
@@ -214,8 +214,8 @@ Assistant dashboard full screen at boot, with no taps.
 | # | Change | How | Undo |
 | --- | --- | --- | --- |
 | 7 | Firefox 158.0.2 `armeabi-v7a` | `adb install` from `archive.mozilla.org/pub/fenix/releases/158.0.2/`, SHA-256 `939002048eecad439ab1b81aca8644c842f731bf6f9a0feb03cfcf45d1204013`, signer `CN=Release Engineering, O=Mozilla Corporation`, cert SHA-256 `A7:8B:62:A5:…:9B:04` (same as in [biuframe.md](biuframe.md)). The owner did Firefox's first-run screens (terms) on the panel | `adb uninstall org.mozilla.firefox` |
-| 8 | Boot Home app | [`scripts/firefox-home`](../scripts/firefox-home/README.md), set with `cmd package set-home-activity` | `adb uninstall com.photoframe.firefoxhome` |
-| 9 | Dashboard as a Firefox web app | Firefox **⋮ → More → Add app to Home screen** on the dashboard; the Home app accepts the pinned shortcut and launches it | Uninstall the Home app, or Firefox |
+| 8 | Boot Home app | [`scripts/firefox-home`](../scripts/firefox-home/README.md), set with `cmd package set-home-activity` | [Restore and test another Home first](../scripts/firefox-home/README.md#undo), then uninstall |
+| 9 | Dashboard as a Firefox web app | Firefox **⋮ → More → Add app to Home screen** on the dashboard; the Home app asks before accepting the Firefox pinned shortcut and launches it | Set a different dashboard URL; restore/test another Home before uninstalling either app |
 
 Observations:
 

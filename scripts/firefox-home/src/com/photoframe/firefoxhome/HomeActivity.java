@@ -113,7 +113,7 @@ public final class HomeActivity extends Activity {
         // A web-app shortcut pinned by Firefox (see PinActivity) opens the site full screen.
         String shortcutPackage = prefs().getString("shortcutPackage", null);
         String shortcutId = prefs().getString("shortcutId", null);
-        if (shortcutPackage != null && shortcutId != null) {
+        if (FIREFOX.equals(shortcutPackage) && shortcutId != null) {
             try {
                 getSystemService(LauncherApps.class).startShortcut(
                         shortcutPackage, shortcutId, null, null, Process.myUserHandle());
@@ -122,7 +122,12 @@ public final class HomeActivity extends Activity {
                 // Shortcut removed or Firefox reinstalled: fall through to the URL.
             }
         }
-        Uri uri = Uri.parse(url());
+        String url = url();
+        if (url.isEmpty()) {
+            status.setText("Set a valid http(s) dashboard URL first.");
+            return;
+        }
+        Uri uri = Uri.parse(url);
         // Firefox opens an installed web app (https only) with no toolbar from VIEW_PWA;
         // otherwise fall back to an ordinary Firefox tab, then to any browser.
         if (open(new Intent(VIEW_PWA, uri).setPackage(FIREFOX))) return;
@@ -135,7 +140,7 @@ public final class HomeActivity extends Activity {
         try {
             startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             return true;
-        } catch (ActivityNotFoundException e) {
+        } catch (ActivityNotFoundException | SecurityException e) {
             return false;
         }
     }
@@ -151,15 +156,22 @@ public final class HomeActivity extends Activity {
     }
 
     private boolean hasShortcut() {
-        return prefs().getString("shortcutId", null) != null;
+        return FIREFOX.equals(prefs().getString("shortcutPackage", null))
+                && prefs().getString("shortcutId", null) != null;
     }
 
     private String url() {
-        return prefs().getString("url", "");
+        return UrlPolicy.normalize(prefs().getString("url", ""));
     }
 
     private void saveUrlFromIntent(Intent intent) {
         String url = intent == null ? null : intent.getStringExtra("url");
-        if (url != null) prefs().edit().putString("url", url.trim()).apply();
+        String valid = UrlPolicy.normalize(url);
+        if (valid.isEmpty()) return;
+        SharedPreferences.Editor edit = prefs().edit().putString("url", valid);
+        if (!valid.equals(url())) {
+            edit.remove("shortcutPackage").remove("shortcutId");
+        }
+        edit.apply();
     }
 }

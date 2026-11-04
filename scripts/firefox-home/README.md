@@ -17,7 +17,7 @@ What it does:
   and **Firefox**. Tapping any of them stops the countdown. This is the way back on frames with
   no navigation bar.
 - If Firefox closes or crashes, Android returns to Home and the countdown starts again.
-- It accepts pinned shortcuts (`CONFIRM_PIN_SHORTCUT`). Firefox only offers **Add app to Home
+- It accepts Firefox pinned shortcuts (`CONFIRM_PIN_SHORTCUT`) after on-screen confirmation. Firefox only offers **Add app to Home
   screen** when the default Home app can pin shortcuts. The pinned web-app shortcut is what the
   app launches, so the site opens with no toolbar (`ExternalAppBrowserActivity`).
 - Without a pinned shortcut it falls back to `VIEW_PWA` (https only), then a normal Firefox tab.
@@ -47,13 +47,21 @@ adb shell am start -n com.photoframe.firefoxhome/.HomeActivity --es url https://
 ```
 
 Then open the dashboard in Firefox, log in, and use **⋮ → More → Add app to Home screen**. A
-toast says the shortcut was saved. A dashboard served over plain `http` can't be a Firefox web
+confirmation asks whether to replace the dashboard, then a toast confirms it was saved. A dashboard served over plain `http` can't be a Firefox web
 app; it opens in a normal tab with the toolbar.
 
+Only `http` and `https` URLs with a host are accepted. Invalid values leave the saved URL
+unchanged. Setting a different URL clears the old pinned shortcut.
+
 ## Undo
+
+Before uninstalling, re-enable and select a known working replacement Home app. On the tested
+Sandstrom that was Frameo (`net.frameo.frame/.ui.activities.AWaitForDeferredInitCompleted`).
+Confirm Home opens it and that you can still reach Android Settings physically; keep USB ADB
+connected while checking. Do not rely on `com.android.settings/.FallbackHome`, which is not a
+usable launcher. Only then uninstall:
 
 ```sh
 adb uninstall com.photoframe.firefoxhome
 ```
 
-Android then falls back to another Home app, or shows the chooser.
