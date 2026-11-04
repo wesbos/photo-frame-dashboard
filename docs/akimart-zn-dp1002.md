@@ -192,6 +192,43 @@ a 100 ms pause finished it, and all 16 regions matched independent device reads.
 37.0.1 on a rear motherboard USB port worked; earlier attempts through a front case port and a hub
 were unreliable. The causes were not isolated.
 
+#### Sleep and touch-responsive night view (2026-10-26–27)
+
+Further observations on that Windows owner's unit, with the same firmware and shipped
+`gslX680-d708` touchscreen. These are one-unit results, not a generic sleep/wake procedure.
+
+- **True sleep did not wake on touch.** After Frameo was disabled, the owner tried touch and
+  double-tap; neither woke the display. A short press of the rear power button did. Automatic
+  alarm-driven wake also worked, but does not establish touch-to-wake support.
+- **Scheduling without Frameo worked.** A separate local native companion used Android RTC wake
+  alarms and the board's shipped `su 0` with fixed sleep/wake key events. Short automatic trials
+  passed before and after disabling Frameo. An already-armed wake alarm also started a new
+  companion process after only its verified idle process had been terminated during sleep;
+  this was not Android's package force-stop, which cancels alarms. Boot and clock-change
+  receivers restored the schedule after a normal reboot without manually opening the companion.
+- **A native black view kept touch available.** A locally modified Home HQ kept the display
+  awake at minimum per-window brightness, hid its floating navigation controls and paused its
+  WebView timers. Actual backlight changed from 179 to 20 while stored daytime brightness stayed
+  179. Leaving that window restored actual brightness to 179 and WebView timers resumed. The
+  owner confirmed that one tap returned to the dashboard. This is a dim, awake screen, not true
+  sleep; faint backlight glow remained and was accepted. These values are this unit's backlight
+  readings, not percentages or measurements of electrical power.
+- **Overnight evidence is limited but positive.** For the first scheduled dim/return cycle on
+  2026-10-27, the companion journal recorded both commands succeeding and Android alarm statistics
+  independently recorded both deliveries. A later read found the dashboard foreground at normal
+  brightness with uptime spanning both actions. The display was not continuously observed
+  overnight. This does not prove an overnight true-sleep/Doze cycle.
+- **Recovery was checked by hand.** Home HQ stayed the default Home app, Frameo and both vendor
+  updaters stayed disabled after reboot, and their APKs/data were retained. The owner verified the
+  fallback launcher, Android Settings → installed apps, and floating Dashboard return.
+
+The companion and modified kiosk above were local builds; this report does not add their source
+or claim that the stock kiosk has these features. No kernel, touchscreen-driver or firmware
+partition changes were needed. Actual power consumption, cold power loss and a full weekend
+schedule remain unverified. To undo the local schedule, restore Frameo's recorded package state
+and open it to re-register its own schedule before disabling the replacement scheduler; keep a
+working Home/Settings route throughout.
+
 ## Third unit: moonka ZN-DP1002 (2026-10-22, Linux)
 
 A third owner's frame, from Amazon US, with Frameo's About screen reading **`moonka ZN-DP1002`**.
