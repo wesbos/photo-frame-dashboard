@@ -249,6 +249,10 @@ adb shell am start -n com.wesbos.homehq/.MainActivity
 Seen on an Android 6 Runxion (WebView 107). Changing the zone in Android Settings has not been
 compared.
 
+The hosted demo sets its own clock to 3:18 PM each time it loads (`App.setTime(15, 18)` in
+`dashboard/js/app.js`), so it can show the wrong time on a frame whose clock is right. Press and
+hold the sidebar clock, then tap **Real time** in Demo controls.
+
 ## Build and install
 
 Host-only navigation regression checks need Python 3 and a JDK on `PATH`:
