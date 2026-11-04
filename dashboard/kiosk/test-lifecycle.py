@@ -33,6 +33,7 @@ MEMBERS = "\n".join(member(marker) for marker in (
     "  private final Runnable stall =",
     "  private final BroadcastReceiver networkChange =",
     "      public void onReceivedError(WebView view, int code, String desc, String failingUrl)",
+    "      public void onReceivedHttpError(WebView view, WebResourceRequest req, WebResourceResponse res)",
     "      public void onReceivedSslError(WebView view, SslErrorHandler h, SslError error)",
     "  protected void onResume()",
     "  protected void onPause()",
@@ -89,6 +90,15 @@ class Thread {
 class SystemClock { static long elapsedRealtime() { return 0; }}
 class Log { static void i(String t, String m) {} static void w(String t, String m) {} }
 class Label { void setText(String s) {} }
+class WebResourceRequest {
+  final boolean main; WebResourceRequest(boolean main) { this.main=main; }
+  boolean isForMainFrame() { return main; }
+  String getUrl() { return "https://example.invalid/dashboard"; }
+}
+class WebResourceResponse {
+  final int status; WebResourceResponse(int status) { this.status=status; }
+  int getStatusCode() { return status; }
+}
 class SslErrorHandler { boolean cancelled; void cancel() { cancelled=true; } }
 class SslError {
   static final int SSL_NOTYETVALID=1, SSL_EXPIRED=2, SSL_DATE_INVALID=3;
@@ -117,6 +127,22 @@ public class MainActivity extends Activity {
   void leavePortal() { left++; } void openPortal() { opened++; } void setOfflineText() {}
 __MEMBERS__
   public static void test() {
+    MainActivity http=new MainActivity();
+    http.onReceivedHttpError(http.web, new WebResourceRequest(false), new WebResourceResponse(503));
+    http.onReceivedHttpError(http.web, new WebResourceRequest(true), new WebResourceResponse(404));
+    http.onReceivedHttpError(http.web, new WebResourceRequest(true), new WebResourceResponse(600));
+    LifecycleHarness.check(!http.retryPending && !http.pageFailed && http.handler.tasks.isEmpty(),
+        "subresource and non-5xx responses do not retry the dashboard");
+    http.onReceivedHttpError(http.web, new WebResourceRequest(true), new WebResourceResponse(503));
+    LifecycleHarness.check(http.retryPending && http.pageFailed && http.handler.tasks.isEmpty()
+        && "https://example.invalid/dashboard".equals(http.retryUrl),
+        "paused HTTP 5xx retains the failing main URL without starting retry");
+    http.offline.visibility=View.VISIBLE; http.onResume(); http.handler.runNext();
+    LifecycleHarness.check(http.loads==1 && !http.retryPending,
+        "pending HTTP 5xx recovery runs on resume");
+    http.onReceivedHttpError(http.web, new WebResourceRequest(true), new WebResourceResponse(500));
+    LifecycleHarness.check(http.retryPending && http.handler.tasks.contains(http.retry),
+        "visible HTTP 5xx schedules recovery");
     MainActivity a=new MainActivity();
     a.onResume();
     LifecycleHarness.check(!a.web.paused && !a.web.timersPaused && NavigationService.visible,

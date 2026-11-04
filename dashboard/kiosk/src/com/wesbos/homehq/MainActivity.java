@@ -261,7 +261,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(retry);
         handler.removeCallbacks(stall);
         retryPending = true;
-        handler.postDelayed(retry, RETRY_MS);
+        if (resumed) handler.postDelayed(retry, RETRY_MS);
       }
 
       @Override
