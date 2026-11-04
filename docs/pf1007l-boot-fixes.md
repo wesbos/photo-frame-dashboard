@@ -61,6 +61,7 @@ October 2026, on a 2 A wall supply:
 - Observed: a TP-Link Deco (#190) and an Orange Livebox 6
   ([Linux hotspot report](pf1007l-linux-20260416-hotspot-report.md#boot-fixes)) did not answer NTP;
   `NTP_SERVER=time.google.com` worked there and on #137, #164 and #172.
+- Observed on a second `20260529` unit (macOS, [report](pf1007l-macos-uk-20260519-20260529-report.md#unit-2-cpu-clock-during-the-backup-and-the-wi-fi-start-freeze)): before the fixes, 3 of 6 boots froze, on a powered dock's USB 2 hub port; each logged freeze ended at `Start app: 00130009, 4`, the AIC8800 calibration firmware start, at 27.7 s and 43.5 s. One boot from a direct Mac port passed the same line. With `WIFI_DEFER=1` and `POWER_FIX=0`, the first boot (direct Mac port) reached the kiosk, started Wi-Fi at 42 s and passed `verify`; not yet tested on the dock port.
 - Guess: the Wi-Fi start freeze is a power problem (current spike with no battery), not a driver
   bug. The kernel log ends at different points of the Wi-Fi start, and the frame survived the
   same start when it ran after boot.
