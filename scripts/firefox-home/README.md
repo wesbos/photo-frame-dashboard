@@ -35,6 +35,18 @@ JAVA_HOME=/path/to/jdk-17 bash scripts/firefox-home/build.sh
 Output goes to the ignored `diagnostics/firefox-home/firefox-home.apk`, with its signing key
 beside it. Keep the key to install updates over the top. The script never touches a frame.
 
+## Test URL handling
+
+With Python 3 and JDK 17 (`java` and `javac` on `PATH`), run from the repository root:
+
+```sh
+python3 scripts/firefox-home/test-url-policy.py
+```
+
+This checks the actual URL policy and saved URL/pin transitions against small host fakes.
+It needs no Android SDK, network or frame, and removes its temporary compiled output.
+It does not test Firefox launches or the on-screen shortcut confirmation.
+
 ## Install and set up
 
 Follow the repository's rules first: identify the device, verify a backup and get the owner's
