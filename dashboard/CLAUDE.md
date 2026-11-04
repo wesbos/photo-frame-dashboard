@@ -85,13 +85,28 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
   TTS engine sideloading** — go straight to pre-recorded clips (see `reading.js`).
 - **No RTC battery.** The system clock resets to a stale default on every power loss. This
   breaks anything date-relative (holiday countdown, "today" itself, garbage/recycling schedule)
-  until fixed. Fix after each reboot:
-  ```sh
-  adb shell su -c "date @$(date +%s)"
-  ```
-  This device's toybox `date` has no `-s` flag; `date @<unixtime>` is the correct SET syntax. The
-  real fix is Wi-Fi + NTP sync so Android corrects itself automatically — not yet set up on this
-  frame (see FRAME-TODO.md).
+  until fixed. This device's toybox `date` has no `-s` flag; `date @<unixtime>` is the correct
+  SET syntax — **but `adb shell su -c "date @$(date +%s)"` (the command this doc previously had)
+  is WRONG and sets the clock 3-4 hours fast** (AST/ADT offset, 4h or 3h depending on DST). Its
+  bug: this device's `date @<epoch>` reads the epoch number directly as the local wall-clock
+  time (not UTC-then-converted), so feeding it the real UTC-correct epoch overshoots by the
+  local UTC offset. Verified by setting the device to a known epoch (`946684800` = exactly
+  2000-01-01 00:00:00 UTC) and observing it displayed `00:00:00 AST` — i.e. it treated the UTC
+  epoch as if it were already local time, then still computed its own UTC as local+4h on top of
+  that, landing 4h into the future. Correct fix — feed it (real epoch + local UTC offset), not
+  the real epoch itself. Use `scripts/fix-frame-clock.sh` (re-derives the offset from `date +%z`
+  each run, so it stays correct across DST). Always verify with `adb shell date` afterward
+  against a real clock — don't just check that the date changed at all, check the actual hour is
+  right. The real fix is Wi-Fi + NTP sync so Android corrects itself automatically — not yet set
+  up on this frame (see FRAME-TODO.md).
+- **`App.now()` (in `app.js`) is the single source of truth for "now" everywhere in the app** —
+  never call `new Date()` directly in a view. It used to always start in a hardcoded demo mode
+  (`App.setTime(15, 18)` on every boot, from upstream's demo scaffolding) that silently
+  overrode the real device clock with a fixed 3:18 PM, drifting forward from there — this is
+  why the clock looked "stuck" or wrong for an entire session even after the device's own clock
+  was correctly fixed. Removed; `App.now()` now reflects real time by default (`offset` stays
+  `0` unless the demo-controls panel's `App.setTime(h, m)` is used to preview a different time,
+  which still works — see `system.js`).
 - **Bundled-APK mode has no server.** `KIOSK_SITE` build serves the dist folder from
   `http://127.0.0.1:8765/` inside the APK itself.
 - **`App.isFamily(e)` checks `e.people.length >= D.people.length`** (currently 4) — an event

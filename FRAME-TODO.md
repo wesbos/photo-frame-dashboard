@@ -81,13 +81,25 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
   arrives: add the words to `felixSpelling.themes` in `family-data.js`, generate audio for any
   new ones with `scripts/gen-reading-audio.sh "<word>" <slug>` (check for accent-slug collisions
   against the existing 1135-entry map first), add each to `CLIPS` in `js/reading.js`.
-- **No RTC battery — clock resets on every power loss.** Breaks anything date-relative. Manual
-  fix after every reboot/power event:
-  ```sh
-  adb shell su -c "date @$(date +%s)"
-  ```
-  **Real fix, not yet done:** get the frame onto Wi-Fi so Android syncs time via NTP
-  automatically on boot. Frame's Wi-Fi state was last seen as "DISCONNECTED" — needs onboarding.
+- **No RTC battery — clock resets on every power loss.** Breaks anything date-relative. The
+  manual fix command previously documented here was **wrong and set the clock 3-4 hours fast**
+  — see the corrected command and the full explanation in `dashboard/CLAUDE.md`'s "No RTC
+  battery" section. Always verify with `adb shell date` against a real clock after running it,
+  not just that the date moved. **Real fix, not yet done:** get the frame onto Wi-Fi so Android
+  syncs time via NTP automatically on boot. Frame's Wi-Fi state was last seen as "DISCONNECTED"
+  — needs onboarding.
+- **The home screen's clock used to always start at a fake hardcoded 3:18 PM** on every app
+  launch (upstream demo scaffolding — `App.setTime(15, 18)` in `app.js`'s boot sequence,
+  unconditionally overriding the real device clock), drifting forward from there rather than
+  tracking real time. This is why the dashboard appeared to show the wrong time throughout
+  earlier sessions even after the device clock itself was corrected. Removed — the clock now
+  reflects real time by default.
+- **Home page + screensaver (ambient/night mode) are now fully translated to French** — day/
+  month names, weather summaries/labels, "next up"/"leave in"/chores/shopping/home-status
+  copy, photo captions ("Ce jour-là · il y a N ans"), and the night-mode countdown. Remaining
+  English on the frame is scoped to the Tâches/Calendrier/other non-home views and the demo
+  event/task data itself (e.g. "Lunch with Sam", "Dentist") — not yet in scope, only the home
+  page and screensaver were requested.
 - **Deployed to the physical frame (2026-11-04).** Full rebuild through the homework feature is
   installed and running on the connected KPKUE frame (`4NAY7EM2BE`), clock re-synced. Verified
   on-device: home view renders with live weather/events, Clara's and Félix's homework reviews

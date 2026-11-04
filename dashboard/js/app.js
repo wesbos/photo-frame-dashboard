@@ -26,9 +26,9 @@
   App.sameDay = function (a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); };
   App.isNight = function () { var h = App.now().getHours(); return h >= 22 || h < 6; };
 
-  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  var MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+  var DAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  var MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+  var MON_SHORT = ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
   App.fmt = {
     time: function (d, ampm) {
       var h = d.getHours(), m = d.getMinutes();
@@ -53,13 +53,13 @@
       m = Math.max(0, Math.round(m));
       if (m < 60) return m + ' min';
       var h = Math.floor(m / 60), r = m % 60;
-      return h + ' hr' + (r ? ' ' + r + ' min' : '');
+      return h + ' h' + (r ? ' ' + r + ' min' : '');
     },
     rel: function (d) {
       var t = App.dayStart(App.now()), x = App.dayStart(d), diff = Math.round((x - t) / 864e5);
-      if (diff === 0) return 'Today';
-      if (diff === 1) return 'Tomorrow';
-      if (diff === -1) return 'Yesterday';
+      if (diff === 0) return 'Aujourd’hui';
+      if (diff === 1) return 'Demain';
+      if (diff === -1) return 'Hier';
       return DAYS[d.getDay()];
     }
   };
@@ -135,17 +135,17 @@
     var summary, advice;
     if (rainAt === h) {
       var stop = h; while (stop < 24 && W.p[stop] >= 50) stop++;
-      summary = 'Rain until ' + App.fmt.hour(new Date(2000, 0, 1, stop));
-      advice = 'Umbrella weather';
+      summary = 'Pluie jusqu’à ' + App.fmt.hour(new Date(2000, 0, 1, stop));
+      advice = 'Prévoir un parapluie';
     } else if (rainAt > -1) {
-      summary = 'Rain from ' + App.fmt.hour(new Date(2000, 0, 1, rainAt));
-      var soccer = App.timedOn(App.now()).filter(function (e) { return /soccer/i.test(e.title) && e.start > App.now(); })[0];
-      advice = soccer ? 'Pack a rain jacket for soccer' : 'Grab a rain jacket';
+      summary = 'Pluie à partir de ' + App.fmt.hour(new Date(2000, 0, 1, rainAt));
+      var soccer = App.timedOn(App.now()).filter(function (e) { return /soccer|soccer practice/i.test(e.title) && e.start > App.now(); })[0];
+      advice = soccer ? 'Prévoir un manteau de pluie pour le soccer' : 'Prendre un manteau de pluie';
     } else {
-      summary = W.t[h] < 12 ? 'Clear and cool' : 'Dry all day';
-      advice = W.t[h] < 12 ? 'Jacket weather' : 'Light layers';
+      summary = W.t[h] < 12 ? 'Clair et frais' : 'Sec toute la journée';
+      advice = W.t[h] < 12 ? 'Prévoir un manteau' : 'Vêtements légers';
     }
-    var labels = { sun: 'Sunny', moon: 'Clear', partly: 'Partly cloudy', cloud: 'Overcast', rain: 'Rain' };
+    var labels = { sun: 'Ensoleillé', moon: 'Dégagé', partly: 'Partiellement nuageux', cloud: 'Nuageux', rain: 'Pluie' };
     return { temp: W.t[h], cond: W.c[h], label: labels[W.c[h]], hi: W.hi, lo: W.lo, summary: summary, advice: advice, hour: h };
   };
   App.hourly = function (count) {
@@ -340,7 +340,6 @@
 
   // ------------------------------------------------------------ boot
   App.start = function () {
-    App.setTime(15, 18); // demo default: a busy weekday afternoon
     fit();
     window.addEventListener('resize', fit);
     // Switch tabs the instant a finger lands (pointerdown), not on release. Keyboard "clicks"

@@ -384,9 +384,9 @@ window.DATA = (function () {
 
   // ---------------------------------------------------------------- chores
   var routines = [
-    { id: 'morning', name: 'Morning', range: '6 – 11 AM', from: 0, to: 11 },
-    { id: 'after', name: 'After school', range: '11 AM – 5 PM', from: 11, to: 17 },
-    { id: 'evening', name: 'Evening', range: '5 – 10 PM', from: 17, to: 24 }
+    { id: 'morning', name: 'Matin', range: '6 h – 11 h', from: 0, to: 11 },
+    { id: 'after', name: 'Après l’école', range: '11 h – 17 h', from: 11, to: 17 },
+    { id: 'evening', name: 'Soir', range: '17 h – 22 h', from: 17, to: 24 }
   ];
   var cid = 0;
   function chore(r, who, title, emoji, stars, done, extra) {
