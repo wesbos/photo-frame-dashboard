@@ -81,8 +81,8 @@ Two cards were used, in this order. Both use the same three-file layout.
 
 | Run | Writes on the frame | Result on this unit |
 | --- | --- | --- |
-| Probe | The probe script only writes `mi86-probe.txt` and `mi86-probe.done` on the card, but the vendor trigger changes `adb_keys` and restarts `adbd` before it runs (below) | `uid=0(root) gid=0(root) context=u:r:toolbox:s0` |
-| ADB enable | Replaces `/data/misc/adb/adb_keys`, sets `service.adb.tcp.port` and `persist.adb.tcp.port` to `5555`, restarts `adbd` | Authenticated `adb` on TCP 5555. Shell uid 2000. A root command in that session returned uid 0, context `u:r:toolbox:s0`. The exact root command was not saved |
+| Probe | The vendor trigger appends to `/data/misc/adb/adb_keys`, changes its mode/ownership, and restarts `adbd`. The probe body only reads device state and writes `mi86-probe.txt` and `mi86-probe.done` on the card | `uid=0(root) gid=0(root) context=u:r:toolbox:s0` |
+| ADB enable | The same vendor trigger runs first. The enabler then replaces `/data/misc/adb/adb_keys`, sets `service.adb.tcp.port` and `persist.adb.tcp.port` to `5555`, and restarts `adbd` | Authenticated `adb` on TCP 5555. Shell uid 2000. A root command in that session returned uid 0, context `u:r:toolbox:s0`. The exact root command was not saved |
 
 The first ADB script (the one that looked for a standalone `base64` command) also ran as root,
 then stopped before it replaced the key file or set either port. Section 6 is the script that
@@ -93,6 +93,11 @@ Frameo itself, on card insertion, already runs a root command that appends one l
 `chown system:shell`, then `adbd` is restarted. The card script drops lines with that comma
 prefix and keeps the original bytes on the card for undo. The public key and the hostname comment
 inside it stay in the private log.
+
+**Obtain the owner's approval before every insertion of a prepared card, including probe
+and repeat runs.** The script's done marker and the enabler's identity guard do not prevent
+the vendor trigger's earlier writes or ADB restart. The enabler's snapshot is taken after
+that trigger; it cannot recover the key state from before the first insertion.
 
 No factory reset was done. At the end of the SD-card work, Frameo was left in place and there
 was no partition backup. The later backup and application replacement are recorded in sections
@@ -165,9 +170,10 @@ Keep the card out of a running frame while preparing it. Use only the matched MI
 
 The probe is [`scripts/dromart-mi86/probe.sh`](../scripts/dromart-mi86/probe.sh)
 (1,270 bytes, SHA-256 `421ffd9c25a9ecb74a2fcf7cafbe31bcaff537d38bf73fcadf2f8d8927913c62`).
-It records `id`, a short property list, the path of `su`, and SELinux. It does not call `su`,
-does not start ADB, and does not change a setting. `mi86-probe.done` makes a second insertion
-leave the first log alone.
+Its body records `id`, a short property list, the path of `su`, and SELinux, without calling
+`su` or changing device settings. **Inserting its card still causes the vendor's frame
+writes and ADB restart described in section 3.** `mi86-probe.done` preserves the first log;
+it does not suppress the vendor trigger on another insertion.
 
 Stage a directory (this does not touch a card):
 
@@ -175,20 +181,30 @@ Stage a directory (this does not touch a card):
 python3 -I scripts/dromart-mi86/prepare_card.py --mode probe --out ./mi86-card
 ```
 
-Use a FAT32 card with no other utility payload. You can stage directly to its mounted root by
-passing that real path as `--out`; this writes ordinary files only and never formats a disk.
-The tool refuses symlink destinations and unrelated files in `Frameo_utilities`. It finishes the
-APK build first, verifies each published file, and writes the trigger config last. On publication
-failure it leaves the config absent. Do not insert a card after any staging error.
+To prepare the FAT32 card itself, use the same tool with its mount point as `--out` so
+destination checks and readback also cover the card. Check there is one APK and eject from
+Finder:
 
-If copying a successfully staged folder instead, keep the card out of the frame: remove its old
-`Frameo_utilities/frameo_utilities.config`, copy the script, APK and public-key directory first,
-compare their bytes against the staged files, and copy the config last. Check that exactly one
-APK is present and that no macOS `._` AppleDouble files were copied. Preserve private logs and
-recovery snapshots separately. Eject the completed card before use.
+```sh
+python3 -I scripts/dromart-mi86/prepare_card.py --mode probe --out "<card-mount-point>"
+find "<card-mount-point>/Frameo_utilities" -name '*.apk' -o -name '._*'
+```
 
-After approval, boot Frameo, open Settings, insert the card, wait for the task, tap **COMPLETE TASK**,
-shut the frame down, and read the card on the computer.
+Replace `<card-mount-point>` with the mounted card's location before running these commands.
+The preparer refuses existing payload/config/APK/public-key entries, including dangling
+symlinks, unless `--replace` is explicit. Inspect existing files before choosing replacement.
+Linked output or managed directories are always refused; explicit replacement replaces leaf
+links without touching their targets. Recovery snapshots, logs and unrelated files remain.
+APK building and validation happen privately before publication. Build failure leaves the
+previous output unchanged. Publication first disarms the config, reads back the bundle, and
+arms the config last; publication failure leaves it disarmed. A disarm failure requires manual
+inspection: do not insert the card. These host checks have not been rerun on the frame.
+Unrelated or AppleDouble files inside `Frameo_utilities` are refused even with `--replace`;
+preserve those elsewhere before staging. Keep the card out of the frame while preparing it.
+
+After obtaining approval for the vendor key-file write and ADB restart, boot Frameo, open
+Settings, insert the card, wait for the task, tap **COMPLETE TASK**, shut the frame down, and
+read the card on the computer.
 
 | `mi86-probe.txt` | Meaning |
 | --- | --- |
@@ -210,6 +226,8 @@ the fingerprint still matches. The enabler also enforces the exact fingerprint f
 a failed property read, empty value or mismatch aborts before taking a device snapshot,
 staging key files, changing properties or restarting ADB. There is no override. Rejection can
 still create the card's `started` marker and `result.txt`; inspect that result before retrying.
+The vendor trigger already changed the key file and restarted ADB before the enabler's guard
+runs; rejection only prevents the enabler's own device changes.
 
 The script is [`scripts/dromart-mi86/enable-adb.sh`](../scripts/dromart-mi86/enable-adb.sh)
 (16,867 bytes, SHA-256 `c29e93a0718cf62d1b543500f3d75b487ada31755707158decd8ada4698dfff5`).
@@ -241,16 +259,14 @@ Put the computer's **public** key on the card. `~/.android/adbkey` stays on the 
 
 ```sh
 python3 -I scripts/dromart-mi86/prepare_card.py --mode adb --replace \
-  --pubkey "$HOME/.android/adbkey.pub" --out ./mi86-card
+  --pubkey "$HOME/.android/adbkey.pub" --out "<card-mount-point>"
 ```
 
-`--replace` explicitly replaces the known script, utility APK, config and supplied public key;
-existing recovery snapshots are preserved. Symlinks and unrelated utility files are refused even
-with this option. The old trigger is removed before publication and the new config is written
-last, after readback checks. Copy to the card in the order described for the probe, or stage
-directly to its mounted root. The private key must not be on the card. Eject, boot Frameo,
-open Settings, insert the card, wait for the task, tap **COMPLETE TASK**, and leave the frame on
-Wi-Fi.
+`--replace` explicitly replaces the payload, config, utility APK and public-key entries with
+the safeguards in section 5. It preserves existing run markers and undo snapshots. The private
+key must not be on the card. Check the card's APK count, eject, and obtain approval for this
+insertion's vendor and enabler writes. Then boot Frameo, open Settings, insert the card, wait
+for the task, tap **COMPLETE TASK**, and leave the frame on Wi-Fi.
 
 Error 1103 means the shell line exited non-zero. On the first enabler that was the `base64`
 failure, and the key file was untouched. Shut down, read `mi86-adb-v2/result.txt`, and keep the
@@ -333,6 +349,15 @@ return `adbd` to its saved running/stopped state. Verify bytes, metadata and pro
 restoration. A `ROLLBACK FAILED` result requires the retained snapshot for manual recovery;
 do not treat it as successful undo.
 
+Before each **manual undo write or deletion**, compare the current target with your recorded
+post-enabler state: exact key bytes, size, type, numeric ownership, mode and SELinux label,
+including an expected absent file, plus both port properties and daemon state. Recheck
+immediately before changing it. Stop if that record is missing or the current state differs;
+do not overwrite later key additions or assume a reboot left runtime properties unchanged.
+Keep the pre-enabler snapshot separate from this expected-current-state record. After each
+restoration, read back and compare the restored state with the selected snapshot. This manual
+procedure does not change the enabler's automatic failure rollback.
+
 ## 8. Verified after access
 
 Later checks on the same unit, 2026-10-28:
@@ -346,7 +371,7 @@ Later checks on the same unit, 2026-10-28:
 | Display | 1280×800 at density 160; framebuffer native mode 800×1280 |
 | Vendor layout | `/vendor` links to `/system/vendor`; no separate vendor partition |
 | Network ADB after reboot | Reconnected using the same authorized computer key; `ro.adb.secure=1`, `persist.adb.tcp.port=5555`, root still worked. Runtime `service.adb.tcp.port` was empty after boot, while ADB listened using the persistent setting |
-| Firmware backup | **Partial: excludes userdata and does not meet the full-device backup rule.** Captured the eMMC prefix through the start of userdata, 1,600,126,976 bytes. Exact length, SHA-256 and gzip readback passed; no aligned `0xCC` filler. Boot, recovery and other static regions matched independent reads |
+| Partial firmware backup | Captured the eMMC prefix through the start of userdata, 1,600,126,976 bytes. This excludes userdata and RPMB and does not meet the full-device backup rule. Exact length, SHA-256 and gzip readback passed; no aligned `0xCC` filler. Boot, recovery and other static regions matched independent reads |
 | Live-system caveat | The first system capture had changing ext4 journal/counters and SuperSU inode timestamps. File contents matched. A later complete 1,207,959,552-byte system image, with the `daemonsu` init restart loop stopped and system read-only, matched full-partition hashes before and after transfer |
 | Frameo backup | Factory and updated APKs, native libraries, original WebView, shared photo paths, settings snapshots and complete Frameo private data backed up. Static files matched independent live reads; every private regular file matched an independent read |
 | Recovery / restore | USB Loader/Maskrom access and raw partition restoration remain untested. No bootloader, kernel, boot, recovery or resource image was written |
@@ -454,27 +479,65 @@ and a physical Settings route, and save the current Home selection plus a read-o
 to restore over a running Package Manager. The helper refuses a different fingerprint and
 requires UID 1000 for `set` and `clear`; root UID 0 can only `inspect`.
 
-**Device invocation remains a record, not a ready-to-run procedure.** The published helper's
-`set` and especially `clear` path have not been tested on this frame. Do not execute a jar as root
-or UID 1000 from shell-writable `/data/local/tmp`, even after a separate comparison: another
-process can replace it between the comparison and execution.
+Replace `<adb-target>` with the selected ADB device. Use the checked
+[host runner](../scripts/dromart-mi86/run_home.py) for every helper operation:
 
-A future device runner must create a fresh root-owned directory that shell cannot modify, copy
-the verified jar into it, set permissions allowing UID 1000 to read but not replace it, and compare
-a binary readback from that protected location. A failed comparison must prevent execution.
-It must enforce the selected device and firmware, retain a working physical Settings route, and
-verify both the immediate Home resolution and the asynchronously saved preference before reboot.
+```sh
+python3 scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build inspect
+```
 
-On the observed earlier helper, `set` required an enabled Home HQ `.Home` candidate. The preference
-appeared in `persistent-preferred-activities` in `/data/system/users/0/package-restrictions.xml`
-after about 10 seconds. Clearing requests Package Manager to remove Home HQ's persistent entry;
-a successful return alone does not prove the XML was saved. Ordinary Home preferences can still
-resolve to Home HQ afterward. Never replace Package Manager's live XML with a snapshot.
+Even `inspect` writes staging files and needs approval for those writes. The runner verifies
+the source/artifact manifest and exact firmware fingerprint before staging. The upload under
+`/data/local/tmp` is untrusted and is never executed. Root copies it into a fresh private
+directory directly under `/data`, then compares binary readback from that protected copy with
+the validated local bytes. The final directory is root:system `0750` and its jar is root:system
+`0640`; shell cannot write either or their checked ancestry. Every failed copy, comparison,
+permission check or remote completion check prevents execution. A fresh completion suffix
+also detects remote failure on older ADB clients that return zero for failed shell commands.
+Only the protected jar becomes `CLASSPATH`, as root for `inspect` or UID 1000 for `set`/`clear`.
+Cleanup removes only the invocation's upload/jar/directory and reports failures. Keep any
+reported cleanup path private. The runner is host-tested; protected staging has not been
+verified on hardware. The existing Java fingerprint and UID guards are unchanged.
+
+Install and configure Home HQ using the [kiosk guide](../dashboard/kiosk/README.md). Enable its
+Home alias and native Menu button:
+
+```sh
+adb -s "<adb-target>" shell am start -n com.wesbos.homehq/.MainActivity --ez home true --ez menu_button true
+```
+
+Physically verify Menu → Android settings → Apps and the Dashboard return before continuing.
+Then set the persistent preference:
+
+```sh
+python3 scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build set
+```
+
+`set` requires `.Home` to be an enabled Home candidate and checks immediate Home resolution.
+Package settings are saved asynchronously: wait for the saved XML's
+`persistent-preferred-activities` section to contain `com.wesbos.homehq/.Home` before rebooting.
+The observed save delay was 10 seconds. If a check fails, keep the existing access route and
+stop before disabling or removing anything. Reboot with Frameo reversibly disabled and
+verify automatic dashboard startup, authenticated ADB, root and physical navigation before
+removing Frameo's backed-up code.
+
+Undo the persistent preference before changing the default Home or uninstalling Home HQ:
+
+```sh
+python3 scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build clear
+```
+
+After the asynchronous save, verify that Home HQ's persistent entry is absent from the XML.
+`clear` requests removal through Package Manager; its return alone does not verify the saved
+file. Home resolution can still be Home HQ through an ordinary preference, so a resolved Home
+of Home HQ is not proof that persistent clear failed. Choose the replacement in Android's
+Home UI and check it after reboot. Do not edit global package XML to force a selection.
 
 Keep Frameo reversibly installed and retain authenticated ADB while testing a replacement Home.
-The report's successful removal with an earlier helper does not establish the published helper's
-undo path. Prove that clear, selection of the alternate Home, reboot, ADB and physical Settings
-navigation all work on the unit before removing any working Home app.
+The report's successful removal with an earlier helper does not establish this helper's undo
+path. Prove that clear, selection of an alternate Home, reboot, ADB and physical Settings
+navigation work on the unit before removing any working Home app. The commands above are
+host-tested examples; they do not establish hardware validation of this revision.
 
 ## 12. Restoring Frameo and the original WebView
 
@@ -482,6 +545,8 @@ This is an untested restoration plan, **not a ready-to-run recovery procedure**.
 own verified pre-change backups. Those contain vendor binaries and private data and are not
 distributed here. Raw partition restoration, USB Loader/Maskrom access and recovery from a
 damaged early boot chain remain untested. No raw image writer is supplied by this PR.
+The recorded firmware backup is partial: its prefix excludes userdata and RPMB. File-level
+app backups supplement it but do not make a complete device image or prove full-device recovery.
 
 ### Required backup contents
 
@@ -512,12 +577,26 @@ locations, preserve a backup of the state being replaced, verify readback and en
 returns read-only on every exit path. The following order describes dependencies, not permission
 to bypass those checks.
 
+Also retain a separate **post-replacement current-state inventory** of every restore target:
+exact paths, regular-file sizes/hashes, symlink targets, directory/special-file types, numeric
+owners/groups, modes, SELinux labels, and explicit expected absences. Immediately before each
+manual overwrite, extraction or deletion, reread and compare the target and relevant parent
+types against that record. Stop on a missing record, unknown file, unexpected link or other
+mismatch. Verifying the backup alone does not authorize overwriting changed current contents.
+Quiesce affected apps during comparison and restoration, and retain the current-state snapshot
+privately for undoing the restoration attempt. Reboot/package registration can create files or
+change UIDs: record and verify that transition before using it as the next step's baseline.
+
+### Restore order
+
 1. **Preserve current access.** Confirm identity, authenticated ADB/root and working physical
    Home HQ Menu/Settings/Dashboard navigation. Verify the selected backup's identity, file
    inventory, hashes and metadata. Keep Home HQ, its persistent preference and WebView 106
-   available until Frameo works. Stop at any mismatch; obtain missing backups before writing.
+   available until Frameo works. Verify the post-replacement inventory too. Stop at any mismatch
+   or missing expected-current-state evidence before writing.
 2. **Restore Frameo code.** As root, restore the complete factory directory and the saved
-   updated code directory from the verified backup, preserving their recorded metadata.
+   updated code directory from the verified backup, preserving their recorded metadata. First
+   compare each current directory/file or expected absence against the post-replacement record.
    Remount `/system` writable only for its file restoration, sync and return it read-only.
    Read back the restored file hashes and metadata before rebooting. Do not restore archived
    global Package Manager XML. Use the saved update path rather than assuming the `-1` slot.
@@ -525,7 +604,9 @@ to bypass those checks.
    APKs. Keep Home HQ as the working Home. Verify Frameo's code paths and versions, then read
    its assigned UID from `dumpsys package net.frameo.frame`. Keep Frameo disabled/stopped
    while restoring private data. Extract PAX entries with host tooling and restore selected
-   entries individually; do not rely on the device tar to understand PAX or long names.
+   entries individually; do not rely on the device tar to understand PAX or long names. Compare
+   each current entry and its parent types against the verified post-registration baseline
+   immediately before writing; stop if anything changed after that snapshot.
    Remap only entries owned by the saved app UID to the new app UID if it changed, preserving
    other ownership, modes, labels and file types. Never assume the old app UID is still valid
    or blanket-change ownership under `/data`. Verify file readback and metadata.
@@ -538,7 +619,8 @@ to bypass those checks.
 5. **Restore WebView only after Frameo works.** Home HQ's dashboard needs the newer provider,
    so keep a working alternate Home/Settings route during this step. Stop apps using WebView,
    restore the complete original `/system/app/webview` directory, and remove replacement-only
-   files only after comparing against the verified backup inventory. Preserve the original
+   files only after comparing current bytes, metadata and types against the recorded replacement
+   inventory, immediately before each write/deletion. Also verify the original backup. Preserve the original
    library/oat layout and metadata; mixing the old APK with the new libraries is incomplete
    rollback. Sync, remount `/system` read-only, verify files, reboot, and verify the reported
    WebView version plus Frameo and ADB/root again.
