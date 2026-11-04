@@ -27,6 +27,20 @@ POWER_FIX=0
 # ADB on this firmware is root with no authentication. Empty: no rule is added.
 ADB_ALLOW=
 
+# Allow-list firewall on the frame (1) or none (0). With 1 the frame can only send DHCP, DNS to
+# FIREWALL_DNS, NTP (UDP 123) and TCP to each FIREWALL_ALLOW host:port; everything else is refused,
+# the rest of your LAN included, and nothing can connect in (ADB_ALLOW still applies). This keeps the
+# vendor app and any other app off the internet even when it uses a hard-coded IP, which a DNS block
+# can't stop. USB ADB is not affected. Undo: touch /data/local/frame-nofirewall (the loop that
+# keeps the rules in place stops within 60 s), then delete the INPUT/OUTPUT jumps or reboot.
+# FIREWALL_ALLOW: space-separated host:port, for example "192.168.1.10:8123" for Home Assistant.
+# FIREWALL_DNS: the DNS server(s) the frame gets from DHCP, space-separated. Read them with
+# `adb shell dumpsys connectivity | grep DnsAddresses` (`getprop net.dns1` came back empty once).
+# With either of the two empty, the firewall is not applied (logcat says so).
+FIREWALL=0
+FIREWALL_ALLOW=
+FIREWALL_DNS=
+
 # Drop IPv6 router advertisements on Wi-Fi (1). Use this if your network advertises an IPv6 DNS
 # server the frame cannot reach: every DNS lookup then waits 5-10 s for it first.
 IGNORE_IPV6_RA=0

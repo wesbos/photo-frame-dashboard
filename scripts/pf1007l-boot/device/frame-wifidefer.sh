@@ -35,6 +35,68 @@ if [ "$IGNORE_IPV6_RA" = 1 ]; then
     ip6tables -C $RA 2> /dev/null || ip6tables -I $RA
 fi
 
+# FIREWALL: allow-list both ways. Out: DHCP, DNS to FIREWALL_DNS, NTP, and TCP to each
+# FIREWALL_ALLOW host:port; everything else is refused, the rest of the LAN included, so the
+# vendor app or any other app can't reach the internet even by a hard-coded IP. In: replies only
+# (and ADB_ALLOW). netd flushes INPUT and OUTPUT when it starts, so this runs after boot_completed,
+# before Wi-Fi starts, and a loop puts the rules back if they disappear (netd restart).
+# /data/local/frame-nofirewall skips it (then reboot).
+frame_firewall() {
+    if [ -z "$FIREWALL_ALLOW" ] || [ -z "$FIREWALL_DNS" ]; then
+        log -t frame-wifidefer "FIREWALL: FIREWALL_ALLOW and FIREWALL_DNS must both be set; firewall NOT applied"
+        return 1
+    fi
+    if grep -qw state /proc/net/ip_tables_matches; then
+        EST="-m state --state ESTABLISHED,RELATED"
+    elif grep -qw conntrack /proc/net/ip_tables_matches; then
+        EST="-m conntrack --ctstate ESTABLISHED,RELATED"
+    else
+        log -t frame-wifidefer "FIREWALL: no state or conntrack match in this kernel; firewall NOT applied"
+        return 1
+    fi
+    REFUSE=DROP
+    grep -qw REJECT /proc/net/ip_tables_targets && REFUSE=REJECT
+    for T in iptables ip6tables; do
+        $T -N FRAME_IN 2> /dev/null
+        $T -N FRAME_OUT 2> /dev/null
+        $T -F FRAME_IN
+        $T -F FRAME_OUT
+        $T -A FRAME_IN -i lo -j ACCEPT
+        $T -A FRAME_OUT -o lo -j ACCEPT
+        $T -A FRAME_IN $EST -j ACCEPT
+        $T -A FRAME_OUT $EST -j ACCEPT
+    done
+    iptables -A FRAME_OUT -p udp --sport 68 --dport 67 -j ACCEPT
+    iptables -A FRAME_IN -p udp --sport 67 --dport 68 -j ACCEPT
+    for ip in $FIREWALL_DNS; do
+        iptables -A FRAME_OUT -d "$ip" -p udp --dport 53 -j ACCEPT
+        iptables -A FRAME_OUT -d "$ip" -p tcp --dport 53 -j ACCEPT
+    done
+    iptables -A FRAME_OUT -p udp --dport 123 -j ACCEPT
+    for hp in $FIREWALL_ALLOW; do
+        iptables -A FRAME_OUT -d "${hp%:*}" -p tcp --dport "${hp##*:}" -j ACCEPT
+    done
+    [ -n "$ADB_ALLOW" ] && iptables -A FRAME_IN -s "$ADB_ALLOW" -p tcp --dport 5555 -j ACCEPT
+    ip6tables -A FRAME_IN -p icmpv6 -j ACCEPT
+    ip6tables -A FRAME_OUT -p icmpv6 -j ACCEPT
+    for T in iptables ip6tables; do
+        $T -A FRAME_IN -j DROP
+        $T -A FRAME_OUT -j $REFUSE 2> /dev/null || $T -A FRAME_OUT -j DROP
+        $T -C INPUT -j FRAME_IN 2> /dev/null || $T -I INPUT -j FRAME_IN
+        $T -C OUTPUT -j FRAME_OUT 2> /dev/null || $T -I OUTPUT -j FRAME_OUT
+    done
+}
+if [ "$FIREWALL" = 1 ] && [ ! -e /data/local/frame-nofirewall ]; then
+    if frame_firewall; then
+        log -t frame-wifidefer "FIREWALL applied: out to $FIREWALL_ALLOW, DNS $FIREWALL_DNS, NTP, DHCP"
+        while sleep 60; do
+            [ -e /data/local/frame-nofirewall ] && break # undo without reboot: touch it, then delete the jumps
+            iptables -C OUTPUT -j FRAME_OUT 2> /dev/null && ip6tables -C OUTPUT -j FRAME_OUT 2> /dev/null && continue
+            frame_firewall && log -t frame-wifidefer "FIREWALL rules were gone (netd restart?); applied again"
+        done &
+    fi
+fi
+
 if [ -e /data/local/frame-nowifi ]; then
     log -t frame-wifidefer "frame-nowifi set; leaving Wi-Fi off"
     exit 0

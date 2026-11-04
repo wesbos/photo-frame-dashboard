@@ -26,6 +26,7 @@ would need the SD card to get back in. `install.sh check` warns when ADB is over
 | Every DNS lookup takes 6-10 s | The network's IPv6 router advertisements listed a DNS server the frame could not reach; Android tried it first | Drop IPv6 router advertisements on Wi-Fi | `IGNORE_IPV6_RA` |
 | "Select a Home app" chooser at boot instead of the kiosk | A power cut corrupted `package-restrictions.xml`; Android reset it and lost the "Always" choice | Start the kiosk if the chooser is showing. Also consider `pm disable-user` on other launchers | `KIOSK` |
 | Network ADB is root with no authentication | `ro.adb.secure=0` on this firmware. Other devices on the same network reach it without passing the router | Allow TCP 5555 only from one network, on the frame itself. `ADB_ALLOW` only adds the firewall rule; it does not turn network ADB on (#172). Turning it on with `persist.adb.tcp.port` opens root ADB with no key check at every boot (see [T3c](pf1007l-start-here.md#t3c-temporary-adb-through-the-aimor-connection)) | `ADB_ALLOW` |
+| The vendor app (or any other app) can reach the internet and the whole LAN | Nothing on the frame limits outgoing traffic. A DNS block on the vendor's names does not stop an app that uses a hard-coded IP (#205 reports a hidden root agent in another frame's firmware) | Allow-list on the frame itself, both ways: out only DHCP, DNS to `FIREWALL_DNS`, NTP (UDP 123, any server) and TCP to each `FIREWALL_ALLOW` host:port; everything else is refused. In: replies only (plus `ADB_ALLOW`). Applied after boot completes and before Wi-Fi starts (netd flushes `INPUT`/`OUTPUT` when it starts); a 60 s loop puts the rules back if they disappear. Not applied, and logged, if the kernel has no `state`/`conntrack` match or either setting is empty. USB ADB is not affected | `FIREWALL`, `FIREWALL_ALLOW`, `FIREWALL_DNS` |
 
 ## Tested on
 
@@ -61,6 +62,15 @@ October 2026, on a 2 A wall supply:
 - Observed: a TP-Link Deco (#190) and an Orange Livebox 6
   ([Linux hotspot report](pf1007l-linux-20260416-hotspot-report.md#boot-fixes)) did not answer NTP;
   `NTP_SERVER=time.google.com` worked there and on #137, #164 and #172.
+- Observed, `FIREWALL=1` (October 2026, one PF1007L on April `20260410`, macOS host, `FIREWALL_ALLOW` =
+  the Home Assistant host on port 8123, `FIREWALL_DNS` = the router): `install.sh apply`, then
+  `adb reboot` (it did not hang on this unit). logcat showed `FIREWALL applied` before `Wi-Fi started`.
+  From the frame (`toybox nc -w 3`): Home Assistant on 8123 connected; `1.1.1.1:443`, the router's
+  port 80, the Home Assistant host's port 22 and `8.8.8.8:53` were refused; names still resolved through the
+  router. The dashboard reached Home Assistant about 30 s after boot. Deleting the `OUTPUT` jump by
+  hand: the loop put it back within 60 s. Before that, the same rules passed 8 cases in Linux network
+  namespaces (allowed host and DNS/NTP through; other port, other LAN host, internet IP, other DNS
+  server and incoming connections refused), and applying twice left one copy of each rule.
 - Guess: the Wi-Fi start freeze is a power problem (current spike with no battery), not a driver
   bug. The kernel log ends at different points of the Wi-Fi start, and the frame survived the
   same start when it ran after boot.
@@ -125,6 +135,16 @@ scripts/pf1007l-boot/install.sh uninstall
 It puts back `install-recovery.sh` and `wpa_supplicant`, removes the scripts and settings, and
 needs a reboot. The backups from `apply` are in `backups/pf1007l-boot/`.
 
+To turn off only the firewall, without a reboot (USB ADB keeps working with it on):
+
+```sh
+adb shell touch /data/local/frame-nofirewall    # the keep-alive loop stops within 60 s
+adb shell 'iptables -D OUTPUT -j FRAME_OUT; iptables -D INPUT -j FRAME_IN; ip6tables -D OUTPUT -j FRAME_OUT; ip6tables -D INPUT -j FRAME_IN'
+```
+
+While `frame-nofirewall` exists the firewall is skipped at every boot. Delete it and reboot to turn
+the firewall back on, or set `FIREWALL=0` and run `install.sh apply` to remove it for good.
+
 ## On the router
 
 - **NTP:** if the frame uses the router for time and the router limits NTP clients (ntpd's
@@ -140,4 +160,6 @@ needs a reboot. The backups from `apply` are in `backups/pf1007l-boot/`.
   a documentation address such as `2001:db8::`, left from a test), fix the router or set
   `IGNORE_IPV6_RA=1`.
 - **Firewall:** the frame needs only DNS, NTP and the dashboard's HTTPS. An allow-list keeps the
-  AiMOR app and any other app from reaching the internet.
+  AiMOR app and any other app from reaching the internet. If the router can't filter per device,
+  `FIREWALL=1` does it on the frame (see the table above). With it on, `FIREWALL_DNS` must be the
+  server the frame really uses: DNS to anything else is refused.
