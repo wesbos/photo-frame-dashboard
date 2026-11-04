@@ -6,9 +6,8 @@ import android.content.Intent;
 
 public final class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
-                && context.getSharedPreferences("home", 0).getBoolean("enabled", true)) {
-            context.startForegroundService(new Intent(context, HomeService.class));
-        }
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+        PendingResult pending = goAsync();
+        HomeStartup.start(context, intent.getFlags(), pending::finish);
     }
 }
