@@ -33,6 +33,7 @@ Unit reports with more detail: [unit A's custom tool](allwinner-a33-boot-access.
 [April `20260416` on macOS](pf1007l-macos-20260416-report.md),
 [January microSD factory-menu unlock](pf1007l-20260113-marker-file-report.md),
 [the same unlock on a smaller eMMC, with WebView 44 vs 106](pf1007l-20260113-marker-smaller-emmc-report.md),
+[January full-setup gotchas on macOS (CA roots for Open-Meteo, Firefox+kiosk RAM, reboot)](pf1007l-macos-20260113-full-setup-report.md),
 [`OS-PF1009` units E and F](pf1007l-pf1009-20260417.md),
 [May `20260519` on Windows + WSL](pf1007l-windows-wsl-20260519-report.md),
 [May `20260519` on Linux](pf1007l-20260519-linux-report.md),
