@@ -26,7 +26,7 @@ would need the SD card to get back in. `install.sh check` warns when ADB is over
 | Every DNS lookup takes 6-10 s | The network's IPv6 router advertisements listed a DNS server the frame could not reach; Android tried it first | Drop IPv6 router advertisements on Wi-Fi | `IGNORE_IPV6_RA` |
 | "Select a Home app" chooser at boot instead of the kiosk | A power cut corrupted `package-restrictions.xml`; Android reset it and lost the "Always" choice | Start the kiosk if the chooser is showing. Also consider `pm disable-user` on other launchers | `KIOSK` |
 | Network ADB is root with no authentication | `ro.adb.secure=0` on this firmware. Other devices on the same network reach it without passing the router | Allow TCP 5555 only from one network, on the frame itself. `ADB_ALLOW` only adds the firewall rule; it does not turn network ADB on (#172). Turning it on with `persist.adb.tcp.port` opens root ADB with no key check at every boot (see [T3c](pf1007l-start-here.md#t3c-temporary-adb-through-the-aimor-connection)) | `ADB_ALLOW` |
-| The vendor app (or any other app) can reach the internet and the whole LAN | Nothing on the frame limits outgoing traffic. A DNS block on the vendor's names does not stop an app that uses a hard-coded IP (#205 reports a hidden root agent in another frame's firmware) | Allow-list on the frame itself, both ways: out only DHCP, DNS to `FIREWALL_DNS`, NTP (UDP 123, any server) and TCP to each `FIREWALL_ALLOW` host:port; everything else is refused. In: replies only (plus `ADB_ALLOW`). Applied after boot completes and before Wi-Fi starts (netd flushes `INPUT`/`OUTPUT` when it starts); a 60 s loop puts the rules back if they disappear. Not applied, and logged, if the kernel has no `state`/`conntrack` match or either setting is empty. USB ADB is not affected | `FIREWALL`, `FIREWALL_ALLOW`, `FIREWALL_DNS` |
+| Apps can reach destinations outside a DNS block | An app can use a hard-coded IP; DNS filtering alone does not control traffic | Optional best-effort allow-list: IPv4 DHCP, configured DNS, NTP and configured TCP destinations; replies to allowed ADB clients. All non-loopback IPv6 is blocked. Rules are checked every 60 s. Boot/service restarts can expose traffic, and root can replace the rules. Requires working USB recovery | `FIREWALL`, `FIREWALL_ALLOW`, `FIREWALL_DNS` |
 
 ## Tested on
 
@@ -62,15 +62,15 @@ October 2026, on a 2 A wall supply:
 - Observed: a TP-Link Deco (#190) and an Orange Livebox 6
   ([Linux hotspot report](pf1007l-linux-20260416-hotspot-report.md#boot-fixes)) did not answer NTP;
   `NTP_SERVER=time.google.com` worked there and on #137, #164 and #172.
-- Observed, `FIREWALL=1` (October 2026, one PF1007L on April `20260410`, macOS host, `FIREWALL_ALLOW` =
-  the Home Assistant host on port 8123, `FIREWALL_DNS` = the router): `install.sh apply`, then
-  `adb reboot` (it did not hang on this unit). logcat showed `FIREWALL applied` before `Wi-Fi started`.
-  From the frame (`toybox nc -w 3`): Home Assistant on 8123 connected; `1.1.1.1:443`, the router's
-  port 80, the Home Assistant host's port 22 and `8.8.8.8:53` were refused; names still resolved through the
-  router. The dashboard reached Home Assistant about 30 s after boot. Deleting the `OUTPUT` jump by
-  hand: the loop put it back within 60 s. Before that, the same rules passed 8 cases in Linux network
-  namespaces (allowed host and DNS/NTP through; other port, other LAN host, internet IP, other DNS
-  server and incoming connections refused), and applying twice left one copy of each rule.
+- Historical firewall test from #253: one PF1007L on April `20260410`, macOS host, with the
+  Home Assistant host on port 8123 and the router as DNS. The allowed service and DNS worked;
+  several unlisted LAN/internet destinations were refused. Removing an OUTPUT jump was repaired
+  within 60 s. The author also reported eight Linux network-namespace cases. **Those results
+  concern the original PR implementation, not the revised transaction and IPv6 policy below.**
+- The revised firewall builds complete inactive chains, checks every command, then activates and
+  verifies both directions in both families. Failed activation removes its new hooks and preserves
+  previous chains; a rollback failure is logged for USB recovery. Cleanup refuses referenced chains.
+  Host command-double tests cover failures and damaged rules; revised hardware behavior is untested.
 - Guess: the Wi-Fi start freeze is a power problem (current spike with no battery), not a driver
   bug. The kernel log ends at different points of the Wi-Fi start, and the frame survived the
   same start when it ran after boot.
@@ -135,15 +135,39 @@ scripts/pf1007l-boot/install.sh uninstall
 It puts back `install-recovery.sh` and `wpa_supplicant`, removes the scripts and settings, and
 needs a reboot. The backups from `apply` are in `backups/pf1007l-boot/`.
 
-To turn off only the firewall, without a reboot (USB ADB keeps working with it on):
+### Optional frame firewall
+
+Enable only with working USB ADB and router isolation available. `install.sh apply` rejects network
+ADB for `FIREWALL=1` and validates literal IPv4 destinations, ports and DNS addresses before writing.
+At boot, the helper checks both IPv4 and IPv6 tooling; absent IPv6 support or the IPv4 state match
+makes policy activation fail rather than silently leaving one family open. A failure is logged and **Wi-Fi
+startup continues**. Check logcat and the actual rules before relying on this extra layer.
+
+Allowed outbound IPv4 traffic is DHCP, DNS to `FIREWALL_DNS`, UDP NTP to any server, TCP to
+`FIREWALL_ALLOW`, and replies to `ADB_ALLOW` clients. Loopback remains available. Other outbound
+IPv4 traffic is dropped, including pre-existing connections to disallowed destinations. Inbound
+network ADB is checked before established-connection rules; with `ADB_ALLOW` empty it is blocked.
+**All non-loopback IPv6 is blocked**, including router advertisements, DNS and IPv6 dashboard sites.
+`IGNORE_IPV6_RA=1` is therefore not bypassed. Use IPv4 addresses for this optional configuration.
+
+The monitor checks chain contents and whether both INPUT and OUTPUT hooks are first, for both
+families. It builds replacement chains before switching hooks and keeps prior chains until the new
+policy verifies. The four hook changes are not atomic across families/directions. An early Wi-Fi
+start, netd flushing rules, concurrent rule changes or the 60-second repair interval can expose
+traffic. Neither `WIFI_DEFER=1` nor a successful log line proves continuous isolation. A privileged
+process can change these rules; use a router/VLAN firewall for a boundary against root malware.
+
+To disable the firewall, use USB ADB and reboot:
 
 ```sh
-adb shell touch /data/local/frame-nofirewall    # the keep-alive loop stops within 60 s
-adb shell 'iptables -D OUTPUT -j FRAME_OUT; iptables -D INPUT -j FRAME_IN; ip6tables -D OUTPUT -j FRAME_OUT; ip6tables -D INPUT -j FRAME_IN'
+adb shell touch /data/local/frame-nofirewall
+adb reboot
 ```
 
-While `frame-nofirewall` exists the firewall is skipped at every boot. Delete it and reboot to turn
-the firewall back on, or set `FIREWALL=0` and run `install.sh apply` to remove it for good.
+The marker stops future repairs and skips installation at the next boot; it does not remove live
+rules. Delete it and reboot to re-enable, or set `FIREWALL=0`, apply the configuration and reboot.
+If rollback reports an error, keep router isolation in place and use USB recovery; do not assume
+the partial rules protect or preserve network ADB.
 
 ## On the router
 
@@ -160,6 +184,6 @@ the firewall back on, or set `FIREWALL=0` and run `install.sh apply` to remove i
   a documentation address such as `2001:db8::`, left from a test), fix the router or set
   `IGNORE_IPV6_RA=1`.
 - **Firewall:** the frame needs only DNS, NTP and the dashboard's HTTPS. An allow-list keeps the
-  AiMOR app and any other app from reaching the internet. If the router can't filter per device,
-  `FIREWALL=1` does it on the frame (see the table above). With it on, `FIREWALL_DNS` must be the
-  server the frame really uses: DNS to anything else is refused.
+  frame from contacting unapproved destinations independently of its firmware. The optional
+  `FIREWALL=1` filter on the frame is an extra layer with the limits above, not a replacement for
+  router isolation. `FIREWALL_DNS` must match the IPv4 resolver the frame actually uses.
