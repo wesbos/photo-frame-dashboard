@@ -338,16 +338,25 @@ public class MainActivity extends Activity {
   /** A "url" extra is saved for later launches. A VIEW link from another app is shown, not saved. */
   private String urlFrom(Intent intent) {
     String saved = intent.getStringExtra(PREF_URL);
-    if (saved == null) return intent.getDataString();
-    // The activity is exported, so only save web URLs: never file:, content: or javascript:.
-    String scheme = Uri.parse(saved).getScheme();
-    if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
-      Log.w(TAG, "Ignoring non-web kiosk URL (scheme " + scheme + ")");
-      return null;
+    if (saved == null) {
+      String link = intent.getDataString();
+      return link != null && isWebUrl(link) ? link : null;
     }
+    if (!isWebUrl(saved)) return null;
     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, saved).apply();
     Log.i(TAG, "Saved kiosk URL: " + forLog(saved));
     return saved;
+  }
+
+  /**
+   * The activity is exported, and an explicit intent skips the manifest's http/https filter. So
+   * check both URL inputs: never load or save file:, content: or javascript:.
+   */
+  private static boolean isWebUrl(String url) {
+    String scheme = Uri.parse(url).getScheme();
+    if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) return true;
+    Log.w(TAG, "Ignoring non-web kiosk URL (scheme " + scheme + ")");
+    return false;
   }
 
   /**
