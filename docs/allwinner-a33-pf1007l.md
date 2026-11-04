@@ -169,7 +169,8 @@ Reboot from the panel, or with `adb reboot`, and run the same commands again.
 On that unit they were unchanged, including after a power cut in the macOS report.
 ADB is then persistent. Skip the SD-card section and continue with the identity checks,
 verified backup and T8 lock-down in the [start-here guide](pf1007l-start-here.md). The tested
-units expose root USB ADB without a key check. To deliberately undo this access, return the
+hosts obtained root USB ADB without an authorization prompt; rejection of a fresh host key
+was not recorded. To deliberately undo this access, return the
 test-app switch to **IS CLOSED**; that removes ADB, so keep another verified way in first.
 
 **Fail:** the dialog rejects the password, or USB never exposes ADB after **is open**.
