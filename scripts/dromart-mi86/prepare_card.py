@@ -148,8 +148,8 @@ def check_public_key(path: Path) -> None:
     text = path.read_text(encoding="utf-8", errors="replace")
     if "PRIVATE" in text:
         raise SystemExit(f"{path} contains a private key. Pass the .pub file only.")
-    lines = [line for line in text.splitlines() if line.strip()]
-    if len(lines) != 1:
+    lines = text.splitlines()
+    if len(lines) != 1 or not lines[0].strip():
         raise SystemExit(f"{path} must be one public-key line, found {len(lines)}")
     blob = lines[0].split()[0]
     try:

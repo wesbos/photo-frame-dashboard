@@ -78,6 +78,10 @@ class Staging(unittest.TestCase):
             with self.assertRaises(SystemExit):self.stage('adb')
             build.assert_not_called()
         self.assertFalse(self.config().exists())
+    def test_extra_public_key_line_rejected(self):
+        self.key.write_bytes(self.key.read_bytes()+b'\n')
+        with self.assertRaises(SystemExit):self.stage('adb')
+        self.assertFalse(self.config().exists())
     def test_explicit_replace_required(self):
         self.stage()
         with self.assertRaises(SystemExit):self.stage()
