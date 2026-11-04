@@ -38,7 +38,11 @@ elif '-f' in args:
         if failure == 'parse': sys.exit(22)
     else:
         if failure == 'load': sys.exit(23)
-        state.write_text(rule)
+        if failure != 'noop':
+            if failure == 'wrong-rule': rule=rule.replace('from 192.168.2.7','from 192.168.2.8')
+            if os.environ.get('CANONICAL'):
+                rule=rule.replace('port 7806 ->','port = 7806 ->').replace('from 192.168.2.7','from 192.168.2.7/32')
+            state.write_text(rule)
 elif args[0] == '-k':
     if failure == 'kill': sys.exit(24)
 elif args[-2:] == ['-F', 'nat']:
@@ -86,11 +90,23 @@ class Redirect(unittest.TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertFalse(any('-f' in c or '-k' in c or '-F' in c for c in self.calls()))
     def test_failures_never_report_success(self):
-        for failure in ('status','root-anchor','parse','load','kill','readback'):
+        for failure in ('status','root-anchor','parse','load','kill','readback','noop','wrong-rule'):
             with self.subTest(failure=failure):
                 result=self.run_script('on','192.168.2.7',PF_FAIL=failure)
                 self.assertNotEqual(result.returncode,0)
                 self.assertNotIn('Redirect active',result.stdout)
+                self.assertFalse((self.root/'rules').exists())
+    def test_canonical_pf_format_is_accepted(self):
+        result=self.run_script('on','192.168.2.7',CANONICAL='1')
+        self.assertEqual(result.returncode,0,result.stderr)
+    def test_bad_readback_cleans_anchor_without_resetting_states(self):
+        for failure in ('noop','wrong-rule'):
+            with self.subTest(failure=failure):
+                (self.root/'calls').write_text('')
+                result=self.run_script('on','192.168.2.7',PF_FAIL=failure)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn(['sudo','pfctl','-a','com.apple/aimor-t3c','-F','nat'],self.calls())
+                self.assertFalse(any('-k' in call for call in self.calls()))
                 self.assertFalse((self.root/'rules').exists())
     def test_cleanup_failure_visible(self):
         self.assertEqual(self.run_script('on','192.168.2.7').returncode,0)

@@ -39,7 +39,9 @@ not been rerun on a Mac Internet Sharing network or frame.
    The helper validates one IPv4 address and netmask on the selected bridge, requires the frame
    to be a different host in that subnet, and refuses to overwrite an occupied dedicated anchor.
    It resets all existing connections from that frame so AiMOR reconnects through the redirect.
-   Other sharing clients are not reset. A pfctl failure stops the helper and is shown unchanged.
+   Other sharing clients are not reset. Before that reset, the helper reads back exactly one rule
+   matching the selected interface, peer, destination and ports. A missing or different rule
+   triggers scoped cleanup. A pfctl failure stops the helper and is shown unchanged.
 
 5. **Start the listener** after the owner approves the command it sends:
 

@@ -45,6 +45,43 @@ except (ValueError, IndexError) as error:
 PY
 }
 
+
+verify_redirect() {
+  local installed
+  installed=$(pf -a "$anchor" -s nat) || return 1
+  # pfctl prints canonical rules (usually "port = 7806"), and may retain /32.
+  # Require exactly our one rule, rather than treating successful listing as readback.
+  python3 - "$bridge" "$frame" "$ip" "$installed" <<'PYVERIFY'
+import ipaddress
+import shlex
+import sys
+try:
+    bridge, peer, target, listing = sys.argv[1:]
+    lines = [line.strip() for line in listing.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise ValueError('expected exactly one redirect rule')
+    tokens = shlex.split(lines[0])
+    normalized = []
+    for token in tokens:
+        if token == '=' and normalized and normalized[-1] == 'port':
+            continue
+        normalized.append(token)
+    if len(normalized) != 17:
+        raise ValueError('unexpected redirect syntax')
+    for index in (8, 14):
+        address = ipaddress.IPv4Interface(normalized[index])
+        if address.network.prefixlen != 32:
+            raise ValueError('redirect contains a subnet instead of one host')
+        normalized[index] = str(address.ip)
+    expected = ['rdr', 'pass', 'on', bridge, 'inet', 'proto', 'tcp', 'from', peer,
+                'to', 'any', 'port', '7806', '->', target, 'port', '7806']
+    if normalized != expected:
+        raise ValueError('loaded peer/interface/destination/ports do not match')
+except (ValueError, IndexError) as error:
+    sys.exit(f'Redirect readback failed: {error}')
+PYVERIFY
+}
+
 case "${1:-}" in
   on)
     [ "$#" = 2 ] || fail 'usage: macos-redirect.sh on <frame-ip>'
@@ -65,7 +102,7 @@ case "${1:-}" in
     fi
     # Only this frame's states are removed (all its connections, not only TCP 7806).
     # Other Internet Sharing clients are unaffected.
-    if ! pf -k "$frame" || ! pf -a "$anchor" -s nat; then
+    if ! verify_redirect || ! pf -k "$frame"; then
       pf -a "$anchor" -F nat || echo "Cleanup failed; inspect $anchor manually" >&2
       fail 'state reset or verification failed; cleanup attempted'
     fi
