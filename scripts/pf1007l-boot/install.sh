@@ -27,7 +27,7 @@ DEV_TMP=/data/local/tmp/frame-boot
 DEV_CONF=/data/local/frame-boot.conf
 HOOK_LINE='exec /system/bin/sh /system/bin/frame-boot-hook.sh'
 OLD_HOOK_LINE='exec /system/bin/sh /system/bin/frame-fixmac.sh'   # from PR #6
-SCRIPTS=(frame-boot-hook.sh frame-fixmac.sh frame-powerfix.sh frame-timesync.sh frame-wifidefer.sh)
+SCRIPTS=(frame-boot-hook.sh frame-fixmac.sh frame-powerfix.sh frame-timesync.sh frame-wifidefer.sh frame-firewall.sh)
 
 EXPECT_DEVICE=astar-m86_8723cs
 EXPECT_RELEASE=6.0.1
@@ -124,6 +124,15 @@ cmd_apply() {
   local f
   for f in "${SCRIPTS[@]}" wpa_supplicant-wrapper.sh; do no_cr "$HERE/device/$f"; done
   no_cr "$CONF"
+  # Validate the optional firewall before writing anything; mistakes can remove network ADB.
+  if ( . "$CONF"; [ "${FIREWALL:-0}" = 1 ] ); then
+    ( . "$CONF"; . "$HERE/device/frame-firewall.sh"; fw_config ) ||
+      die "invalid firewall settings: use literal IPv4 DNS addresses and IPv4:port destinations"
+    case "$(adb get-serialno 2>/dev/null)" in
+      *:*) die "install FIREWALL=1 over working USB ADB, not network ADB; verify USB recovery first" ;;
+      unknown|'') die "no selected USB ADB device for firewall installation" ;;
+    esac
+  fi
   cmd_backup
   local tmp mac s
   tmp="$(mktemp -d)"

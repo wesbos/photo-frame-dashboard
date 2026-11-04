@@ -35,6 +35,21 @@ if [ "$IGNORE_IPV6_RA" = 1 ]; then
     ip6tables -C $RA 2> /dev/null || ip6tables -I $RA
 fi
 
+# Optional best-effort filtering. Boot/network-service timing can leave exposure windows;
+# this is not a prerequisite for Wi-Fi, and a privileged app can replace these rules.
+if [ "$FIREWALL" = 1 ] && [ ! -e /data/local/frame-nofirewall ]; then
+    if [ -r /system/bin/frame-firewall.sh ]; then
+        . /system/bin/frame-firewall.sh
+        if frame_firewall; then
+            frame_firewall_monitor &
+        else
+            log -t frame-wifidefer "FIREWALL not applied; Wi-Fi startup continues, use router isolation"
+        fi
+    else
+        log -t frame-wifidefer "FIREWALL helper missing; no protection applied"
+    fi
+fi
+
 if [ -e /data/local/frame-nowifi ]; then
     log -t frame-wifidefer "frame-nowifi set; leaving Wi-Fi off"
     exit 0

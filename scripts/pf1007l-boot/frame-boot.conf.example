@@ -27,6 +27,22 @@ POWER_FIX=0
 # ADB on this firmware is root with no authentication. Empty: no rule is added.
 ADB_ALLOW=
 
+# Optional best-effort firewall, off by default. Install only over working USB ADB.
+# IPv4 out: DHCP, DNS to FIREWALL_DNS, NTP (UDP 123, any server), TCP to FIREWALL_ALLOW,
+# and replies to allowed network ADB clients. Other IPv4 traffic is dropped. IPv6 is blocked
+# except loopback, including router advertisements (IGNORE_IPV6_RA remains effective).
+# This is not a boundary against root malware: root can change the rules. Boot/service restarts
+# and the 60-second repair interval can expose traffic. Failure is logged; Wi-Fi still starts.
+# Missing IPv6 support or state matching is an error, not permission to install half a policy.
+# FIREWALL_ALLOW: space-separated literal IPv4:port entries, e.g. "192.168.1.10:8123".
+# FIREWALL_DNS: space-separated literal IPv4 DNS addresses used by the frame.
+# Both are required; hostnames, IPv6 addresses and malformed ports are refused before install.
+# Undo over USB: touch /data/local/frame-nofirewall, then reboot. The marker does not remove
+# live rules; it prevents installation next boot. Delete it and reboot to re-enable.
+FIREWALL=0
+FIREWALL_ALLOW=
+FIREWALL_DNS=
+
 # Drop IPv6 router advertisements on Wi-Fi (1). Use this if your network advertises an IPv6 DNS
 # server the frame cannot reach: every DNS lookup then waits 5-10 s for it first.
 IGNORE_IPV6_RA=0
