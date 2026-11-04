@@ -97,11 +97,10 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
   `'<word>': '<slug>'` to the `CLIPS` map in `js/reading.js`. **Watch for accent collisions**: a
   naive slugify of accented words can collide (e.g. "là"/"la", "où"/"ou", "sûr"/"sur" — the accent
   is lost in the slug). Always check for duplicate slug values before generating audio for a new
-  word; append `-v2` to disambiguate if a collision is unavoidable. As of the current state,
-  `CLIPS`/the audio folder only cover Clara's ~29 phonics words — the full ~987-word set (all of
-  Félix's spelling themes + the common "mot du jour" word bank) still needs generating. This is
-  just a shell loop calling the script per word — straightforward but takes a while (roughly 1-2
-  seconds per word including the ffmpeg conversion).
+  word; append `-v2` to disambiguate if a collision is unavoidable. `CLIPS`/the audio folder
+  currently cover all 1135 words across `wordBank`/`felixSpelling`/`claraPhonics`. Adding new
+  words later (e.g. Félix's real homework list) means regenerating just the delta — don't redo
+  the whole set.
 - **`scripts/ical-import.mjs` + `scripts/ical-emit.mjs`** — parses a Google Calendar `.ics`
   export (via `node-ical`, NOT a `dashboard/package.json` dependency — see the usage comment at
   the top of `ical-import.mjs` for how to install it standalone) into `/tmp/ical-out.json`, then

@@ -26,7 +26,7 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
   plus the original Calendrier/Tâches/Épicerie/Photos/Maison/Agents tabs (French-labeled).
 - **Family data model.** `family-data.js`: people config (Clara 6, Félix 8, with persona
   colours), chores/routine/taskMenu, holiday list, Clara's phonics-by-sound groups, Félix's
-  theme-grouped spelling lists, a ~900-word common-word bank for "mot du jour" with a
+  theme-grouped spelling lists, a 1135-word common-word bank for "mot du jour" with a
   deterministic daily picker.
 - **Kid views (Clara, Félix).** Shared `kid-view.js` builder: chores with paid task picker,
   holiday countdown, "mot du jour" (5 words/day, different per kid), and the outfit widget.
@@ -34,8 +34,11 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
 - **Adult views (Papa, Maman).** Shared `adult-view.js` builder: that parent's events today
   (including the garbage/recycling reminder when it applies to them).
 - **Reading practice — pre-recorded audio, not TTS.** This WebView has no Web Speech API (see
-  CLAUDE.md). `reading.js` plays `public/audio/fr/*.mp3` via `<audio>`. Currently only Clara's 29
-  phonics words have generated clips — **see "Known issues" below, the full set is pending.**
+  CLAUDE.md). `reading.js` plays `public/audio/fr/*.mp3` via `<audio>`. **Full audio set
+  generated**: all 1135 words across `wordBank`/`felixSpelling`/`claraPhonics` have a clip and a
+  `CLIPS` entry (expanded `wordBank` from 585 to 1135 unique words first, to match the original
+  ~987+ scope, then generated all 1105 missing clips in one batch via macOS `say -v Amélie` +
+  `ffmpeg`, zero failures).
 - **"What to wear today" widget (`outfit.js`).** Reads live weather, draws a small cartoon
   Clara/Félix dressed for today's conditions (warm/mild/cold/snow/rain), pinned bottom-left of
   each kid's view.
@@ -68,14 +71,10 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
 
 ## Known issues / next steps
 
-- **Reading-practice audio set is incomplete.** Only Clara's ~29 phonics words have generated
-  mp3 clips (`dashboard/public/audio/fr/`) and matching `CLIPS` entries in `js/reading.js`. Words
-  tapped without a clip silently do nothing (no error, just no sound) — this is intentional so
-  the UI stays usable, but it means most of Félix's spelling words and the whole "mot du jour"
-  word bank are currently silent. To finish: run `scripts/gen-reading-audio.sh "<word>" <slug>`
-  for every remaining word (Félix's ~48 theme words + however much of the ~900-word common bank
-  is worth covering), adding each to `CLIPS`. Budget real time for this — it's roughly 1-2
-  seconds per word but there are hundreds of them.
+- **Félix's real homework word list not yet ingested.** The user is preparing it. When it
+  arrives: add the words to `felixSpelling.themes` in `family-data.js`, generate audio for any
+  new ones with `scripts/gen-reading-audio.sh "<word>" <slug>` (check for accent-slug collisions
+  against the existing 1135-entry map first), add each to `CLIPS` in `js/reading.js`.
 - **No RTC battery — clock resets on every power loss.** Breaks anything date-relative. Manual
   fix after every reboot/power event:
   ```sh
