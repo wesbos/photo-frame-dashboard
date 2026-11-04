@@ -13,10 +13,13 @@ name into a shell.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import os
 import shutil
 import subprocess
+import struct
 import sys
 import tempfile
 from pathlib import Path
@@ -149,10 +152,15 @@ def check_public_key(path: Path) -> None:
     if len(lines) != 1:
         raise SystemExit(f"{path} must be one public-key line, found {len(lines)}")
     blob = lines[0].split()[0]
-    if len(blob) != 700 or not blob.startswith("QAAAA") or not blob.endswith("="):
-        raise SystemExit(
-            f"{path} is not an ADB public key (expected a 700-character QAAAA…= blob)"
-        )
+    try:
+        raw = base64.b64decode(blob, validate=True)
+    except (ValueError, binascii.Error):
+        raise SystemExit(f"{path} is not canonical ADB public-key base64") from None
+    if (len(blob) != 700 or len(raw) != 524
+            or base64.b64encode(raw).decode("ascii") != blob
+            or struct.unpack_from("<I", raw, 0)[0] != 64
+            or struct.unpack_from("<I", raw, 520)[0] not in (3, 65537)):
+        raise SystemExit(f"{path} is not a supported ADB RSA public key")
 
 
 def build_apk(destination: Path, version_code: int) -> None:
@@ -233,52 +241,115 @@ def build_apk(destination: Path, version_code: int) -> None:
         raise SystemExit("APK is missing the Android 6 v1 signature")
 
 
+def _regular_or_absent(path: Path) -> None:
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise SystemExit(f"refusing non-regular destination: {path}")
+
+
+def _directory_or_absent(path: Path) -> None:
+    if path.is_symlink() or (path.exists() and not path.is_dir()):
+        raise SystemExit(f"refusing non-directory destination: {path}")
+
+
 def stage(out: Path, mode: str, version_code: int, public_key: Path | None, replace: bool) -> None:
     check_sources()
+    out = out.expanduser().absolute()
+    # Reject symlink traversal, including dangling links. Use the real path explicitly
+    # if a legitimate parent is a symlink (for example /private/tmp on macOS).
+    for parent in (out, *out.parents):
+        if parent.is_symlink():
+            raise SystemExit(f"symlink in output path: {parent}; choose its real path")
+    _directory_or_absent(out)
     utilities = out / "Frameo_utilities"
-    utilities.mkdir(parents=True, exist_ok=True)
-    apk_files = [path for path in utilities.glob("*.apk") if not path.name.startswith("._")]
+    key_dir = out / "mi86-adb-v2"
     script_path = out / "p_frameo_jb"
-    if not replace and (script_path.exists() or apk_files):
-        raise SystemExit(
-            f"{out} already has card files. Pass --replace to overwrite p_frameo_jb, "
-            "the config, and the utility APK."
-        )
-    for extra in utilities.glob("._*.apk"):
-        raise SystemExit(
-            f"remove AppleDouble file {extra.name} from Frameo_utilities before staging"
-        )
+    config_path = utilities / "frameo_utilities.config"
+    apk_path = utilities / APK_NAME
+    key_path = key_dir / "adbkey.pub"
+    for directory in (utilities, key_dir):
+        _directory_or_absent(directory)
+    for path in (script_path, config_path, apk_path, key_path):
+        _regular_or_absent(path)
+    if not replace and any(path.exists() for path in (script_path, utilities, key_dir)):
+        raise SystemExit(f"{out} already has card files; explicit --replace is required")
+    if utilities.exists():
+        unknown = [p.name for p in utilities.iterdir()
+                   if p.name not in ("frameo_utilities.config", APK_NAME)]
+        if unknown:
+            raise SystemExit("Frameo_utilities has unrelated/AppleDouble files; preserve them elsewhere before staging")
     source = PROBE if mode == "probe" else ENABLE
+    key_bytes = None
     if mode == "adb":
         if public_key is None:
             raise SystemExit("--mode adb requires --pubkey")
         check_public_key(public_key)
-    shutil.copyfile(source, script_path)
-    (utilities / "frameo_utilities.config").write_text(CONFIG, encoding="utf-8")
-    for old_apk in apk_files:
-        old_apk.unlink()
-    apk_path = utilities / APK_NAME
-    build_apk(apk_path, version_code)
-    if mode == "adb":
-        key_dir = out / "mi86-adb-v2"
-        key_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(public_key, key_dir / "adbkey.pub")
-    apk_left = [
-        path.name
-        for path in utilities.iterdir()
-        if path.is_file() and path.name.endswith(".apk")
-    ]
-    if apk_left != [APK_NAME]:
-        raise SystemExit(f"Frameo_utilities must contain one APK, found {apk_left}")
+        key_bytes = public_key.read_bytes()
+    script_bytes = source.read_bytes()
+    if hashlib.sha256(script_bytes).hexdigest() != EXPECTED[source]:
+        raise SystemExit("source changed during staging")
+    out.mkdir(parents=True, exist_ok=True)
+    # Finish the build and all input checks before changing any existing card payload.
+    # The configuration is the trigger: disarm it before publishing, and publish it LAST.
+    # On publication failure leave it absent; never re-arm a partly updated payload.
+    with tempfile.TemporaryDirectory(prefix=".mi86-stage-", dir=out) as temp_name:
+        temp = Path(temp_name)
+        staged_script = temp / "p_frameo_jb"
+        staged_script.write_bytes(script_bytes)
+        staged_apk = temp / APK_NAME
+        build_apk(staged_apk, version_code)
+        staged_config = temp / "frameo_utilities.config"
+        staged_config.write_text(CONFIG, encoding="utf-8")
+        staged_key = temp / "adbkey.pub"
+        if key_bytes is not None:
+            staged_key.write_bytes(key_bytes)
+            check_public_key(staged_key)
+        expected = {staged_script.name: script_bytes, staged_apk.name: staged_apk.read_bytes(),
+                    staged_config.name: CONFIG.encode("utf-8")}
+        if key_bytes is not None:
+            expected[staged_key.name] = key_bytes
+
+        def publish(src: Path, dest: Path) -> None:
+            with src.open("rb") as payload:
+                os.fsync(payload.fileno())
+            _regular_or_absent(dest)
+            os.replace(src, dest)
+            if dest.read_bytes() != expected[dest.name]:
+                raise SystemExit(f"readback mismatch: {dest}")
+
+        # Recheck destinations after a potentially slow SDK build.
+        for directory in (out, utilities, key_dir):
+            _directory_or_absent(directory)
+        for path in (script_path, config_path, apk_path, key_path):
+            _regular_or_absent(path)
+        utilities.mkdir(exist_ok=True)
+        try:
+            config_path.unlink(missing_ok=True)
+            publish(staged_script, script_path)
+            publish(staged_apk, apk_path)
+            if key_bytes is not None:
+                key_dir.mkdir(exist_ok=True)
+                publish(staged_key, key_path)
+            # Reject an unexpected APK that appeared during the build/publication.
+            if {p.name for p in utilities.iterdir()} != {APK_NAME}:
+                raise SystemExit("unexpected utility file appeared; trigger remains disarmed")
+            publish(staged_config, config_path)
+        except BaseException:
+            # This also covers a failed configuration readback and KeyboardInterrupt.
+            # Unlink the entry itself; never follow a symlink in an error path.
+            try:
+                config_path.unlink(missing_ok=True)
+            except OSError:
+                print("ERROR: could not disarm trigger; do not insert this card", file=sys.stderr)
+            raise
     print(f"mode: {mode}")
     print(f"out: {out}")
     print(f"p_frameo_jb: {script_path.stat().st_size} bytes {sha256(script_path)}")
-    print(f"config: {sha256(utilities / 'frameo_utilities.config')}")
+    print(f"config: {sha256(config_path)}")
     print(f"apk: {apk_path.stat().st_size} bytes versionCode {version_code}")
     print("apk filename created by this program; do not paste it into a shell")
     if mode == "adb":
-        print("public key copied to mi86-adb-v2/adbkey.pub")
-    print("card not ejected; copy these files to the FAT32 root if --out was not the card")
+        print("public key copied to mi86-adb-v2/adbkey.pub; existing recovery snapshots preserved")
+    print("card not ejected; publish the config last when copying to the FAT32 root")
 
 
 def main() -> None:
@@ -295,7 +366,7 @@ def main() -> None:
     parser.add_argument(
         "--replace",
         action="store_true",
-        help="overwrite an existing p_frameo_jb, config, and utility APK in --out",
+        help="replace known script, config, utility APK and public key; preserve recovery snapshots",
     )
     args = parser.parse_args()
     if args.version_code <= 0:

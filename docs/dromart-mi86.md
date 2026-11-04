@@ -81,7 +81,7 @@ Two cards were used, in this order. Both use the same three-file layout.
 
 | Run | Writes on the frame | Result on this unit |
 | --- | --- | --- |
-| Probe | None. The script writes `mi86-probe.txt` and `mi86-probe.done` on the card | `uid=0(root) gid=0(root) context=u:r:toolbox:s0` |
+| Probe | The probe script only writes `mi86-probe.txt` and `mi86-probe.done` on the card, but the vendor trigger changes `adb_keys` and restarts `adbd` before it runs (below) | `uid=0(root) gid=0(root) context=u:r:toolbox:s0` |
 | ADB enable | Replaces `/data/misc/adb/adb_keys`, sets `service.adb.tcp.port` and `persist.adb.tcp.port` to `5555`, restarts `adbd` | Authenticated `adb` on TCP 5555. Shell uid 2000. A root command in that session returned uid 0, context `u:r:toolbox:s0`. The exact root command was not saved |
 
 The first ADB script (the one that looked for a standalone `base64` command) also ran as root,
@@ -96,7 +96,9 @@ inside it stay in the private log.
 
 No factory reset was done. At the end of the SD-card work, Frameo was left in place and there
 was no partition backup. The later backup and application replacement are recorded in sections
-8 and 11; they follow the usual [rules](../README.md#rules-we-learned-the-hard-way).
+8 and 11. Initial access therefore preceded a verified device backup and does **not** meet the
+[no-writes-before-backup rule](../README.md#rules-we-learned-the-hard-way). This limitation applies
+to the probe trigger too; do not mistake it for a read-only device check.
 
 ## 4. How the utility runs the script
 
@@ -156,6 +158,11 @@ installed. On this unit that was **80322**, one above 80321. A newer OTA needs a
 
 ## 5. Probe first
 
+**Obtain approval before inserting even the probe card.** The probe payload is read-only on
+Android, but Frameo's manufacturer trigger first changes its ADB key file and restarts ADB.
+Those vendor side effects happen before our script can check the fingerprint or take a snapshot.
+Keep the card out of a running frame while preparing it. Use only the matched MI86 firmware.
+
 The probe is [`scripts/dromart-mi86/probe.sh`](../scripts/dromart-mi86/probe.sh)
 (1,270 bytes, SHA-256 `421ffd9c25a9ecb74a2fcf7cafbe31bcaff537d38bf73fcadf2f8d8927913c62`).
 It records `id`, a short property list, the path of `su`, and SELinux. It does not call `su`,
@@ -168,18 +175,20 @@ Stage a directory (this does not touch a card):
 python3 -I scripts/dromart-mi86/prepare_card.py --mode probe --out ./mi86-card
 ```
 
-Copy the staged files to the FAT32 root. On the Mac used here, `cp -X` avoids new AppleDouble
-files. Then check there is still one APK, and eject from Finder.
+Use a FAT32 card with no other utility payload. You can stage directly to its mounted root by
+passing that real path as `--out`; this writes ordinary files only and never formats a disk.
+The tool refuses symlink destinations and unrelated files in `Frameo_utilities`. It finishes the
+APK build first, verifies each published file, and writes the trigger config last. On publication
+failure it leaves the config absent. Do not insert a card after any staging error.
 
-```sh
-cp -X -R ./mi86-card/. "<card-mount-point>/"
-dot_clean -m "<card-mount-point>"
-find "<card-mount-point>/Frameo_utilities" -name '*.apk' -o -name '._*'
-```
+If copying a successfully staged folder instead, keep the card out of the frame: remove its old
+`Frameo_utilities/frameo_utilities.config`, copy the script, APK and public-key directory first,
+compare their bytes against the staged files, and copy the config last. Check that exactly one
+APK is present and that no macOS `._` AppleDouble files were copied. Preserve private logs and
+recovery snapshots separately. Eject the completed card before use.
 
-Replace `<card-mount-point>` with the mounted card's location before running these commands.
-Boot Frameo, open Settings, insert the card, wait for the task, tap **COMPLETE TASK**, shut the
-frame down, and read the card on the computer.
+After approval, boot Frameo, open Settings, insert the card, wait for the task, tap **COMPLETE TASK**,
+shut the frame down, and read the card on the computer.
 
 | `mi86-probe.txt` | Meaning |
 | --- | --- |
@@ -235,8 +244,11 @@ python3 -I scripts/dromart-mi86/prepare_card.py --mode adb --replace \
   --pubkey "$HOME/.android/adbkey.pub" --out ./mi86-card
 ```
 
-`--replace` overwrites `p_frameo_jb`, the config, and the utility APK in that directory. Copy to
-the card the same way as the probe. The private key must not be on the card. Eject, boot Frameo,
+`--replace` explicitly replaces the known script, utility APK, config and supplied public key;
+existing recovery snapshots are preserved. Symlinks and unrelated utility files are refused even
+with this option. The old trigger is removed before publication and the new config is written
+last, after readback checks. Copy to the card in the order described for the probe, or stage
+directly to its mounted root. The private key must not be on the card. Eject, boot Frameo,
 open Settings, insert the card, wait for the task, tap **COMPLETE TASK**, and leave the frame on
 Wi-Fi.
 
@@ -308,7 +320,11 @@ first.
 | `adbd` restarted | The property undo restarts it again |
 | `frameo_utilities.config` removed from the card | Write the one-line config back when you mean the task to run again. Delete `mi86-adb-v2/started` and `mi86-adb-v2/done` or the script returns immediately |
 
-The table records this unit's original state. For another run, use that run's `attempt.*`
+The table records this unit's original state; it is not permission to overwrite a later state.
+Before manual undo, compare current bytes and properties with the successful run's recorded
+modified state, verify incoming backup bytes and metadata, and stop if anything has changed.
+Preserve any subsequent legitimate keys or settings instead of overwriting them.
+For another run, use that run's `attempt.*`
 snapshot: `baseline.state`, `adb_keys.raw`, `metadata`, `selinux`, both saved port properties,
 and `init.svc.adbd`. An `absent` baseline means remove the generated key file; `empty` means
 restore the empty file and its metadata; `present` means restore the exact raw bytes and
@@ -330,7 +346,7 @@ Later checks on the same unit, 2026-10-28:
 | Display | 1280×800 at density 160; framebuffer native mode 800×1280 |
 | Vendor layout | `/vendor` links to `/system/vendor`; no separate vendor partition |
 | Network ADB after reboot | Reconnected using the same authorized computer key; `ro.adb.secure=1`, `persist.adb.tcp.port=5555`, root still worked. Runtime `service.adb.tcp.port` was empty after boot, while ADB listened using the persistent setting |
-| Firmware backup | Captured the eMMC prefix through the start of userdata, 1,600,126,976 bytes. Exact length, SHA-256 and gzip readback passed; no aligned `0xCC` filler. Boot, recovery and other static regions matched independent reads |
+| Firmware backup | **Partial: excludes userdata and does not meet the full-device backup rule.** Captured the eMMC prefix through the start of userdata, 1,600,126,976 bytes. Exact length, SHA-256 and gzip readback passed; no aligned `0xCC` filler. Boot, recovery and other static regions matched independent reads |
 | Live-system caveat | The first system capture had changing ext4 journal/counters and SuperSU inode timestamps. File contents matched. A later complete 1,207,959,552-byte system image, with the `daemonsu` init restart loop stopped and system read-only, matched full-partition hashes before and after transfer |
 | Frameo backup | Factory and updated APKs, native libraries, original WebView, shared photo paths, settings snapshots and complete Frameo private data backed up. Static files matched independent live reads; every private regular file matched an independent read |
 | Recovery / restore | USB Loader/Maskrom access and raw partition restoration remain untested. No bootloader, kernel, boot, recovery or resource image was written |
@@ -403,7 +419,7 @@ successful ADB reconnect after reboot required before removal.
   reconciliation; the complete private-data backup was retained. Shared photo
   directories remained present, and `/system` was read-only. WebView remote debugging was off.
 
-### Build and use the Home-preference helper
+### Build and validation status of the Home-preference helper
 
 The source is [PersistentHome.java](../scripts/dromart-mi86/PersistentHome.java); build it with
 [build_home.py](../scripts/dromart-mi86/build_home.py). Use JDK 17 (`JAVA_HOME`) and an installed
@@ -438,54 +454,31 @@ and a physical Settings route, and save the current Home selection plus a read-o
 to restore over a running Package Manager. The helper refuses a different fingerprint and
 requires UID 1000 for `set` and `clear`; root UID 0 can only `inspect`.
 
-Replace `<adb-target>` with the selected ADB device. Copy the locally built jar, make it
-readable to UID 1000, and compare a binary readback before executing it:
+**Device invocation remains a record, not a ready-to-run procedure.** The published helper's
+`set` and especially `clear` path have not been tested on this frame. Do not execute a jar as root
+or UID 1000 from shell-writable `/data/local/tmp`, even after a separate comparison: another
+process can replace it between the comparison and execution.
 
-```sh
-adb -s "<adb-target>" push ./mi86-home-build/persistent-home.jar /data/local/tmp/mi86-persistent-home.jar
-adb -s "<adb-target>" shell chmod 644 /data/local/tmp/mi86-persistent-home.jar
-adb -s "<adb-target>" exec-out cat /data/local/tmp/mi86-persistent-home.jar > ./mi86-home-build/from-frame.jar
-cmp ./mi86-home-build/persistent-home.jar ./mi86-home-build/from-frame.jar
-adb -s "<adb-target>" shell su 0 env CLASSPATH=/data/local/tmp/mi86-persistent-home.jar app_process /system/bin PersistentHome inspect
-```
+A future device runner must create a fresh root-owned directory that shell cannot modify, copy
+the verified jar into it, set permissions allowing UID 1000 to read but not replace it, and compare
+a binary readback from that protected location. A failed comparison must prevent execution.
+It must enforce the selected device and firmware, retain a working physical Settings route, and
+verify both the immediate Home resolution and the asynchronously saved preference before reboot.
 
-Install and configure Home HQ using the [kiosk guide](../dashboard/kiosk/README.md). Enable its
-Home alias and native Menu button:
+On the observed earlier helper, `set` required an enabled Home HQ `.Home` candidate. The preference
+appeared in `persistent-preferred-activities` in `/data/system/users/0/package-restrictions.xml`
+after about 10 seconds. Clearing requests Package Manager to remove Home HQ's persistent entry;
+a successful return alone does not prove the XML was saved. Ordinary Home preferences can still
+resolve to Home HQ afterward. Never replace Package Manager's live XML with a snapshot.
 
-```sh
-adb -s "<adb-target>" shell am start -n com.wesbos.homehq/.MainActivity --ez home true --ez menu_button true
-```
-
-Physically verify Menu → Android settings → Apps and the Dashboard return before continuing.
-Then set the persistent preference:
-
-```sh
-adb -s "<adb-target>" shell su 1000 env CLASSPATH=/data/local/tmp/mi86-persistent-home.jar app_process /system/bin PersistentHome set
-```
-
-`set` requires `.Home` to be an enabled Home candidate and checks immediate Home resolution.
-Package settings are saved asynchronously: wait for the saved XML's
-`persistent-preferred-activities` section to contain `com.wesbos.homehq/.Home` before rebooting.
-The observed save delay was 10 seconds. If a check fails, keep the existing access route and
-stop before disabling or removing anything. Reboot with Frameo reversibly disabled and
-verify automatic dashboard startup, authenticated ADB, root and physical navigation before
-removing Frameo's backed-up code.
-
-Undo the persistent preference before changing the default Home or uninstalling Home HQ:
-
-```sh
-adb -s "<adb-target>" shell su 1000 env CLASSPATH=/data/local/tmp/mi86-persistent-home.jar app_process /system/bin PersistentHome clear
-```
-
-After the asynchronous save, verify that Home HQ's persistent entry is absent from the XML.
-`clear` requests removal through Package Manager; its return alone does not verify the saved
-file. Home resolution can still be Home HQ through an ordinary preference, so a resolved Home
-of Home HQ is not proof that persistent clear failed. Choose the replacement in Android's
-Home UI and check it after reboot. Do not edit global package XML to force a selection.
+Keep Frameo reversibly installed and retain authenticated ADB while testing a replacement Home.
+The report's successful removal with an earlier helper does not establish the published helper's
+undo path. Prove that clear, selection of the alternate Home, reboot, ADB and physical Settings
+navigation all work on the unit before removing any working Home app.
 
 ## 12. Restoring Frameo and the original WebView
 
-This is a manual restoration procedure, **not hardware-tested recovery**. It depends on your
+This is an untested restoration plan, **not a ready-to-run recovery procedure**. It depends on your
 own verified pre-change backups. Those contain vendor binaries and private data and are not
 distributed here. Raw partition restoration, USB Loader/Maskrom access and recovery from a
 damaged early boot chain remain untested. No raw image writer is supplied by this PR.
@@ -510,7 +503,14 @@ device's old tar skipped a long crash-log directory on this unit; use a PAX-awar
 verify the complete file inventory. FIFO entries are metadata and must not be read as ordinary
 files. Keep all backups out of version control.
 
-### Restore order
+### Requirements for a guarded restore
+
+No restore writer is provided. Before each replacement, a device-specific implementation must
+compare the current destination against the recorded modified state, verify the incoming backup
+and its metadata, reject symlinks/unexpected files and stop on mismatch. Stage in protected
+locations, preserve a backup of the state being replaced, verify readback and ensure `/system`
+returns read-only on every exit path. The following order describes dependencies, not permission
+to bypass those checks.
 
 1. **Preserve current access.** Confirm identity, authenticated ADB/root and working physical
    Home HQ Menu/Settings/Dashboard navigation. Verify the selected backup's identity, file

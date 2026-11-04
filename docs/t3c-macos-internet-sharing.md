@@ -9,7 +9,8 @@ sends the frame's AiMOR connection (TCP 7806) to `server.py`, whatever address t
 No DNS record and no `dns.py` are needed.
 
 Tested on one PF1007L, firmware `20260519`, AiMOR 6.0.78, macOS 27 (see [unit report](#unit-report)).
-It should work on any AiMOR frame that T3c works on.
+Other frames remain untested. The corrected helper has offline failure-path coverage; it has
+not been rerun on a Mac Internet Sharing network or frame.
 
 ## Steps
 
@@ -19,40 +20,52 @@ It should work on any AiMOR frame that T3c works on.
 2. **Turn on Internet Sharing.** Keep the Mac's Wi-Fi on; Internet Sharing stops by itself when
    it's off. System Settings → General → Sharing → Internet Sharing ⓘ: share from Ethernet or
    iPhone USB, to devices using **Wi-Fi**. Set a network name and password under Wi-Fi Options,
-   then turn it on. `ipconfig getifaddr bridge100` prints the Mac's address, usually `192.168.2.1`.
-3. **Add the redirect.** It asks for your password, and it also cuts any vendor connection the
-   frame already has, so the order of steps 3 and 4 doesn't matter:
+   then turn it on. `ifconfig bridge100` shows that bridge's address, usually `192.168.2.1`; use the
+   actual sharing bridge. `ipconfig getifaddr` can return nothing on some sharing bridges.
+3. **Join the frame to the Mac's network** (AiMOR's Wi-Fi screen). Find its address and verify
+   which bridge Internet Sharing uses; a VM may already own `bridge100`. The frame's About screen
+   and the sharing bridge's ARP entries help identify it:
 
    ```sh
-   scripts/aimor-network-adb/macos-redirect.sh on
+   BRIDGE=bridge100 scripts/aimor-network-adb/macos-redirect.sh status
    ```
 
-4. **Join the frame to the Mac's network** (AiMOR's Wi-Fi screen). Find its address:
+4. **Add the redirect for that frame only.** Substitute the confirmed address and bridge:
 
    ```sh
-   scripts/aimor-network-adb/macos-redirect.sh status
+   BRIDGE=bridge100 scripts/aimor-network-adb/macos-redirect.sh on <frame-ip>
    ```
+
+   The helper validates one IPv4 address and netmask on the selected bridge, requires the frame
+   to be a different host in that subnet, and refuses to overwrite an occupied dedicated anchor.
+   It resets all existing connections from that frame so AiMOR reconnects through the redirect.
+   Other sharing clients are not reset. A pfctl failure stops the helper and is shown unchanged.
 
 5. **Start the listener** after the owner approves the command it sends:
 
    ```sh
-   /usr/bin/python3 scripts/aimor-network-adb/server.py --bind 192.168.2.1 --frame-ip <frame-ip> --seconds 600
+   python3 scripts/aimor-network-adb/server.py --bind <sharing-bridge-ip> --frame-ip <frame-ip> --seconds 600
    ```
 
    AiMOR retries on its own. Wait for `runtime_adb_command_sent`, then continue with step 7 of the
    [procedure](pf1007l-20260410-network-adb.md#3-enable-temporary-wi-fi-adb) (`adb connect` and the
    identity checks) and the `persist.sys.usb.config` step in
    [T3c](pf1007l-start-here.md#t3c-temporary-adb-through-the-aimor-connection).
-6. **Clean up.** Turn off Internet Sharing, then:
+6. **Clean up.** Remove the redirect while Internet Sharing is still on:
 
    ```sh
    scripts/aimor-network-adb/macos-redirect.sh off
    ```
 
+   Require successful cleanup, then turn off Internet Sharing. The helper flushes only NAT/redirect
+   rules in `com.apple/aimor-t3c`, never the main pf ruleset. If `on` reports an occupied anchor,
+   inspect it with `status` and explicitly use `off` before replacing it.
+
 ## Notes
 
 - **The frame changes its address after a Wi-Fi toggle**, because its MAC changes. The listener
-  then logs `rejected_peer` with the new address. Restart it with that `--frame-ip`.
+  then logs `rejected_peer` with the new address. Run `off`, reinstall the redirect with the new
+  confirmed frame address, and restart the listener with the matching `--frame-ip`.
 - **The frame has internet on this network.** The rule keeps only TCP 7806, the root-command
   channel, on the Mac. Do T8 before the frame stays online.
 - **Joining the Mac's network:** the [PF1006 report](pf1006-20240910-wifi-only.md) saw a frame never
