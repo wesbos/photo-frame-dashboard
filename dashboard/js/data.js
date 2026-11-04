@@ -362,6 +362,11 @@ window.DATA = (function () {
   icalEvents.push(ev(674, '11:00', '12:00', 'Lasik appt', ALL));
   icalEvents.push(allDay(690, 1, 'Ethan pollabauer 2018', ALL));
   icalEvents.push(ev(694, '09:00', '10:00', 'Orange shirt day reminder', ALL));
+  // From the Family and Birthdays Google Calendar exports (narrower follow-up import — only
+  // birthdays/holidays/no-school days were brought in from those, everything else was either
+  // off-topic personal/work noise or already covered by the Lessards calendar above).
+  icalEvents.push(allDay(241, 1, 'Christian Lessard birthday', ALL));
+  icalEvents.push(allDay(339, 1, "Papa's birthday 🎂", ['papa']));
   events = events.concat(icalEvents);
 
 

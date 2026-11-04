@@ -57,10 +57,14 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
   calendar's own shorthand), whole-family fallback otherwise. See `scripts/ical-import.mjs` +
   `scripts/ical-emit.mjs` to re-run this if the calendar changes — **the raw `.ics` file itself
   is never committed** (personal data), only the reusable scripts.
-  - Only the "Lessards" calendar was imported so far — the user has 4 more exported calendars
-    (Family, Birthdays, plus personal/work ones that were deliberately excluded last time) not
-    yet brought in. Worth checking whether "Family"/"Birthdays" add anything "Lessards" doesn't
-    already cover before importing them too, to avoid duplicate events.
+  - The 3 remaining exported calendars (Birthdays, Family, and the user's primary personal
+    `agoole@gmail.com` calendar) were checked and brought in narrowly, on request: only
+    birthdays/holidays/no-school days, not the full event lists. Found just 2 qualifying
+    birthdays (Papa's own, and "Christian Lessard birthday") — everything else in those 3
+    calendars was either stale/past, off-topic personal or work content (old recurring work
+    meetings, fitness, "Save money to buy crypto"), or already covered by the Lessards import
+    above (no-school days). The `agoole@gmail.com` calendar in particular is not family-specific
+    and shouldn't be imported wholesale if revisited later.
 
 ## Known issues / next steps
 
