@@ -132,7 +132,10 @@ uninstall/reinstall and lose the frame's saved Home-app setting.
 
 ```sh
 npm run build                                   # from dashboard/ — emits dist/
-KIOSK_SITE=dist ANDROID_HOME=/path/to/sdk bash kiosk/build.sh   # from dashboard/
+# On this Mac the SDK lives at /usr/local/share/android-commandlinetools, NOT the
+# /opt/homebrew/... path kiosk/build.sh defaults to — pass ANDROID_HOME explicitly.
+# KIOSK_SITE needs an absolute path; a relative one resolves against kiosk/, not dashboard/.
+KIOSK_SITE="$(pwd)/dist" ANDROID_HOME=/usr/local/share/android-commandlinetools bash kiosk/build.sh   # from dashboard/
 adb install -r kiosk/build/homehq.apk
 adb shell am force-stop com.wesbos.homehq && adb shell am start -n com.wesbos.homehq/.MainActivity
 ```

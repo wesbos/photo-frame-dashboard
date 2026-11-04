@@ -88,10 +88,16 @@ lives there permanently — never in a scratchpad.** See the warning at the top 
   ```
   **Real fix, not yet done:** get the frame onto Wi-Fi so Android syncs time via NTP
   automatically on boot. Frame's Wi-Fi state was last seen as "DISCONNECTED" — needs onboarding.
-- **Current build has not been pushed to the physical frame.** This rebuild exists only in the
-  dev-server preview and on GitHub (`fork add-kpkue-dp-10b`) — the physical KPKUE frame is still
-  running whatever was last installed on it, which predates all of this. Deploy via the
-  Build/deploy loop in `dashboard/CLAUDE.md` once ready, then re-apply the clock fix.
+- **Deployed to the physical frame (2026-11-04).** Full rebuild through the homework feature is
+  installed and running on the connected KPKUE frame (`4NAY7EM2BE`), clock re-synced. Verified
+  on-device: home view renders with live weather/events, Clara's and Félix's homework reviews
+  both open and respond to real touchscreen drags (letter-sound highlighting and whole-word
+  scrubbing both confirmed via `logcat`'s `MediaFocusControl` audio-session entries). The
+  Android SDK needed to rebuild (`aapt2`/`d8`/`apksigner`/build-tools 34, platform 34, JDK 17)
+  is already set up at `/usr/local/share/android-commandlinetools` — note this is NOT the
+  `/opt/homebrew/...` path `kiosk/build.sh`'s default `ANDROID_HOME` assumes; pass
+  `ANDROID_HOME=/usr/local/share/android-commandlinetools` explicitly on this Mac. Clock will
+  drift back to its stale default on the next power loss — see the fix above.
 - **Adult (Papa/Maman) views are intentionally minimal.** Just today's schedule. No detailed
   spec survived from the lost session beyond "adult-view.js is a shared adult builder" — expand
   if/when there's a concrete idea of what else should be there (chores status for the kids? a
