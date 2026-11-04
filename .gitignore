@@ -20,3 +20,6 @@ scripts/si006-webview-overlay/build/
 
 # Private per-frame records (docs/frame-records.md). No trailing slash, so a symlink is ignored too.
 /frames
+
+# Locally compiled MI86 app_process helper; source only is published.
+/mi86-home-build/
