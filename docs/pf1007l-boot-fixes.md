@@ -22,7 +22,7 @@ would need the SD card to get back in. `install.sh check` warns when ADB is over
 | After a power cut the clock is 1969 and every HTTPS page fails ("date invalid") | No battery-backed clock. Android 6's SNTP client accepted a rate-limit reply (Kiss-o'-Death) from the router as the time, then waited 24 h | Restore the last saved time early in boot, then SNTP every 2 s until the server answers; save the time every 10 min | `NTP_SERVER` |
 | The screen goes dark or freezes white about 30 s into boot, on most boots | The AIC8800 powers up while boot is at its busiest. The frame has no battery. The kernel log ends during the Wi-Fi firmware load or the first scan | Hide the driver from Android's boot-time load, then start Wi-Fi a few seconds after boot completes | `WIFI_DEFER` |
 | (same) | The AXP223 starts with a 500 mA input limit (register `0x30 = 0x21`) and the kernel lifts it only at ~31 s | Write `0x63` (no limit) early in boot and keep it there. **Off by default:** only with a charger that supplies more than 500 mA, since frames on laptop ports browned out | `POWER_FIX` |
-| About 1 boot in 10: connected to Wi-Fi but no IP address for ~36 s | The access point sent a group-key update right after the handshake; then no DHCP offer arrived. Reconnecting fixed it | If associated with no address for 2 s, disconnect and reconnect (about 4 s) | always on |
+| About 1 boot in 10: connected to Wi-Fi but no IP address for ~36 s | The access point sent a group-key update right after the handshake; then no DHCP offer arrived. Reconnecting fixed it | If associated with no address for 10 s, disconnect and reconnect (about 4 s), at most 3 times per boot. The wait was 2 s until a network where association to address takes 5-7 s turned the fix into the problem (see Tested on) | always on |
 | Every DNS lookup takes 6-10 s | The network's IPv6 router advertisements listed a DNS server the frame could not reach; Android tried it first | Drop IPv6 router advertisements on Wi-Fi | `IGNORE_IPV6_RA` |
 | "Select a Home app" chooser at boot instead of the kiosk | A power cut corrupted `package-restrictions.xml`; Android reset it and lost the "Always" choice | Start the kiosk if the chooser is showing. Also consider `pm disable-user` on other launchers | `KIOSK` |
 | Network ADB is root with no authentication | `ro.adb.secure=0` on this firmware. Other devices on the same network reach it without passing the router | Allow TCP 5555 only from one network, on the frame itself. `ADB_ALLOW` only adds the firewall rule; it does not turn network ADB on (#172). Turning it on with `persist.adb.tcp.port` opens root ADB with no key check at every boot (see [T3c](pf1007l-start-here.md#t3c-temporary-adb-through-the-aimor-connection)) | `ADB_ALLOW` |
@@ -56,6 +56,12 @@ October 2026, on a 2 A wall supply:
   Wi-Fi started at 39.9 to 44 s uptime. Repeated and power-cut boots were not tested on most of them;
   the Linux `20260416` unit also reached the page by itself on a wall charger, and again after an
   unplug and replug.
+- Observed on a May `20260519` unit, Linux host, October 2026: on this access point the frame
+  needs 5-7 s from association to an address (four hand measurements with the loop off), so the
+  2 s wait rejoined every ~5 s and cut each DHCP exchange short. On both boots tested the address
+  arrived within 5 s of the loop giving up, at 148 and 165 s of uptime. With the wait at 10 s and
+  the rejoins capped at 3, the change above, two further boots got an address at 51 and 52 s of
+  uptime with no rejoin logged. Boots that do need a rejoin take about 8 s longer than they did.
 - Observed before the fixes, the same freeze on other units: a January unit went dark about 30 s
   into a boot from a laptop port (#137); a January unit on a 5 W USB-A charger stayed black after
   the boot logo (#164); an April unit boot-looped on a Mac port when Wi-Fi started (#187).
@@ -72,6 +78,10 @@ October 2026, on a 2 A wall supply:
   verifies both directions in both families. Failed activation removes its new hooks and preserves
   previous chains; a rollback failure is logged for USB recovery. Cleanup refuses referenced chains.
   Host command-double tests cover failures and damaged rules; revised hardware behavior is untested.
+- Observed on a May `20260519` unit: the frame has no power supply at all —
+  `/sys/class/power_supply/` is empty. `dumpsys battery` still reports `present: true, level: 100,
+  AC powered: true`, which is healthd's fallback with no supply to read, not a measurement.
+  `voltage: 0` and an empty `technology` are the only tells.
 - Guess: the Wi-Fi start freeze is a power problem (current spike with no battery), not a driver
   bug. The kernel log ends at different points of the Wi-Fi start, and the frame survived the
   same start when it ran after boot.

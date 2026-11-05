@@ -495,11 +495,23 @@ Do section 8 of [aimor-remote-root-shell.md](aimor-remote-root-shell.md): block 
 launcher, then disable `com.efercro.os.aimor`, `com.yhk.qeota` and `com.DeviceTest`. Wait until
 `package-restrictions.xml` shows `enabled="2"`, then reboot.
 
+The list above has three packages, but the frames ship a fourth that it misses:
+`com.android.gl2jni`, labelled **Thomas's room**, in `/system/priv-app/tomas/`. It is a leftover
+OpenGL demo with storage and wake-lock permissions, no `INTERNET` and no services, first noticed
+in #16 and described in the [PF1009 report](pf1007l-pf1009-20260417.md); the
+[`20260519` Windows report](pf1007l-aimor-20260519-windows-adb-on-report.md) identifies it by
+label. Removing it is tidiness, not security. `pm disable com.android.gl2jni` is enough; moving
+the directory out of `/system/priv-app/` drops the package at the next boot and is undone with
+one `mv`.
+
 After T3b, forget the Wi-Fi network on the frame: one `20260416` unit had silently rejoined the
 network it used for T3b, and AiMOR already had an established connection to `:7806` when T8 started
 (#119). #113's January unit was caught online the same way, mid-backup. `svc wifi disable` did not
 survive a reboot on #182 (`wifi_on` was 1 at every boot), so forget the network instead. One unit
-already had a factory Wi-Fi network saved in `wpa_supplicant.conf` (#172): check for it.
+already had a factory Wi-Fi network saved in `wpa_supplicant.conf` (#172), and so did #135's
+(`1YHK-03`), the PF1006 of the [`20240910` report](pf1006-20240910-wifi-only.md) (`AAA888-2.4G`)
+and a `20260519` unit (`1YHK-03` again): treat it as the rule rather than something to check
+for.
 
 AiMOR relaunched over the launcher after a force-stop on #182, and disabling it cleared the
 "Always" Home choice on #187: set the Home app again after the reboot.
