@@ -51,7 +51,7 @@ October 2026, on a 2 A wall supply:
   [Linux report](pf1007l-linux-20260416-hotspot-report.md#boot-fixes)) and May `20260519`
   ([#204](pf1007l-aimor-20260519-windows-adb-on-report.md#setup-that-worked) from Windows Git Bash,
   `check` and `apply` only; [#227](pf1007l-macos-20260519-12mhz-full-setup-report.md), Wi-Fi at 42.6 s;
-  #240), with `WIFI_DEFER=1` and `POWER_FIX=0`.
+  #240; [Windows Wi-Fi report](pf1007l-windows-20260519-wifi-home-assistant-report.md), `check`, `apply` and `verify` over Wi-Fi ADB with `bash.exe -lc` so `/usr/bin/core_perl/shasum` is in `PATH`, Wi-Fi at 42.1 s, `KIOSK` set to Home Assistant Companion Minimal's `LauncherAlias`), with `WIFI_DEFER=1` and `POWER_FIX=0`.
   Wi-Fi started at 39.9 to 44 s uptime. Repeated and power-cut boots were not tested on most of them;
   the Linux `20260416` unit also reached the page by itself on a wall charger, and again after an
   unplug and replug.
