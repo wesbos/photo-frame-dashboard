@@ -182,14 +182,20 @@ the large clock and titles overflow; see [Web fonts and the bundled page](#web-f
 ### Web fonts and the bundled page
 
 On the third unit the demo was bundled into the APK (`KIOSK_SITE`, served at
-`http://127.0.0.1:8765/`). Once the frame was on Wi-Fi, the titles still overflowed. Checked over
-WebView remote debugging (`--ez debug true`, then a normal launch to turn it off again):
-`document.fonts` held no Archivo or Instrument Serif faces at all.
+`http://127.0.0.1:8765/`). The frame booted with Wi-Fi turned off, and Wi-Fi was turned on
+afterwards. The titles still overflowed. Checked over WebView remote debugging (`--ez debug true`,
+then a normal launch to turn it off again): `document.fonts` held no Archivo or Instrument Serif
+faces at all.
 
-The page loads from the APK at boot, before Wi-Fi has joined. Guess: the Google Fonts stylesheet
-fails then and nothing requests it again, since the kiosk only retries pages that failed to load
-and this one didn't. After a reload (the two-finger hold → **Reload dashboard** does the same),
-both families loaded and the titles fit on one line.
+The bundled page doesn't fail without a network, so the kiosk has nothing to retry, and the Google
+Fonts stylesheet that failed while offline wasn't requested again when Wi-Fi came up. After a
+reload (the two-finger hold → **Reload dashboard** does the same), both families loaded and the
+titles fit on one line.
+
+After a later reboot with Wi-Fi on, both families loaded without a reload. The network was
+validated about 3 seconds after Home HQ started. Not separated: whether the request simply came
+after Wi-Fi joined, or the fonts came from WebView's cache after the earlier reload. Guess: if Wi-Fi
+joins later than the page loads, the fonts are missing until a reload.
 
 The large clock still overflows with the fonts loaded. At 1920×1080 and density 160, `.h-time`
 measured from 11 px above the top of the viewport, so the tops of the digits are cut off. Guess: the
