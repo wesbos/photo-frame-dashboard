@@ -1,4 +1,4 @@
-# ARZOPA frame (RK3126, Android 6.0.1, firmware `dpf01m1a_user_JVSHI_202505261448`)
+# ARZOPA D10 frame (RK3126, Android 6.0.1, firmware `dpf01m1a_user_JVSHI_202505261448`)
 
 Record of one unit, tested from Windows 11 (WSL2 Ubuntu + usbipd-win for loader mode) on
 2026-10-15. Observations are kept separate from guesses. Unique identifiers (serial, MAC) are
