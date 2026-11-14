@@ -37,6 +37,7 @@ TCP_PORT = "5555"
 TESTED = {
     "d71c313ddaa4693948acb20af7740ccb56c88bf9376746a47fce2d00c14fc6a4": 15_886_336,  # PF1007L 20260113
     "529ef1ee32e546e847f532c640922800d05edff986bb819f6dd9fa38c3c650be": 14_911_488,  # SOMY M10R7_20260313
+    "4eb4a3bdf6a14b8239c6870f23bd29715ab1e46fbb4ae996bd5d593377c47b3b": 14_962_688,  # ALONG B-102K-Z_20240110
 }
 
 
@@ -132,7 +133,6 @@ def new_entry(like, name, data, mode, ino):
     f[0], f[1], f[2], f[3], f[4] = ino, mode, 0, 0, 1
     return dict(f=f, name=name, data=data)
 
-
 def patch_ramdisk(raw, key_line):
     ents, end = cpio_parse(raw)
     tail = raw[end:]
@@ -148,12 +148,14 @@ def patch_ramdisk(raw, key_line):
     dp = by["default.prop"]["data"].decode()
     if "ro.adb.secure" in dp or "service.adb.tcp.port" in dp:
         die("default.prop already sets adb props")
+    dp = dp.replace("persist.sys.usb.config=none","persist.sys.usb.config=adb")
     if not dp.endswith("\n"):
         dp += "\n"
     dp += f"ro.adb.secure=1\nservice.adb.tcp.port={TCP_PORT}\n"
     by["default.prop"]["data"] = dp.encode()
 
     rc = by["init.rc"]["data"].decode()
+    rc = rc.replace("service adbd /sbin/adbd --root_seclabel=u:r:su:s0", "service adbd /sbin/adbd")
     if not rc.endswith("\n"):
         rc += "\n"
     rc += (
