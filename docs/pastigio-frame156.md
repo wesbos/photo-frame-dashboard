@@ -478,3 +478,83 @@ running (`ps` shows no Frameo process); the logo is cosmetic. Replacing it needs
 was not attempted.
 
 Motion/PIR, loader mode, firmware restore and a WebView upgrade were not tested on this unit.
+
+## Sixth unit: `M15R4`, firmware v2025052119, Frameo v1.32.18, tested on Linux (2026-11-15)
+
+An older-firmware unit, sold as "DPF Frame 156" (Frameo About). Host: Ubuntu 24.04, USB-A to USB-C cable. It differs from the
+units above in three ways that change the setup plan: a different product name, **WebView 61**, and a **32-bit-only** userspace.
+
+| Observation | Value |
+| --- | --- |
+| `ro.product.model` / `ro.product.device` | `M15R4` / `M15R4` (not `FRAME156`) |
+| Firmware | `FrameO.DP105F.v2025052119` |
+| Fingerprint | `rockchip/rk3326_32bit/rk3326_32bit:8.1.0/OC/195458:user/release-keys`, security patch 2020-11-05 |
+| ABI | `armeabi-v7a,armeabi`, `ro.zygote=zygote32`; every app is `primaryCpuAbi=armeabi-v7a` |
+| Partition table | Same sizes and order as the table above (p1 `uboot` to p16 `userdata`) |
+| Display | 1920x1080, 170 dpi |
+| Frameo | `net.frameo.frame` **v1.32.18 (80340)** in `/data/app`, an update over the system copy |
+| WebView as shipped | `com.android.webview` **61.0.3163.98**, `/system/app/webview/webview.apk`, signed with certificate `cf2ab381...8525` (index 3 in `packages.xml`, the same ODM key as the [Arzopa P156W](arzopa-p156w.md)) |
+| Vendor apps | `com.muxintu.app.mxota`, `android.rockchip.update.service`, `com.szclink.app.cldevicetest`, `com.android.soundrecorder` |
+| `/system`, `/vendor` | ext4 `ro`, no `dm-*` devices, although `ro.boot.veritymode=enforcing`; SELinux permissive |
+| Root | Shipped `su -c` returned uid 0 without a prompt |
+
+### USB and ADB
+
+ADB enumerated as `2211:0006`, product name `rockchip M15R4`. `adb devices` printed
+`no permissions (missing udev rules?)` until a udev rule for vendor `2211` was added:
+`SUBSYSTEM=="usb", ATTR{idVendor}=="2211", MODE="0660", GROUP="plugdev"` in `/etc/udev/rules.d/51-android.rules`, then
+`udevadm control --reload-rules && udevadm trigger`. After that the usual Beta Program -> ADB Access toggle
+with the cable in gave `device`. **After every `adb reboot` the host stopped seeing the frame until the USB cable was unplugged and
+re-plugged at the frame end** (twice, same as the second unit).
+
+### Backup (verified before any write)
+
+Sectors 0-5,612,544 (everything before `userdata`) through the shipped `su`, compressed on the frame and moved as base64 (the
+`exec-out` LF trap above applies; a 1 MiB probe matched the device hash first): 2,873,622,528 bytes raw, 524 MB gzipped, `gzip -t` clean, and the
+SHA-256 of the decompressed stream equals a fresh read of the same range on the
+frame (the hash itself is kept private with the dump). `userdata`, `cache`, `rpmb` and `mmcblk2boot0/1` were not captured, and restore (Rockchip loader mode) was not tried.
+Note for anyone scripting this: a backgrounded `adb exec-out` pipeline keeps running after the shell wrapper reports completion, so wait for the
+pipeline itself (a status file written after it) before hashing, or you will compare a partial file.
+
+### Changes made
+
+| Change | How | Undo |
+| --- | --- | --- |
+| Vendor updaters off | `pm disable-user --user 0` for `com.muxintu.app.mxota` and `android.rockchip.update.service` | `pm enable <pkg>` |
+| Frameo off | `pm disable-user --user 0 net.frameo.frame`, run twice, then waited until `package-restrictions.xml` showed `enabled="3"` before rebooting | `pm enable net.frameo.frame` |
+| Sound recorder off | `pm disable-user --user 0 com.android.soundrecorder` (same wait) | `pm enable com.android.soundrecorder` |
+| Kiosk | `dashboard/kiosk` built from this repo, `adb install -r`, `WRITE_SECURE_SETTINGS` granted; `am start ... --ez home true`, then `cmd package set-home-activity com.wesbos.homehq/.Home` | Pick another Home app, `--ez home false` |
+| WebView 131 | see below | see below |
+| Dashboard | Built with `vite build` and bundled with `KIOSK_SITE=dist`; saved URL `http://127.0.0.1:8765/` | `scripts/set-kiosk-url.sh <url>` |
+
+After a reboot: the kiosk is HOME, Frameo, both updaters and the sound recorder stay disabled and not running, the navigation service stays enabled, and Mulch is still the WebView.
+`com.android.systemui` showed `enabled="2"` (caller `shell:0`) in `package-restrictions.xml` partway through the session while its process kept running; none of the
+commands in this record touched it, and its origin was not established.
+
+### WebView 61 to Mulch 131 (a 32-bit variant of the Arzopa overlay route)
+
+The `/system` tree swap used on the third unit does not apply: this unit's WebView is signed with the ODM key above, so an AOSP-signed prebuilt cannot replace it. The vendor-overlay
+route from [arzopa-p156w.md](arzopa-p156w.md#a-modern-webview-without-touching-system-verified) works here, with one change: that unit was 64-bit, this one is **32-bit only**, so the
+`arm` build of Mulch is needed, not `arm64`.
+
+| File | Source | SHA-256 |
+| --- | --- | --- |
+| `treble-overlay-mulch-webview.apk` | [A4Alpha/mulch-webview-overlay](https://github.com/A4Alpha/mulch-webview-overlay) release `v0.1` | `372fe0ba0cb7b98e98346978b12d3aeb073ea4cde0fd033c9b1a775187394a5a` (matches the Arzopa pin) |
+| Mulch `webview.apk`, `armeabi-v7a`, `us.spotco.mulch_wv` 131.0.6778.200, minSdk 26 | GitLab `divested-mobile/mulch`, `prebuilt/arm/webview.apk` at commit `c4c5b73fa5a5` (2024-12-18) | `1f5147f86c5733bc98edd42df695294b6940061e61b65a4a71f6628b6aee5750` |
+
+Checked on the host first: the certificate declared in the overlay's `config_webview_packages.xml` (SHA-256 `260e0a49...18d2`) is the same certificate that signs the Mulch APK. Then, with the verified backup in place and the owner's approval:
+`adb install -r` the Mulch APK (it installed as `armeabi-v7a`), hash-checked the overlay on the frame, remounted `/vendor` read-write, copied it to `/vendor/overlay/`
+(`root:root`, 0644, label `vendor_overlay_file`), `sync`, remounted read-only, rebooted. `cmd overlay list` showed `[x] com.alpha.mulch.webview.overlay`, `dumpsys webviewupdate` listed both providers as valid, and
+`cmd webviewupdate set-webview-implementation us.spotco.mulch_wv` printed `Success`. The kiosk process has to be restarted to pick the new provider. The choice survived a reboot.
+Undo is the same as the Arzopa record. Mulch is no longer updated, the overlay is a third-party binary, and this is one unit.
+
+### Black side bars
+
+The first screenshots on the hosted demo showed the fixed 1280-wide stage (96 px side bars, and a shrunken, half-empty page while WebView 61 was active). The hosted demo predates
+[#226](https://github.com/wesbos/photo-frame-dashboard/pull/226). Building the dashboard from this checkout and bundling it in the kiosk APK
+(`KIOSK_SITE`, see the [kiosk README](../dashboard/kiosk/README.md#a-page-bundled-in-the-apk-no-server)) filled the 1920x1080 panel edge to edge.
+
+Verified on the panel: the two-finger hold opens the kiosk controls and reaches Android Settings.
+
+Not tested on this unit: loader mode, firmware restore, motion/PIR, the vendor boot animation, the factory test app `com.szclink.app.cldevicetest`, whether the system `Frameo` copy returns after a factory reset.
+
