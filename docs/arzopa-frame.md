@@ -1,13 +1,15 @@
-# ARZOPA frame (RK3126, Android 6.0.1, firmware `dpf01m1a_user_JVSHI_202505261448`)
+# ARZOPA D10 frame (RK3126, Android 6.0.1, firmware `dpf01m1a_user_JVSHI_202505261448`)
 
 Record of one unit, tested from Windows 11 (WSL2 Ubuntu + usbipd-win for loader mode) on
 2026-10-15. Observations are kept separate from guesses. Unique identifiers (serial, MAC) are
 left out.
 
-**Result:** ADB over USB through a code-protected toggle in the Arzopa app, and shipped SuperSU
-root. A verified loader-mode backup of everything before `userdata` was taken first. No partition
-was written. Every step of the [BIUFRAME setup guide](biuframe-setup-guide.md) then worked, run
-one at a time, and the frame boots into the `dashboard/kiosk` app (see [Setup](#setup-phase-6)).
+**Result on the original unit (app 4.3.6):** ADB over USB through a code-protected toggle in the
+Arzopa app, and shipped SuperSU root. A verified loader-mode backup of everything before
+`userdata` was taken first. No partition was written. Every step of the
+[BIUFRAME setup guide](biuframe-setup-guide.md) then worked, run one at a time, and that frame
+boots into the `dashboard/kiosk` app (see [Setup](#setup-phase-6)). The later app 6.3.4
+observation below confirms ADB, but not root or the setup steps.
 
 ## How it relates to the known RK3126 frames
 
@@ -28,7 +30,7 @@ Same platform build as the [YIAISIGN 10X1](yiaisign-10x1.md) and the
 
 | | |
 | --- | --- |
-| About screen | Firmware `dpf01m1a_user_JVSHI_202505261448`, software version `4.3.6`, frame name `Arzopa<digits>` |
+| About screen | Firmware `dpf01m1a_user_JVSHI_202505261448`; app 4.3.6 on original unit, 6.3.4 on later unit; frame name `Arzopa<digits>` |
 | `ro.product.model` / `brand` / `manufacturer` | `ARZOPA frame` / `rockchip` / `incar` |
 | `ro.product.device` / `board` / `board.platform` | `rk312x` / `rk30sdk` / `rk312x` |
 | Build fingerprint | `rockchip/rk312x/rk312x:6.0.1/MXC89K/user.fyl.20170927.202757:userdebug/test-keys` |
@@ -44,15 +46,36 @@ Same platform build as the [YIAISIGN 10X1](yiaisign-10x1.md) and the
 | eMMC (`rfi`) | 61,079,552 sectors of 512 bytes (about 29.8 GB), the same count as the YIAISIGN |
 | Parameter block | `FIRMWARE_VER:6.0.0`, `MACHINE_MODEL:rk312x`, `MANUFACTURER:PHILCO` |
 | `boot` partition (loader `0x14000`, `0x7000` sectors) | Starts with `ANDROID!`. SHA-256 of the whole 14,680,064-byte partition read: `790b30c320e084d9e1985360315710446dc887e48c3195812bc65f5a41132f2b` |
-| Vendor software | `com.arzopa.frame.server` 4.3.6, `com.adups.fota` (Adups FOTA updater) |
+| Vendor software | `com.arzopa.frame.server` 4.3.6 on original unit and 6.3.4 on later unit; `com.adups.fota` (Adups FOTA updater) |
+
+## Updated Arzopa app 6.3.4
+
+A later check of a unit with the same firmware identifier was made on 2026-11-10. The About screen
+reported software version `6.3.4`; `com.arzopa.frame.server` was installed at
+`/data/app/com.arzopa.frame.server-1/base.apk` rather than the older unit's
+`/system/app/Jvshi` path. The Android build fingerprint and USB IDs matched the observations
+above.
+
+The ADB unlock is still present, but its hidden entry point moved:
+
+1. Open **Settings → About** and tap the **About title at the top** five times. Tapping the
+   software version does not reveal the ADB row on this version.
+2. Open the newly revealed ADB row, enable its toggle and enter the same fixed code documented
+   below. After authorization, `adb devices -l` showed the frame as `device`.
+3. `adb shell id` returned `uid=2000(shell)`. Root access, `su`, persistence across a normal
+   reboot and network ADB were not checked on this app version.
+
+This is a one-unit observation. No partition was written; the APK was read from its existing
+userdata extent in Loader mode for offline inspection.
 
 ## Getting ADB
 
 1. Plugged into the PC, ADB was already on: Windows lists an "ADB Interface" and
    `adb devices` shows `unauthorized`. No "Allow USB debugging?" prompt appeared, and the Arzopa
    settings have no developer options.
-2. In the Arzopa app, **Settings → About**, tap **Software version** five times. A toast counts
-   down and an **ADB** row appears (`AboutFragment.setAdbStatus`).
+2. In app version 4.3.6, **Settings → About**, tap **Software version** five times. A toast
+   counts down and an **ADB** row appears (`AboutFragment.setAdbStatus`). In app version 6.3.4,
+   tap the **About title** five times instead; tapping the software version does not work.
 3. Turn the ADB toggle on. It asks for a code. The code is a fixed string in the app,
    **`arzopazxcv`** (`AboutFragment.showFramePassDialog`); nothing on screen is a challenge. A
    correct code sets `Settings.Global.adb_enabled=1`.
