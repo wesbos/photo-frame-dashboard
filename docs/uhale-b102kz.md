@@ -1,12 +1,12 @@
 # Uhale B102KZ access report
 UHale B102KZ model unit tested on macOS on 2026-11-12. 
-This is a Allwinner A33 and distinctly different from the Rockchip [Uhale 102KZ](uhale-102kz.md).
+This is an Allwinner A33 and distinctly different from the Rockchip [Uhale 102KZ](uhale-102kz.md).
 It also differs from the battery-powered [Uhale A33 report](uhale-a33-astar-d7.md).
 
 This unit was only capable of USB power, no data.  The UHale app's 'PC Trasfer' function reported 'disconnected' when plugged in via USB.
-No USB device device enumerated in `dmesg` or `lsusb` on Linux or macOS when connected over the Micro-USB port, including during normal boot, while holding the onboard `RECOVER` button, or when booting with a `fel-sdboot` SD card.
+No USB device enumerated in `dmesg` or `lsusb` on Linux or macOS when connected over the Micro-USB port, including during normal boot, while holding the onboard `RECOVER` button, or when booting with a `fel-sdboot` SD card.
 
-W-Fi ADB was achieved following Route S. See [pf1007l-start-here.md](pf1007l-start-here.md) for the Route S overview.
+Wi-Fi ADB was achieved with the [SD-card route](allwinner-a33-sdcard-adb-wifi.md) (Route S), whose `patch-boot.py` makes two extra ramdisk edits for this image only. See [pf1007l-start-here.md](pf1007l-start-here.md) for the Route S overview.
 
 ## Hardware & Firmware
 
@@ -21,7 +21,7 @@ W-Fi ADB was achieved following Route S. See [pf1007l-start-here.md](pf1007l-sta
 | **Android / SDK** | Android `6.0.1` (SDK `23`, `armeabi-v7a`) |
 | **Kernel** | `3.4.39` (`#244 SMP PREEMPT Tue Jan 9 19:00:14 CST 2024`) |
 | **Preinstalled Frame App** | Uhale (`com.zeasn.frame`, `versionName=5.1.0`, `versionCode=5010030`) |
-| **Boot Partition (`P03 boot`)** | Sector `172032` (`14,962,688` bytes / `29,224` sectors; page `2048`, kernel `10,221,784` B, ramdisk `4,735,298` B) |
+| **Boot Partition (`P03 boot`; `sunxi-mbr` number, the partition the guide calls p6)** | Sector `172032` (`14,962,688` bytes / `29,224` sectors; page `2048`, kernel `10,221,784` B, ramdisk `4,735,298` B) |
 | **Stock `boot` SHA-256** | `4eb4a3bdf6a14b8239c6870f23bd29715ab1e46fbb4ae996bd5d593377c47b3b` |
 
 ## Access Path (Route S)

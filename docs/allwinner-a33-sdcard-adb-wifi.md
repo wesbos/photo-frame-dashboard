@@ -27,9 +27,10 @@ The scripts stop if the boot partition is not the tested one.
 
 ### Other boards with the boot partition at sector 172032
 
-The same scripts have been used on a [SOMY M10R7](somy-m10r7.md), whose p6 also starts at sector
-172032 but holds a different boot image. Its image is in the `TESTED` list. Everything else in this
-guide is unchanged.
+The same scripts have been used on a [SOMY M10R7](somy-m10r7.md) and an
+[ALONG/Uhale B-102K-Z](uhale-b102kz.md). On both, p6 also starts at sector 172032 but holds a
+different boot image. Both images are in the `TESTED` list. The B-102K-Z image also gets two extra
+ramdisk edits ([section 2](#2-what-the-patch-changes)). Everything else in this guide is unchanged.
 
 1. **4-bit eMMC.** If the dump reports `emmc_dev: ok` but `st_00=FAIL first read`, rebuild with
    the eMMC at 4-bit, 26 MHz: `A33_EMMC_4BIT=1 bash scripts/a33-sdboot/build-macos.sh` (or the same
@@ -62,6 +63,7 @@ It does not change `/system` or `/data`.
 | `/default.prop` | Adds `ro.adb.secure=1` and `service.adb.tcp.port=5555` at the end. |
 | `/init.rc` | Adds an `on boot` action with `start adbd` at the end. |
 | `/adb_keys` | New file, mode 0644, owner root. It holds one line: your `adbkey.pub`. |
+| `/default.prop`, `/init.rc` (B-102K-Z image only) | `persist.sys.usb.config=none` becomes `adb`; `--root_seclabel=u:r:su:s0` is removed from `service adbd`. `patch-boot.py` stops unless each line occurs exactly once. |
 
 The stock firmware already sets `ro.secure=0` and `ro.debuggable=1`. Thus, `adbd` runs as root.
 The kernel command line sets SELinux to disabled.

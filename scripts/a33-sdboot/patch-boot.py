@@ -7,6 +7,7 @@ against SHA256SUMS, cuts out the boot partition (p6), and changes the ramdisk on
   1. default.prop: ro.adb.secure=1 (adbd demands key auth), service.adb.tcp.port=5555
   2. /adb_keys: exactly one key, the PC's adbkey.pub
   3. init.rc: `on boot` starts adbd, so Wi-Fi ADB comes up whatever sys.usb.config is
+  4. Only for images listed in QUIRKS: a few exact one-line edits for that image
 
 Everything else (kernel, header fields, other cpio entries) stays byte-identical, and
 the output is padded to the original image size. Run with `python -I`.
@@ -38,6 +39,14 @@ TESTED = {
     "d71c313ddaa4693948acb20af7740ccb56c88bf9376746a47fce2d00c14fc6a4": 15_886_336,  # PF1007L 20260113
     "529ef1ee32e546e847f532c640922800d05edff986bb819f6dd9fa38c3c650be": 14_911_488,  # SOMY M10R7_20260313
     "4eb4a3bdf6a14b8239c6870f23bd29715ab1e46fbb4ae996bd5d593377c47b3b": 14_962_688,  # ALONG B-102K-Z_20240110
+}
+# Extra ramdisk edits for one tested image only, keyed by its original SHA-256. Each line must occur
+# exactly once in that file, or the build stops. Other images get none of these edits.
+QUIRKS = {
+    "4eb4a3bdf6a14b8239c6870f23bd29715ab1e46fbb4ae996bd5d593377c47b3b": (  # ALONG B-102K-Z_20240110
+        ("default.prop", "persist.sys.usb.config=none\n", "persist.sys.usb.config=adb\n"),
+        ("init.rc", "service adbd /sbin/adbd --root_seclabel=u:r:su:s0\n", "service adbd /sbin/adbd\n"),
+    ),
 }
 
 
@@ -133,7 +142,8 @@ def new_entry(like, name, data, mode, ino):
     f[0], f[1], f[2], f[3], f[4] = ino, mode, 0, 0, 1
     return dict(f=f, name=name, data=data)
 
-def patch_ramdisk(raw, key_line):
+
+def patch_ramdisk(raw, key_line, quirks=()):
     ents, end = cpio_parse(raw)
     tail = raw[end:]
     if cpio_pack(ents) + tail != raw:
@@ -144,18 +154,21 @@ def patch_ramdisk(raw, key_line):
     for need in ("default.prop", "init.rc"):
         if need not in by:
             die(f"{need} missing from ramdisk")
+    for name, old, new in quirks:
+        text = by[name]["data"].decode()
+        if text.count(old) != 1:
+            die(f"{name}: expected exactly one {old.strip()!r} for this image")
+        by[name]["data"] = text.replace(old, new).encode()
 
     dp = by["default.prop"]["data"].decode()
     if "ro.adb.secure" in dp or "service.adb.tcp.port" in dp:
         die("default.prop already sets adb props")
-    dp = dp.replace("persist.sys.usb.config=none","persist.sys.usb.config=adb")
     if not dp.endswith("\n"):
         dp += "\n"
     dp += f"ro.adb.secure=1\nservice.adb.tcp.port={TCP_PORT}\n"
     by["default.prop"]["data"] = dp.encode()
 
     rc = by["init.rc"]["data"].decode()
-    rc = rc.replace("service adbd /sbin/adbd --root_seclabel=u:r:su:s0", "service adbd /sbin/adbd")
     if not rc.endswith("\n"):
         rc += "\n"
     rc += (
@@ -238,7 +251,7 @@ def main():
         die("computed boot id differs from the header's; parser is wrong")
     raw = gzip.decompress(rd_gz)
 
-    new_raw, mode = patch_ramdisk(raw, key_line)
+    new_raw, mode = patch_ramdisk(raw, key_line, QUIRKS.get(sha256(img), ()))
     new_gz = gzip.compress(new_raw, 9, mtime=0)
     if up(len(new_gz)) > up(h["rsz"]):
         die(f"new ramdisk {len(new_gz)} B needs more pages than the original {h['rsz']} B")
