@@ -390,7 +390,7 @@ owner's ADB key through the frame's own manufacturer update task — no
 BootROM session, no reader upload, no flash write. It suits an owner with
 physical access to the SD slot whose frame still boots normally. The
 mechanism is the same manufacturer SD utility documented for the
-[Dromart MI86](dromart-mi86.md).
+[Dromart MI86](dromart-mi86.md) and is sourced from https://github.com/dusty-du/frameo-159k-jailbreak-builder.
 
 The package holds a metadata-only APK (never installed), the manufacturer
 auto-run config, an on-frame setup script, and your ADB public key.
