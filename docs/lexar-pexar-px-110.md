@@ -169,7 +169,7 @@ rest.
 ```sh
 adb shell getprop ro.build.display.id
 adb shell getprop ro.boot.verifiedbootstate
-adb exec-out su 0 dd if=/dev/block/by-name/vbmeta bs=4096 count=1 > vbmeta.img
+adb exec-out "su 0 sh -c 'dd if=/dev/block/by-name/vbmeta bs=4096 count=1 2>/dev/null'" > vbmeta.img
 python3 avbtool.py info_image --image vbmeta.img | grep -i -E "algorithm|public key"
 ```
 
