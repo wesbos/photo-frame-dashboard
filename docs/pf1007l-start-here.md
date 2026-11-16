@@ -45,7 +45,8 @@ Unit reports with more detail: [unit A's custom tool](allwinner-a33-boot-access.
 [May `20260529` T3c + full native-Windows setup](pf1007l-windows-20260529-t3c-report.md),
 [May `20260529` from a TF card, with Home Assistant](pf1007l-tf-card-20260529-home-assistant-report.md),
 [PF1009 July `20260708` on Windows](pf1009-20260708-windows-report.md),
-[two UK units on macOS, `20260519` and `20260529`](pf1007l-macos-uk-20260519-20260529-report.md).
+[two UK units on macOS, `20260519` and `20260529`](pf1007l-macos-uk-20260519-20260529-report.md),
+[a `20260519` board with no PMIC (`U708HC`) on macOS](pf1007l-macos-20260519-u708hc-no-pmic-report.md).
 
 Follow the [repository rules](../README.md#rules-we-learned-the-hard-way): the owner approves each
 write, a verified backup comes first, and dumps stay private.
@@ -435,6 +436,8 @@ change to the U-Boot source, and its reports are the reference.
 | Frame resets 45 to 50 s after U-Boot starts | The START STOP patch above (full backup at about 2.7 MB/s afterwards) | #19 |
 | `ums` never enumerates on May `20260519` | **Unsolved** on #36. Try the 4-bit build and the START STOP patch, then the 12 MHz low-power build, which fixed a missing eMMC disk on two other `20260519` units (#98, #189). One unit: Route S dump, then Route U `boot-patch.py` ([report](pf1007l-macos-20260519-route-s-report.md)) | #36 |
 | Frame resets about 16 minutes into a continuous read | **Unsolved.** Resumable backup works around it | #13 |
+| The read-only disk drops at a different point each run (about 7 minutes in), with START STOP and the 12 MHz low-power build already in | Null console input: `CONFIG_SYS_DEVICE_NULLDEV=y` and `setenv stdin nulldev` before `ums` (the [May macOS recipe](pf1007l-macos-20260529-report.md#reproduce-the-ram-only-build)). Then a full two-pass backup with no drop | [U708HC report](pf1007l-macos-20260519-u708hc-no-pmic-report.md#2-ums-drops-at-random-points-nulled-console-input-fixed-it) |
+| AXP PMIC programming fails in the SPL (`power_failed = -5`), or mainline Linux logs `axp20x-rsb … Failed to set masks in 0x40: -5` | Check for a board with **no PMIC**: no `pmu1_para`/`power_sply` sections in the vendor `script.bin`, `[product] machine = U708HC`. Nothing answers on RSB or I2C. Use a no-PMIC build (`CONFIG_SUNXI_NO_PMIC=y`) and fixed regulators in any Linux device tree | [U708HC report](pf1007l-macos-20260519-u708hc-no-pmic-report.md#1-no-pmic-on-this-board); possibly [UK unit 1](pf1007l-macos-uk-20260519-20260529-report.md#unit-1-the-spl-hang-was-dram-byte-lane-1) |
 | SD-booted U-Boot: the eMMC stops answering after 18 MiB to a few hundred MiB of reads, also at 4-bit 26 MHz with retries and `mmc rescan`. U-Boot keeps running | **Unsolved.** Keep U-Boot's eMMC work short ([one-sector edit](pf1007l-sector-edit-sdcard.md)), then back up over root ADB | [sector edit](pf1007l-sector-edit-sdcard.md#8-why-only-one-sector-u-boots-emmc-access-on-this-unit) |
 
 Route S's U-Boot (`scripts/a33-sdboot/a33.config`) has no `CONFIG_CRC32_VERIFY`, so `crc32 -v` does not
