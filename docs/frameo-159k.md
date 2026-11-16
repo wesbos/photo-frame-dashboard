@@ -8,7 +8,9 @@ reported success after changing `/adb_keys` from root:root 0600 to
 root:root 0644 and using separate ramdisk/header writes. The 0600 key
 left ADB `unauthorized` on that unit. **The revised builder and guarded
 recipe below have not been hardware-tested.** Other firmware variants
-remain untested.
+remain untested. An alternative that needs no flash write — an SD-card
+package run through the frame's manufacturer update task — is in
+[SD-card owner ADB setup](#sd-card-owner-adb-setup-no-flash-write) below.
 
 **This patch enables TCP ADB on port 5555 on all network interfaces after
 every boot, with root available through the shipped `su`. Rejection of unknown host keys
@@ -381,6 +383,40 @@ Only a successful final full-image check establishes that this operation's
 bytes reached flash. It does not establish that the revised candidate
 boots. Do not reset or attempt another write after any failure.
 
+## SD-card owner ADB setup (no flash write)
+
+`scripts/frameo-adb-setup/` builds an SD-card package that enables the
+owner's ADB key through the frame's own manufacturer update task — no
+BootROM session, no reader upload, no flash write. It suits an owner with
+physical access to the SD slot whose frame still boots normally. The
+mechanism is the same manufacturer SD utility documented for the
+[Dromart MI86](dromart-mi86.md).
+
+The package holds a metadata-only APK (never installed), the manufacturer
+auto-run config, an on-frame setup script, and your ADB public key.
+Running once, the setup merges your key into `/data/misc/adb/adb_keys`
+(existing keys are preserved), sets `service.adb.tcp.port` and
+`persist.adb.tcp.port` to 5555, and restarts `adbd` — the same
+ADB-over-TCP end state as the boot-ramdisk patch above, reached without
+touching the boot partition. The setup is one-shot, records pre-run
+snapshots on the card for exact rollback, and verifies every step; the
+builder self-verifies the complete package (inventory, hashes, ZIP
+contents, APK identity and signature) before the card is written. The
+tool's README covers requirements, deploy, verification with
+`connect.sh`, rollback, and version handling for newer Frameo releases.
+
+```sh
+cd scripts/frameo-adb-setup
+python3 build.py --adb-pubkey ~/.android/adbkey.pub --sd-card /Volumes/FRAME_SD
+```
+
+Status: verified on one 159K running Frameo 1.30.19 (versionCode 69880):
+a physically inserted card was accepted by the update task, the setup
+script ran as root, and the card recorded the key merge, both port
+properties and the adbd restart, followed by a host-side `su 0 id`
+reaching uid 0. That unit already carried an authorized lab ADB
+baseline, so a clean, never-authorized device is not yet recorded.
+
 ## Test plan and status
 
 The original macOS report confirmed a written/read-back boot image,
@@ -443,3 +479,4 @@ this frame from untrusted clients even though `ro.secure=1` and
 - Repo issue #126: the 159K owner report and loader observations.
 - `docs/devices.md`: device index.
 - `scripts/build-frameo159k-boot.py`: guarded builder.
+- `scripts/frameo-adb-setup/`: SD-card owner ADB setup (no flash write).

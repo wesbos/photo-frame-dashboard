@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+out/
+out-*/
+out.previous-*/
+.frameo-sd-build-*/
+.out.staging-*
+.build/
+*.zip
+*.log
+.DS_Store
