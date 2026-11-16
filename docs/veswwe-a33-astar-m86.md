@@ -93,7 +93,7 @@ investigated; while it was running, no TCP connection owned by uid 1000 was open
 ## Undo
 
 ```sh
-adb shell 'mount -o remount,rw /system && mv /system/app/webview /system/homehq-new-webview && mv /system/homehq-stock-webview /system/app/webview && sync && mount -o remount,ro /system'
+adb shell 'test -d /system/homehq-stock-webview || { echo "stock WebView copy missing"; exit 1; }; mount -o remount,rw /system && mv /system/app/webview /system/homehq-new-webview && mv /system/homehq-stock-webview /system/app/webview && sync && mount -o remount,ro /system'
 adb shell pm unhide com.yhk.rabbit.yhkages
 adb shell pm enable com.yhk.rabbit.yhkages; adb shell pm enable com.yhk.qeota; adb shell pm enable net.frameo.frame
 adb shell am start -n com.wesbos.homehq/.MainActivity --ez home false

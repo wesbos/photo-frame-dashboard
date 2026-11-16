@@ -1,4 +1,6 @@
-# SSZA ZN-DP1002C calendar (Allwinner A133, Android 10 → LineageOS 21 / Android 14 by DSU)
+# SSA / moonka ZN-DP1002C calendar (Allwinner A133, Android 10 → LineageOS 21 / Android 14 by DSU)
+
+See also [android14-dsu.md](android14-dsu.md) (Skylight RK3566 DSU trial).
 
 ![LineageOS 21 with Lawnchair as Home, running on the ZN-DP1002C in landscape](images/ssza-zn-dp1002c-lawnchair.jpg)
 

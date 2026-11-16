@@ -51,7 +51,8 @@ hash also cannot clear another firmware: loader names, locations and host apps m
 The older [SI006 report](si006-uhale.md#dashboard-launcher-and-disabled-apps) lists the same three
 packages on a different build (`W25.22.5-11`). That unit's loader has not been investigated here.
 Neither shared package names nor a shared board establishes the same infection on SI006,
-[VTimes VT01001](vtimes-vt01001.md) or [HSB / F10](uhale-hsb-f10.md).
+[VTimes VT01001](vtimes-vt01001.md), [HSB / F10](uhale-hsb-f10.md) or
+[TAPINSAW DW10](tapinsaw-dw10-s580.md) (`W26.22.2-16`, not checked for the loader).
 
 ## Read-only checks
 

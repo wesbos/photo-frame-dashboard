@@ -68,7 +68,7 @@ Fix, as root (`adb shell` is already uid 0):
 
 1. `adb push ~/.android/adbkey.pub /data/local/tmp/host.pub`
 2. `mount -o remount,rw /system`
-3. Append a newline plus the public key to `/system/etc/security/adb_keys`
+3. First keep a copy of the factory file: `cp -p /system/etc/security/adb_keys /data/adb_keys.factory` (this unit didn't). Then append a newline plus the public key to `/system/etc/security/adb_keys`, and check with `cat /system/etc/security/adb_keys` that the last line is exactly your key
    (the factory file has no trailing newline — append `echo` first or the key
    joins the previous line).
 4. `mount -o remount,ro /system`

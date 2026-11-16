@@ -105,7 +105,7 @@ adb shell su 0 rm /data/local/tmp/pre-userdata.img
 The `dd` took 94 s and the pull 225 s (6.2 MB/s). Checks that passed:
 
 - Length exactly **1,455,423,488 bytes** (2,842,624 x 512).
-- The frame's `md5sum` of the image equals the host MD5.
+- The frame's `md5sum` of the image equals the host MD5. This is MD5 only, with no gzip readback, so it does not meet README rule 2.
 - `uboot`, `resource`, `kernel`, `boot`, `recovery` and all of `system`, re-read from the frame
   partition by partition, match the corresponding slices of the pulled image.
 - No 1 MiB block of the image is all `0xCC`. The boot slice starts with `ANDROID!` and the system

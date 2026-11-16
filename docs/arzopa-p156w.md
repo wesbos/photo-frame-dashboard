@@ -302,6 +302,9 @@ but only index 0 is a real AOSP key: `platform`, `shared`, `media` and `testkey`
 and indices 1, 2, 3 and 5 are ODM-generated keys that copy the subject. The WebView is signed with
 one of those, so an AOSP- or Google-signed prebuilt cannot replace it. Copying the APK straight into
 `/system` would produce the same refusal at the next boot scan, with the package then unavailable.
+(A guess, not tried here. On a Pastigio `M15R4`, whose WebView carries the same ODM certificate, the
+LineageOS 138 prebuilt copied into `/system` was accepted at the boot scan:
+[pastigio-frame156.md](pastigio-frame156.md#model-m15r4-firmware-v2025052119-sixth-to-eighth-units).)
 
 The repo already records this reasoning and, for the pinned prebuilt, the same certificate:
 [biuframe.md](biuframe.md) notes its `CN=Unknown` signer with cert SHA-256 `32:A2:FC:74:…:D1:E0`, and

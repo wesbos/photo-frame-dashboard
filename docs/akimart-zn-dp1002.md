@@ -283,7 +283,7 @@ A fourth owner's frame, sold as **Dxmart** 10.1" Frameo, 32 GB, from
 units above. Host: macOS on Apple silicon, USB ADB only, through a USB-A to USB-C data cable in the
 USB-A port of Apple's USB-C Digital AV Multiport Adapter.
 
-**On this firmware, USB ADB is gone after every boot once Frameo is disabled.** Before you
+**On this firmware, USB ADB can be gone after a boot once Frameo is disabled.** Before you
 disable Frameo, run `adb shell grep -n usb.config /vendor/build.prop`. If it shows the garbled
 line described below, apply the `persist.sys.usb.config` fix first.
 
@@ -343,6 +343,10 @@ line described below, apply the `persist.sys.usb.config` fix first.
   which held the first time. After the two fixes above and an untouched reboot: the kiosk was HOME
   and resumed, the navigation service was bound, Frameo and both updaters were `enabled=3` with no
   process, no TCP port was listening, and only the kiosk and Gboard connected out.
+
+### A second `SSA_Frame_20260721` unit (Akimart, 2026-11-15, macOS)
+
+[Amazon India B0FB929WRN](https://www.amazon.in/dp/B0FB929WRN), reported in the [#303 discussion](https://github.com/wesbos/photo-frame-dashboard/pull/303): same identity, partition map and 32 MiB boot hash as the fourth unit, and the same garbled `/vendor/build.prop` line. After one untouched reboot with Frameo disabled, UsbDeviceManager's failsafe fell back to plain `adb` about 38 s after boot, so ADB survived that boot. The `persist.sys.usb.config=adb` fix then gave a clean boot with no failsafe fallback. The FOTA restart loop (62 crashes in 4 minutes) and the `pm hide com.adups.fota` fix were both confirmed. `adb_keys` held the same invalid factory key. So `SSA_Frame_20260721` does not always lose USB ADB at boot; set `persist.sys.usb.config` first to be safe.
 
 ## Guesses, not confirmed
 

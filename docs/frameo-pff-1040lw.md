@@ -1,4 +1,4 @@
-# Frameo PFF-1040LW / PFF_1024 10.1" Frameo frame (RK3126, Android 6.0.1, 512 MB RAM)
+# Frameo PFF-1040LW / PFF_1024 10.1" Frameo frame (RK3126, Android 6.0.1)
 
 Record of one unit, 2026-11-04, macOS host (Darwin 27.0.0). Observations are kept separate from guesses.
 Unique identifiers (serial, MAC, IP) are left out; they live in the ignored `backups/` folder.
@@ -28,7 +28,7 @@ Key differences from the Denver unit:
 | Low-RAM mode | **Off**: `ro.config.low_ram` is not set |
 | SELinux | Permissive (`ro.boot.selinux=permissive`) |
 | Display | 1280x800, 160 dpi |
-| RAM / storage | 512 MB (assumed, same as Denver PFF-1024BMK2); 128 MB zram; eMMC size not checked |
+| RAM / storage | Not measured; 128 MB zram; eMMC size not checked. The PFF-1021BMK3 on the same build family has 1 GB |
 | WebView | Version not checked (Android 6 system WebView likely old) |
 | CA store | Not checked |
 | Wi-Fi | Onboard radio works |
@@ -59,9 +59,9 @@ All made after ADB+root verified, one at a time.
 | Updaters off | `su -c 'pm disable-user android.rockchip.update.service'` | `su -c 'pm enable android.rockchip.update.service'` |
 | Home HQ kiosk installed | Built from `wesbos/photo-frame-dashboard` `dashboard/kiosk/build.sh`, `adb install -r` | `adb uninstall com.wesbos.homehq` |
 | Home HQ as Home app | `am start --ez home true`, then Home button → **Home HQ → Always** | N/A (chooser returns) |
-| Frameo off | `su -c 'pm disable net.frameo.frame/.feature.slideshow.ui.AScreenSlidePager'` then `su -c 'pm disable-user net.frameo.frame'` | `su -c 'pm enable net.frameo.frame'` |
+| Frameo off | `su -c 'pm disable net.frameo.frame/.feature.slideshow.ui.AScreenSlidePager'` then `su -c 'pm disable-user net.frameo.frame'` | `su -c 'pm enable net.frameo.frame'` then `su -c 'pm enable net.frameo.frame/.feature.slideshow.ui.AScreenSlidePager'` |
 | Boot receiver on | `su -c 'pm enable com.wesbos.homehq/.BootReceiver'` | `su -c 'pm disable com.wesbos.homehq/.BootReceiver'` |
-| Navigation service | `su -c 'pm enable com.wesbos.homehq/.NavigationService'`; `settings put secure enabled_accessibility_services "com.wesbos/homehq/.NavigationService"`; `settings put secure accessibility_enabled 1` | Turn off in Accessibility, `pm revoke` |
+| Navigation service | `su -c 'pm enable com.wesbos.homehq/.NavigationService'`; `settings put secure enabled_accessibility_services "com.wesbos.homehq/.NavigationService"`; `settings put secure accessibility_enabled 1` | Turn off Home HQ navigation in Settings → Accessibility |
 
 ### Not checked / skipped
 
@@ -69,7 +69,7 @@ All made after ADB+root verified, one at a time.
 - Partition table (likely same as Denver PFF-1024BMK2)
 - WebView version (Android 6 system WebView is old; dashboard may need WebView swap)
 - Let's Encrypt CA roots (Denver unit had them; this build may too)
-- `iotv` hidden root agent (Denver unit mentioned it; not checked here)
+- `iotv` hidden root agent (not checked here)
 - Low-RAM killing behavior (assumed same as Denver: off)
 - Wi-Fi chip model (Denver: `rk915`)
 
@@ -85,25 +85,4 @@ All made after ADB+root verified, one at a time.
 | 6 Make it useful | Done: Home HQ is Home app, boots to dashboard. Frameo disabled. |
 | 7 Networking | Onboard Wi-Fi works. |
 | 8 Vendor updates | Done: Rockchip updater disabled. Frameo already updated itself. |
-| 9 Security hand-off | Root for any app via shipped `su`, no ADB key check, Android 6 (2016). |
-
-## Reporting Template
-
-```
-About model / firmware:
-PFF-1040LW / PFF_1024 / F6010T_ZhiHeXing_Frameo_1001-V1.0.1202605200900.release-keys
-
-AiMOR version: N/A (Frameo platform)
-Ports: USB-C only (requires USB-A to USB-C data cable)
-Cable and port that gave USB data: USB-A to USB-C data cable
-T3 USB IDs seen / adb devices output: product:PFF_1024 model:Frame device:PFF_1024 transport_id:8
-T3b network ADB result (port 5555): Not tested (USB ADB worked)
-T4 sunxi-fel version output: N/A (Rockchip, not Allwinner)
-T5 check-dump stage / chunks: N/A
-eMMC size in sectors: Not checked
-Boot partition start sector: Not checked
-Boot image SHA-256: Not checked
-Route used and result: USB ADB → shipped su → Home HQ kiosk
-Host OS: macOS (Darwin 27.0.0)
-First failed step and its exact output: N/A (all steps succeeded)
-```
+| 9 Security hand-off | Root for any app via shipped `su`, ADB key check untested, Android 6 (2016). |
