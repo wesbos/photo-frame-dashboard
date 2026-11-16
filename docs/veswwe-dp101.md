@@ -5,6 +5,9 @@ frame in [veswwe-10.1.md](veswwe-10.1.md), but ADB shows a different board and A
 Nothing from the RK3326 docs or `scripts/` applies to it. Check `ro.product.model` and
 `ro.board.platform` before following either page.
 
+> The same ASIN (B0H6NQVZGW) also shipped, on Amazon.de, with an Allwinner A33 Android 6 board
+> (`ro.product.name` `astar_m86_8723cs`, model `story`): see [veswwe-a33-astar-m86.md](veswwe-a33-astar-m86.md).
+
 End result: Home HQ is the Home app and boots into the dashboard, touch works, Frameo is disabled
 and the Adups updater is removed for user 0. No root, WebView swap, backup image, boot patch or
 flash was needed. Everything below is reversible over ADB.
