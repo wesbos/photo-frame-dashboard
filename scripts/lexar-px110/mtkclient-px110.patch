@@ -1,0 +1,100 @@
+Changes to mtkclient that the Lexar Pexar PX-110 (MT8167) needed over macOS serial mode.
+
+Applies to:  https://github.com/bkerler/mtkclient at commit 118a000a83ea31c4f427fe5225abfe964546e05e
+Licence:     mtkclient is GPL-3.0 (its LICENSE file); this patch is a change to that code and is offered
+             under the same licence. Nothing of mtkclient itself is copied into this repository.
+Apply with:  git -C <your mtkclient checkout> checkout 118a000a83ea31c4f427fe5225abfe964546e05e
+             git -C <your mtkclient checkout> apply --check <this file>   (must print nothing)
+             git -C <your mtkclient checkout> apply <this file>
+
+What it changes (three files, nothing else):
+  1. seriallib.py   the reply wait in serial mode is at least 5 s instead of 0.25 s.
+  2. Port.py        a loader that is already in command mode is recognised; late echo bytes are dropped;
+                    the echo read after each handshake byte waits up to 1 s.
+  3. mtk_da_handler.py   `reset` restarts the frame through the chip's watchdog (two register writes:
+                    0x22000014 to 0x10007000, then 0x1209 to 0x10007014; nothing on flash) instead of
+                    asking the loader to shut down and wait for the cable to be pulled, which leaves this
+                    frame stuck. MTK_RESET_POWEROFF=1 gives the original behaviour back.
+                    frame-doctor.sh relies on the line "Watchdog restart sent" that this prints.
+
+diff --git a/mtkclient/Library/Connection/seriallib.py b/mtkclient/Library/Connection/seriallib.py
+index 1ae208f..c75bd9d 100644
+--- a/mtkclient/Library/Connection/seriallib.py
++++ b/mtkclient/Library/Connection/seriallib.py
+@@ -214,7 +214,7 @@ class SerialClass(DeviceClass):
+         # the caller's overall timeout when it is longer.
+         retry_empty_reads = resplen is not None and resplen > 1
+         read_deadline = (
+-            time.monotonic() + max(timeout, 0.25)
++            time.monotonic() + max(timeout, 5.0)  # PX-110 change: the agent needs longer than 0.25 s on macOS serial
+             if retry_empty_reads
+             else None
+         )
+diff --git a/mtkclient/Library/DA/mtk_da_handler.py b/mtkclient/Library/DA/mtk_da_handler.py
+index a7ef654..a3b283a 100644
+--- a/mtkclient/Library/DA/mtk_da_handler.py
++++ b/mtkclient/Library/DA/mtk_da_handler.py
+@@ -1394,8 +1394,26 @@ class DaHandler(metaclass=LogBase):
+         elif cmd == "reset":
+             if os.path.exists(os.path.join(self.mtk.config.hwparam_path, ".state")):
+                 os.remove(os.path.join(self.mtk.config.hwparam_path, ".state"))
+-            mtk.daloader.shutdown(bootmode=0)
+-            print("Reset command was sent. Disconnect usb cable to power off.")
++            # PX-110 change: the loader's own shutdown waits for the cable to be pulled.
++            # Restart through the chip's watchdog instead (register writes only, nothing on flash):
++            # mode = key | external reset | skip power key, then the software-reset key.
++            # MTK_RESET_POWEROFF=1 gives the original behaviour.
++            xft = getattr(mtk.daloader, "xft", None)
++            if xft is not None and os.environ.get("MTK_RESET_POWEROFF") != "1":
++                wdt = mtk.config.chipconfig.watchdog or 0x10007000
++                try:
++                    xft.custom_writeregister(wdt, 0x22000014)
++                    xft.custom_writeregister(wdt + 0x14, 0x1209)
++                except Exception:
++                    pass  # the chip restarts before it can answer
++                try:
++                    mtk.port.close(reset=True)
++                except Exception:
++                    pass
++                print("Watchdog restart sent. The device should boot by itself.")
++            else:
++                mtk.daloader.shutdown(bootmode=0)
++                print("Reset command was sent. Disconnect usb cable to power off.")
+         elif cmd == "da":
+             subcmd = args.subcmd
+             if subcmd is None:
+diff --git a/mtkclient/Library/Port.py b/mtkclient/Library/Port.py
+index 2c194b0..9f8c5ca 100644
+--- a/mtkclient/Library/Port.py
++++ b/mtkclient/Library/Port.py
+@@ -94,8 +94,21 @@ class Port(metaclass=LogBase):
+                     v = ep_in(1, timeout=20)  # Do not wait 1 sec, bootloader is only active for 0.3 sec.
+                     if len(v) == 1 and v[0] == ~(startcmd[i]) & 0xFF:
+                         i += 1
++                    elif i == 0 and len(v) == 1 and v[0] == startcmd[0]:
++                        # PX-110 change: the loader is already in command mode (it echoes bytes
++                        # back unchanged), so the handshake was done earlier; carry on from here.
++                        self.info("Loader already in command mode")
++                        break
+                     else:
+                         i = 0
++            # PX-110 change: drop any late echo bytes so the next command reads its own reply.
++            time.sleep(0.3)
++            try:
++                dev = self.cdc.device
++                if dev is not None and dev.in_waiting:
++                    dev.read(dev.in_waiting)
++            except Exception:
++                pass
+             self.info("Device detected :)")
+             return True
+         except Exception as serr:
+@@ -254,7 +267,7 @@ class Port(metaclass=LogBase):
+             data = [data]
+         for val in data:
+             self.usbwrite(val)
+-            tmp = self.usbread(len(val), maxtimeout=0)
++            tmp = self.usbread(len(val), maxtimeout=1000)  # PX-110 change: macOS serial replies slower than 20 ms
+             # print(hexlify(tmp))
+             if val != tmp:
+                 return False

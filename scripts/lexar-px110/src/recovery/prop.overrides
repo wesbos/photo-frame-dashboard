@@ -1,0 +1,3 @@
+# Properties changed in the recovery ramdisk's prop.default. One key=value per line.
+# Each key must already be in the stock file; recbuild.py replaces its value and stops if it is absent.
+ro.adb.secure=0

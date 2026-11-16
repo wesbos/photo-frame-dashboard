@@ -23,3 +23,8 @@ scripts/si006-webview-overlay/build/
 
 # Locally compiled MI86 app_process helper; source only is published.
 /mi86-home-build/
+
+# Lexar Pexar PX-110 tools: per-unit settings, fetched keys and everything the tools build.
+/scripts/lexar-px110/unit.conf
+/scripts/lexar-px110/keys/
+/scripts/lexar-px110/build/

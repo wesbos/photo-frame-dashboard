@@ -1,0 +1,29 @@
+# Photo Frame's boot hooks (second start-up image).
+#
+# 1) Early, at post-fs-data (/data is mounted and readable by now; /data/local is not encrypted):
+#    run /data/local/photoframe/early.sh as root, in the background. early.sh comes from Photo Frame's
+#    install.sh (it is not part of this image), so its logic can change without a flash. It puts the
+#    app firewall up before Wi-Fi. If the script is missing, sh fails once and init carries on.
+on post-fs-data
+    exec_background u:r:su:s0 root root -- /system/bin/sh /data/local/photoframe/early.sh
+
+# 2) The start-up animation: bind-mount /data/local/photoframe/bootanimation.zip over
+#    /system/media/bootanimation.zip, which the boot animation player reads first. (Setting a
+#    different path with a property was tested on the frame and is ignored, so this mount is the route.)
+#    Photo Frame's bootscreen.sh writes that file from Settings. If the file is missing the mount fails,
+#    init logs it and carries on, and the stock animation plays.
+on post-fs-data
+    mount none /data/local/photoframe/bootanimation.zip /system/media/bootanimation.zip bind
+
+# 3) The late hook, as in the first image: run /data/local/photoframe/boot.sh as root once Android has
+#    finished booting. If the script is missing, sh exits with an error and nothing else happens
+#    (oneshot: init does not restart it).
+service photoframe /system/bin/sh /data/local/photoframe/boot.sh
+    user root
+    group root
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start photoframe
