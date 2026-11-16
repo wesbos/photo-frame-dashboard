@@ -81,8 +81,8 @@ def trusted_ancestry() -> str:
   [ -d "$parent" ] && [ ! -L "$parent" ] || exit 1
   [ "$(stat -c %u "$parent")" = 0 ] || exit 1
   mode=$(stat -c %a "$parent") && group=$(stat -c %g "$parent") || exit 1
-  [ $((0$mode & 0002)) -eq 0 ] || exit 1
-  if [ $((0$mode & 0020)) -ne 0 ]; then
+  [ $((8#$mode & 2)) -eq 0 ] || exit 1
+  if [ $((8#$mode & 16)) -ne 0 ]; then
     [ "$group" = 0 ] || [ "$group" = 1000 ] || exit 1
   fi
 done"""

@@ -483,7 +483,7 @@ Replace `<adb-target>` with the selected ADB device. Use the checked
 [host runner](../scripts/dromart-mi86/run_home.py) for every helper operation:
 
 ```sh
-python3 scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build inspect
+python3 -I scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build inspect
 ```
 
 Even `inspect` writes staging files and needs approval for those writes. The runner verifies
@@ -510,7 +510,7 @@ Physically verify Menu → Android settings → Apps and the Dashboard return be
 Then set the persistent preference:
 
 ```sh
-python3 scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build set
+python3 -I scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build set
 ```
 
 `set` requires `.Home` to be an enabled Home candidate and checks immediate Home resolution.
@@ -524,7 +524,7 @@ removing Frameo's backed-up code.
 Undo the persistent preference before changing the default Home or uninstalling Home HQ:
 
 ```sh
-python3 scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build clear
+python3 -I scripts/dromart-mi86/run_home.py --serial "<adb-target>" --build-dir ./mi86-home-build clear
 ```
 
 After the asynchronous save, verify that Home HQ's persistent entry is absent from the XML.
