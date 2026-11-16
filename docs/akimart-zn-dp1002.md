@@ -79,6 +79,7 @@ any of these pages.
 | Sold as | Firmware | Stock WebView | `su` over `adb exec-out` | Partition map | Page |
 | --- | --- | --- | --- | --- | --- |
 | Akimart, Dxmart, moonka ZN-DP1002 10.1" | `SSA_Frame_20260420` | 106 | byte-clean | above | this page |
+| Dxmart 10.1" (Amazon.se) | `SSA_Frame_20260721` | 106 | byte-clean | same | [fourth unit](#fourth-unit-dxmart-ssa_frame_20260721-2026-11-10-macos): USB ADB lost at boot without Frameo |
 | Runxion 10.1" | `SSA_Frame_20250928` | 61 | byte-clean | same | [runxion-zn-dp1002-rk3326.md](runxion-zn-dp1002-rk3326.md) |
 | YENOCK ZN-DP1501 15.6" | `SSA_Frame_20250814` | 61 | adds CR | same | [yenock-zn-dp1501.md](yenock-zn-dp1501.md) |
 | SSA "Frame" 21.5" | `SSA_Frame_21inch-20260518` | 106 | adds CR | extra `fotocube`, later partitions shifted | [ssa-frame-21inch-rk3326.md](ssa-frame-21inch-rk3326.md) |
@@ -274,6 +275,75 @@ Host: Ubuntu, USB ADB only, USB-A to USB-C data cable.
   After the reboot, the kiosk `.Home` was resumed, Frameo and both updaters were `enabled=3` with
   no process, the navigation service was bound and Wi-Fi was connected.
 
+## Fourth unit: Dxmart, `SSA_Frame_20260721` (2026-11-10, macOS)
+
+A fourth owner's frame, sold as **Dxmart** 10.1" Frameo, 32 GB, from
+[Amazon.se B0DNMGKW2H](https://www.amazon.se/dp/B0DNMGKW2H), the same listing number as the
+[Windows Dxmart unit](#another-dxmart-unit-2026-10-22-windows). It runs newer firmware than the
+units above. Host: macOS on Apple silicon, USB ADB only, through a USB-A to USB-C data cable in the
+USB-A port of Apple's USB-C Digital AV Multiport Adapter.
+
+**On this firmware, USB ADB is gone after every boot once Frameo is disabled.** Before you
+disable Frameo, run `adb shell grep -n usb.config /vendor/build.prop`. If it shows the garbled
+line described below, apply the `persist.sys.usb.config` fix first.
+
+- **Identity:** `ro.build.display.id` is `SSA_Frame_20260721` and the fingerprint is
+  `rockchip/rk3326_go/rk3326_go:8.1.0/OC/031508:user/release-keys`. Every other field that was
+  read matched the [identity table](#identity-from-adb): model, brand and manufacturer, platform
+  and board, Android 8.1 / API 27, the 2020-06-05 patch, kernel 4.4.138, RAM, 1280×800 at 160 dpi,
+  `ro.debuggable=1`, `ro.adb.secure=1`, SELinux permissive, `su 0 <cmd>` as root, and WebView
+  106.0.5249.126 in `/system/app/webview`. CPU, ABI and verified-boot state were not read.
+- **Firmware:** the partition map matched sector for sector (p1–p16, including the 128 MiB
+  recovery), and the 32 MiB boot partition SHA-256 is the same `4ed777af…891b` as above. No
+  `/system/bin/iotv` or `run_iotv.sh`, no init `.rc` file mentions it and no such process.
+- **Frameo updated itself within minutes:** the `/system/priv-app` copy is v1.31.18. Minutes
+  after the frame first went online, v1.32.18 was installed in `/data/app`. Frameo listened on
+  TCP 33324 on all interfaces. The frame shipped with time zone `America/Los_Angeles` and
+  automatic time zone off.
+- **Cables:** USB-C to USB-C gave no power and no data, as on the second unit. Through the
+  adapter, the frame did not show up on the first try; it enumerated after the owner reseated the
+  cable or toggled ADB access.
+- **USB ADB lost at boot (firmware bug):** line 80 of `/vendor/build.prop` reads
+  `persist.sys.usb.config=testing.mediascanner.skiplist=/mnt/shell/emulated/Android/`. At boot,
+  UsbDeviceManager tries that value as the USB configuration, init has no such configuration, the
+  USB state stays `none` and adbd is stopped. The Mac saw no USB device at all. This first showed
+  at the reboot after Frameo and the updaters were disabled; the frame had not been rebooted
+  before that, so whether Frameo hides the bug at boot was not tested.
+  - Turning USB debugging off and on, in Developer options (unlocked on the panel) or with
+    Frameo's ADB access switch, makes UsbDeviceManager retry, and its failsafe falls back to plain
+    `adb`. ADB then works until the next boot, not after it.
+  - Before the fix, `/data/property` held
+    `testing.mediascanner.skiplist=/mnt/shell/emulated/Android/,adb`, still not a valid
+    configuration.
+  - **Fix:** `adb shell su 0 setprop persist.sys.usb.config adb`. The value is stored in
+    `/data/property` and overrides `/vendor/build.prop`; `/vendor` is not touched. After an
+    untouched `adb reboot`, USB ADB was back within about 10 s, `sys.usb.config` read `adb` and
+    UsbDeviceManager logged no failures.
+  - **Undo:** set the previous value again
+    (`su 0 setprop persist.sys.usb.config 'testing.mediascanner.skiplist=/mnt/shell/emulated/Android/,adb'`),
+    or delete `/data/property/persist.sys.usb.config` and reboot. Either way USB ADB is lost at
+    boot again.
+- **FOTA restart loop:** `com.adups.fota` is a `PERSISTENT` app. After `pm disable-user`, Android
+  8.1 still started it; it crashed with `No such service` for its `SystemActionService` and was
+  started again about every 3 s: 122 restarts in the first 6 minutes after the reboot. The
+  [iQual RK3326 page](iqual-10x1-rk3326.md#open-questions) records the same crash. `su 0 pm hide
+  com.adups.fota` stopped it: after another reboot, `hidden=true`, `enabled=3`, no process and no
+  restarts. Undo: `su 0 pm unhide com.adups.fota`. APK and data are kept.
+- **Factory ADB key:** `/data/misc/adb/adb_keys` shipped with one key from a factory host. A
+  leading comma makes it invalid base64, so adbd rejects it. The Mac's key was added below it
+  through the normal prompt. To see what yours ships with:
+  `adb shell su 0 cat /data/misc/adb/adb_keys`; the comment at the end of each line names the
+  host.
+- **Backup:** the same `adb exec-out "su 0 dd"` method in 64 MiB chunks over USB took 343 s
+  (about 9.5 MiB/s on average), with no stalls. Every check passed: chunk lengths, gzip readback,
+  no `0xCC` blocks and on-device SHA-256 of all 16 regions. About 687 MiB compressed.
+- **Setup:** as on the second unit. Home HQ kiosk 1.2 became HOME through the `.Home` alias,
+  `WRITE_SECURE_SETTINGS` was granted, and the owner turned on the navigation service on the panel.
+  Frameo and both updaters were disabled with the wait 30 s, check, `sync`, `adb reboot` sequence,
+  which held the first time. After the two fixes above and an untouched reboot: the kiosk was HOME
+  and resumed, the navigation service was bound, Frameo and both updaters were `enabled=3` with no
+  process, no TCP port was listening, and only the kiosk and Gboard connected out.
+
 ## Guesses, not confirmed
 
 - Android probably writes `package-restrictions.xml` a few seconds after `pm disable-user`, and
@@ -290,8 +360,17 @@ Host: Ubuntu, USB ADB only, USB-A to USB-C data cable.
   power, which would explain a USB-C to USB-C cable doing nothing.
 - The Akimart listing likely ships more than one board, as other listings in the
   [device index](devices.md) do.
+- The `SSA_Frame_20260420` units probably don't have the garbled `/vendor/build.prop` line: the
+  second unit kept USB ADB after a reboot with Frameo disabled. Its `/vendor/build.prop` was not
+  read.
+- The boot partition is identical across both firmware versions, so `SSA_Frame_20260721`
+  probably changes only `/system`, `/vendor` or `/oem`. No per-partition hashes from the earlier
+  units are published to compare.
 
 ## Not yet checked
 
 - Other factory apps' network behaviour. Keep the frame on an isolated network: Android 8.1 with
   a 2020 security patch and shipped root.
+- Whether a disabled `com.adups.fota` also restarts in a loop on `SSA_Frame_20260420`. The first
+  unit showed no FOTA process after its reboot, but a single read can miss a 3 s loop.
+- Whether `adb_keys` on `SSA_Frame_20260420` units ships with a factory key.
