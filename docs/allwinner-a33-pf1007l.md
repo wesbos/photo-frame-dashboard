@@ -108,7 +108,8 @@ About firmware ending `20260529`, Android 6.0.1 `eng`/`test-keys`, AiMOR 6.0.78,
 The frame was not on Wi-Fi. No card was in the TF slot. Nothing was written to the boot partition.
 A later comment on that issue confirmed the same About path on a PF1007 and a PF1506.
 The same route also worked on a [May `20260519` unit](pf1007l-aimor-20260519-macos-root-report.md)
-(#272). This does not establish the password on every firmware.
+(#272) and on one [January `20260113` unit](pf1007l-20260113-test-app-password-report.md).
+This does not establish the password on every firmware.
 Another May `20260529` report on the issue, from macOS, used the same steps. After the switch
 that host saw `1f3a:1002` rather than `1f3a:1009`. Treat the USB id as a clue, and treat
 `adb devices` plus a root shell as the pass condition.
