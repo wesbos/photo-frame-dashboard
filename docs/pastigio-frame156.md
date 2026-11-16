@@ -478,3 +478,64 @@ running (`ps` shows no Frameo process); the logo is cosmetic. Replacing it needs
 was not attempted.
 
 Motion/PIR, loader mode, firmware restore and a WebView upgrade were not tested on this unit.
+
+## Sixth unit: model `M15R4`, firmware v2025052119, WebView 61, tested on Arch Linux (2026-11-12)
+
+Bought as the Pastigio 15.6" FRAME156 listing. Same `DP105F` firmware family, RK3326 board and
+partition map as the units above, but Android reports the model as **`M15R4`**, the firmware is
+**older** than every unit above, and the shipped WebView is **61**, not 106. Nothing was written to the
+frame in this session: no backup, no kiosk, no package disabled. Read-only observations only.
+
+Host: Arch Linux (kernel 7.2), platform-tools 37.0.1 (ADB 1.0.41). The cable ran from a **USB-A port on
+the computer** to the **USB-C port on the back of the frame**, with the frame's **own power supply
+connected**; the owner reports the frame does not come up over USB power alone.
+
+| Observation | Value |
+| --- | --- |
+| `ro.product.model` / `device` / `name` | `M15R4` / `M15R4` / `M15R4`; brand `Pastigio`, manufacturer `rockchip` |
+| Firmware | `FrameO.DP105F.v2025052119`, built 2025-05-21 (units above: `v2026010414`, `v2026051219`) |
+| Fingerprint | `rockchip/rk3326_32bit/rk3326_32bit:8.1.0/OC/195458:user/release-keys` |
+| Android | 8.1.0, API 27, security patch 2020-11-05, kernel 4.4.138, `ro.config.low_ram=true` |
+| ABI | `armeabi-v7a,armeabi` |
+| Display | 1920x1080, 170 dpi |
+| RAM / eMMC | 974,220 kB / 61,472,768 sectors (31,474,057,216 bytes); `boot0`, `boot1` and `rpmb` 4 MiB each |
+| Partitions | p1–p15 identical to the [table above](#partition-table-emmc-mmcblk2-512-byte-sectors); `userdata` is 55,860,160 sectors |
+| USB (ADB) | `2211:0012`, vendor string `rockchip`, product `M15R4`; one PTP interface plus the ADB interface (class `ff`, interface string `ADB Interface`). Earlier units: product `0006` |
+| Frameo | `net.frameo.frame` v1.32.18 in `/data/app` (self-updated; the frame had been online); system copy **v1.25.7** at `/system/priv-app/DP_Frameo`. Still the HOME app |
+| OTA / factory test | `com.muxintu.app.mxota` and `com.szclink.app.cldevicetest` present and enabled |
+| Launcher3 | `com.android.launcher3` already disabled when received |
+| WebView | `com.android.webview` **61.0.3163.98** at `/system/app/webview`, targetSdk 27 |
+| Root / SELinux | `su -c id` returns uid 0 with no prompt; `getenforce` reports `Permissive`; `ro.adb.secure=1` |
+| Boot / `/system` | `ro.boot.veritymode=enforcing`, `ro.boot.flash.locked=1`, no `/dev/block/dm-*`; `/system` is `mmcblk2p11` ext4 `ro`, `/vendor` is `mmcblk2p13` |
+| Network ADB | Port 5555 closed; `service.adb.tcp.port` and `persist.adb.tcp.port` unset |
+| Backlight | `/sys/class/backlight/backlight/brightness`, 0–255, `system:system` `0644` (a root write is needed from a non-system app). No `/sys/class/disp` |
+| Motion | `pir-s18` node in the device tree, as on the first unit; not tested |
+
+### ADB authorization
+
+The owner turned on **Settings -> About -> Beta -> ADB Access** and turned computer photo transfer off
+before connecting the cable. The kernel log showed the frame enumerate, disconnect and enumerate again
+within two seconds of plugging in. The host then showed the frame as **`offline`** (not
+`unauthorized`), and still `offline` after `adb kill-server` and `adb start-server`. `adb reconnect
+offline` made it leave the device list for a few seconds. On the next server start the handshake
+completed: the frame answered the host's `CNXN` with an `AUTH` token, the host signed it, the frame
+replied `CNXN`, and `adb devices` reported `device`. About two minutes passed from plugging in to
+`device`. No key injection or loader was needed. Whether Frameo showed its ADB warning on the
+frame during those two minutes was not recorded.
+
+`/data/misc/adb/adb_keys` (711 bytes, `system:shell`, `0640`, `u:object_r:adb_keys_file:s0`) carried
+the timestamp of that handshake, so the host key was stored on the frame at that moment, as on the
+[fifth unit](#adb-authorization-and-persistence). Persistence across a reboot was not tested.
+
+### Guesses (unverified)
+
+- The repeated `offline` may be the server losing a race against the frame's double enumeration at
+  plug-in, since the third server start succeeded with nothing else changed. Restarting the host
+  server, as the [fourth unit](#adb-authorization) needed, is the thing to try before toggling anything
+  on the frame.
+- WebView 61 on this older firmware, where the later firmware ships 106, matches the QCREA YYD-1156
+  and YENOCK ZN-DP1501 rows on the same BSP. A dashboard built for WebView 106 should be checked on
+  61 before relying on it, or the WebView swapped the way the [third unit](#webview-138-in-place-of-the-vendor-webview-106)
+  did, after a verified backup.
+- Whether the OTA app would move this unit to a 2026 firmware with WebView 106 is unknown; the owner
+  intends to disable it rather than find out.
