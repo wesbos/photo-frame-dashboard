@@ -347,6 +347,19 @@
     });
   }
 
+  // Arriving at the calendar always means "today, by person", never wherever the last person
+  // left it: this is a wall panel, so the state someone walks up to has to be predictable.
+  // V outlives a visit, and both the date and the mode have to be put back on every entry --
+  // V.date used to be set only when null, and V.mode never at all, so the frame opened on
+  // whatever date and mode the last tap had wandered off to. It also looked intermittent:
+  // views are pre-built at startup (see app.js refreshStale), which pinned V.date to the
+  // dayStart at boot, so after a day of uptime the calendar opened on "Yesterday".
+  function enter() {
+    V.mode = 'day';
+    V.date = App.dayStart(App.now());
+    V.scroll = null;
+  }
+
   App.register('calendar', {
     show: function (el, opts) {
       if (!V.el) {
@@ -354,10 +367,14 @@
         el.addEventListener('click', onClick);
         swipe(el);
       }
-      if (!V.date) V.date = App.dayStart(App.now());
-      if (!opts.rerender) V.scroll = null;
+      // A rerender (demo clock, or a feed refresh landing while the view is open) is not an
+      // entry, so it leaves the view on the day being read.
+      if (!opts.rerender) enter();
       render();
-    }
+    },
+    // The rail tap usually lands here, not in show(): App.go only rebuilds a view that is
+    // unbuilt or stale, and the calendar is neither by the time anyone presses the button.
+    resume: function () { enter(); render(); }
   });
   App.on('minute', function () {
     if (App.current !== 'calendar') return;
