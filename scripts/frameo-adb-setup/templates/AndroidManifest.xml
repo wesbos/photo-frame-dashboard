@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- build.py rewrites versionCode/versionName on every build; the values
+     below are only the defaults for the verified Frameo 1.30.19 baseline. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="net.frameo.frame"
+    android:versionCode="69881"
+    android:versionName="setup-69881">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
+    <application android:label="Frameo ADB Setup" />
+</manifest>
