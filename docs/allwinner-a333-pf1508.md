@@ -2,7 +2,8 @@
 
 One unit, an Anna Bella 15.6" frame from [Amazon US](https://www.amazon.com/dp/B0H4VVFPG6?tag=webo080-20),
 tested 2026-10-17 from macOS (Apple silicon, `adb` 37.0.0). Observations are separate from
-guesses, and guesses are marked.
+guesses, and guesses are marked. A third unit (same firmware and fingerprint, macOS host,
+2026-11-07) added the notes that say so.
 
 This is a different platform from the other AiMOR frames in this repo: Android 15, 64-bit, on an
 Allwinner A333. Persistent USB ADB took about five minutes, through the factory test app from
@@ -68,7 +69,8 @@ stick on an OTG adapter, and it's unknown whether the USB-C port does host mode.
 - **A saved factory Wi-Fi network**, `A8-20` (WPA2/WPA3), before any Wi-Fi setup. The frame
   would join it whenever it's in range. Removed with `adb shell cmd wifi forget-network <id>`, using the ID that
   `adb shell cmd wifi list-networks` shows for it (it was `0` here); it
-  stayed gone after reboots.
+  stayed gone after reboots. On the third unit it was named `A8-21` (also ID `0`), so check
+  `list-networks` instead of looking for an exact name.
 - **AiMOR** (`com.efercro.os.aimor`, in `/system/system_ext/priv-app/AUMIOS_MoShare`) runs as the
   `system` user and was the Home app (`cn.nineox.robot.aimor.activity.NavigationActivity`). Its
   `CommunicationService` was running. Guess: that's the same vendor command channel as on the
@@ -175,7 +177,29 @@ seconds after `--ez home true` and `set-home-activity` before rebooting: a reboo
 lost the Home alias and the frame booted into KISS. With the frame still offline,
 the demo dashboard was served from the computer over `adb reverse tcp:8080 tcp:8080` and saved
 with `--es url http://127.0.0.1:8080/`; it rendered full screen. Without Google Fonts (offline)
-the large clock and titles overflow; not checked online yet.
+the large clock and titles overflow; see [Web fonts and the bundled page](#web-fonts-and-the-bundled-page).
+
+### Web fonts and the bundled page
+
+On the third unit the demo was bundled into the APK (`KIOSK_SITE`, served at
+`http://127.0.0.1:8765/`). The frame booted with Wi-Fi turned off, and Wi-Fi was turned on
+afterwards. The titles still overflowed. Checked over WebView remote debugging (`--ez debug true`,
+then a normal launch to turn it off again): `document.fonts` held no Archivo or Instrument Serif
+faces at all.
+
+The bundled page doesn't fail without a network, so the kiosk has nothing to retry, and the Google
+Fonts stylesheet that failed while offline wasn't requested again when Wi-Fi came up. After a
+reload (the two-finger hold → **Reload dashboard** does the same), both families loaded and the
+titles fit on one line.
+
+After a later reboot with Wi-Fi on, both families loaded without a reload. The network was
+validated about 3 seconds after Home HQ started. Not separated: whether the request simply came
+after Wi-Fi joined, or the fonts came from WebView's cache after the earlier reload. Guess: if Wi-Fi
+joins later than the page loads, the fonts are missing until a reload.
+
+The large clock still overflows with the fonts loaded. At 1920×1080 and density 160, `.h-time`
+measured from 11 px above the top of the viewport, so the tops of the digits are cut off. Guess: the
+`line-height: .78` box assumes the 1280×800 layout; not checked on an 800-high screen.
 
 This firmware has no navigation bar, so turn on the kiosk's navigation service:
 
@@ -214,6 +238,45 @@ adb shell pm grant com.wesbos.homehq android.permission.WRITE_SECURE_SETTINGS
 Checked on that unit after an `adb install -r` (which also unbinds the service) and after a
 reboot: logcat showed `Navigation service listed but not running, rebinding`, the service was
 bound, and the buttons showed over Android Settings.
+
+### Allwinner's background manager can block the rebind
+
+On the third unit, with the grant, the buttons came back after 6 of 7 reboots. After the other one,
+the service stayed unbound although Home HQ logged its rebind. Logcat:
+
+```text
+ActivityManager: bindServiceInstance return, because awbms skipService ,callingPackage: android ,service: Intent { cmp=com.wesbos.homehq/.NavigationService (has extras) }
+```
+
+It appeared twice in that boot: for Android's own bind at boot and for Home HQ's rebind. On a boot
+where the rebind worked, the first line still appeared, for Android's bind only.
+
+`awbms` is Allwinner's background manager. `adb shell dumpsys background` showed version 3.3.9
+with `skipService:true`, a system whitelist that includes `com.softwinner`, `com.yhk.qeota` and
+`com.yhk.rabbit.yhkages` but not Home HQ, and an empty user whitelist. After a blocked bind, the
+global setting `awbms_notification_for_blocked_app` named `com.wesbos.homehq`, and SystemUI had
+posted a notification, "Home HQ: … unread message", with **Remove Restriction** and **Never Remind**.
+
+That button is the only route to the user whitelist found on this firmware, and it couldn't be
+reached:
+
+- The notification shade doesn't open. The status bar window is 0×0, and
+  `adb shell cmd statusbar expand-notifications` did nothing over the kiosk or over Android
+  Settings.
+- The button's receiver in SystemUI (action `awbms_remove_restriction`) is `exported=false`, so
+  `am broadcast` from ADB can't reach it.
+- The framework's `setUserWhitelist` needs `softwinner.permission.AWBACKGROUND_ACCESS`
+  (`internal|privileged`), which neither the shell nor an installed app gets.
+- The `persist.sys.awbms.enable` switch is labelled `system_prop` and SELinux is enforcing, so the
+  shell shouldn't be able to set it (not tried).
+
+The failure came right after `com.yhk.qeota` was disabled, so qeota was re-enabled to test it. The
+rebind then worked, but it also worked on the next three reboots with qeota disabled again (while
+`com.softwinner.update` and `com.softwinner.runin` were turned off). Guess: a race between Home
+HQ's rebind and the background manager, not a vendor app.
+
+When the buttons are missing, `adb shell am start -n com.wesbos.homehq/.MainActivity` brings the
+dashboard back from Android Settings.
 
 ## Not tested
 
