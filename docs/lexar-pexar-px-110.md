@@ -73,7 +73,7 @@ image builders and checkers, the repair script, their tests, our mtkclient patch
 to firmware `PF1106_V2.06_20250527` and refuse a backup with other hashes or another `product`
 layout. Not included: keys (a script fetches them and checks each hash), any backup or firmware
 file, the kiosk APK, the WebView APK, a logo picture, and the scripts that run from `/data`
-(section 16 step 8 gives their commands).
+(section 16, steps 6 and 8, gives their commands).
 
 ## 1. Identity
 
@@ -208,7 +208,7 @@ About 9 MB stayed free on `product`. The `product` extent in `super` was not mov
 own checker, run before any flash. For `boot` the checker shares no code with the builder, fails
 on a flipped bit and on a correctly signed image with the wrong contents, and a rebuild gives the
 same bytes. Tests run on the Mac against stand-ins: 173 for the recovery script (with a model of
-the bootloader), 52 for the `boot` wrapper, 91 for the repair script.
+the bootloader), 52 for the `boot` wrapper, 130 for the repair script, 27 that the tools refuse what they must, 30 for the write blocks in section 16.
 
 ## 6. What runs from `/data`
 
@@ -424,18 +424,37 @@ These are the steps we took on one unit, with the tools in
 [scripts/lexar-px110](../scripts/lexar-px110/README.md). They are not safe in every case. Sections
 13 and 15 still apply in full. Ask the owner before every write.
 
+**The order matters.** Three things must be in place before the step that leans on them:
+
+| Before | This must already work | Why |
+| --- | --- | --- |
+| Step 5, the first write | The loader port, proved in step 3 | It is the only net if the frame does not start |
+| Step 7, our recovery | The cover over the vendor's recovery installer, from step 6 | Android puts the stock recovery back at every start without it |
+| Step 9, the `boot` wrapper | The arming and the all clear, from step 8 | The wrapper arms the note at every start. With no all clear, the third restart stays in recovery |
+
+Do not arm the note (step 8) before our recovery is in (step 7). The stock recovery waits on our
+note for a key the frame does not have.
+
 How to read the steps:
 
 - Commands run on the computer, from `scripts/lexar-px110`, unless a block says **root shell**.
-  A root shell is `adb shell`, then `su 0 sh`.
-- Copy `unit.conf.example` to `unit.conf` first and fill it in. `$BACKUP` below is your `BACKUP_DIR`.
-- A hash that depends on your kiosk APK is written `<yours>`. Take it from the `SHA256SUMS` named.
+  A root shell is `adb shell`, then `su 0 sh`. Keep one root shell open through a step: later
+  blocks use what earlier ones set.
+- Copy `unit.conf.example` to `unit.conf` first and fill it in, your frame's `SERIAL` included.
+  `frame-doctor.sh` will not write without it. `$BACKUP` below is your `BACKUP_DIR`.
+- A hash that depends on your kiosk APK or your compiler is not printed here. A line on the
+  computer prints it as an assignment. Paste that line into the root shell.
+- **Each root-shell block that writes checks first, in the shell itself.** If a check fails it
+  prints `STOP` and writes nothing. Paste a block whole. Go on only when it prints the word the
+  step names.
 - Stop at the first check that does not match.
 - The builds, the checkers and the `frame-doctor.sh` commands are the ones we ran. The root-shell
-  lines follow our written procedures. Four pieces are written out fresh here and have **not**
-  been run on the frame in this exact form: the backup loop (step 2), the two note files (steps 6
-  and 7), the list edit (step 7) and the `/data` commands as loose lines (step 8). Read them
-  before you trust them.
+  writes follow our written procedures, but the lines here are written out fresh: the backup loop
+  (step 2), the `/data` commands as loose lines (steps 6 and 8), the note files (steps 7 and 9),
+  the list edit (step 9), and the checks wrapped round every root-shell write.
+  `tools/test_howto_blocks.sh` cuts those blocks out of this page and runs them on the computer
+  against stand-in partition files, good cases and bad. They have **not** been run on the frame
+  in this exact form, and the frame's shell is not the computer's. Read them before you trust them.
 
 ### Step 1. Identity and the key check (reads only)
 
@@ -454,18 +473,21 @@ Then the key check in section 4.
 
 ### Step 2. Full backup with hashes (reads only)
 
-Keep the backup outside git. It holds your Wi-Fi password and identifiers. A loop of this shape
+Keep the backup outside git. It holds your Wi-Fi password and identifiers. Set `BACKUP` to your
+`BACKUP_DIR` first. The loop does nothing if the folder is not set or cannot be entered. `dd` is
+silenced on the frame, so that its report does not end up inside the image. A loop of this shape
 gives the files the tools expect (we did not keep ours word for word):
 
 ```sh
-mkdir -p "$BACKUP" && cd "$BACKUP"
-for p in $(adb shell su 0 ls /dev/block/by-name | tr -d '\r'); do
-  [ "$p" = userdata ] && continue
-  adb exec-out su 0 dd if=/dev/block/by-name/$p bs=1048576 > $p.img
-done
-adb exec-out su 0 dd if=/dev/block/mmcblk0boot0 bs=1048576 > mmcblk0boot0.img   # the preloader
-adb shell su 0 sgdisk --print /dev/block/mmcblk0 > partition-table.txt
-shasum -a 256 *.img > frame.sha256
+: "${BACKUP:?set BACKUP to your BACKUP_DIR first}"
+mkdir -p "$BACKUP" && ( cd "$BACKUP" &&
+  for p in $(adb shell su 0 ls /dev/block/by-name | tr -d '\r'); do
+    [ "$p" = userdata ] && continue
+    adb exec-out "su 0 sh -c 'dd if=/dev/block/by-name/$p bs=1048576 2>/dev/null'" > "$p.img"
+  done &&
+  adb exec-out "su 0 sh -c 'dd if=/dev/block/mmcblk0boot0 bs=1048576 2>/dev/null'" > mmcblk0boot0.img &&
+  adb shell su 0 sgdisk --print /dev/block/mmcblk0 > partition-table.txt &&
+  shasum -a 256 *.img > frame.sha256 )
 adb shell 'su 0 sh -c "cd /dev/block/by-name && sha256sum boot recovery logo lk vbmeta vbmeta_system vbmeta_vendor super para"'
 ```
 
@@ -491,8 +513,8 @@ git -C repo apply /path/to/scripts/lexar-px110/mtkclient-px110.patch
 python3 -m venv venv && venv/bin/pip install -r repo/requirements.txt
 ```
 
-The patch header says what the four changes are. `pip` installs mtkclient's own requirements,
-which mtkclient does not pin by hash. Read them first.
+The patch makes four changes in three files. Its header lists them. `pip` installs mtkclient's own
+requirements, which mtkclient does not pin by hash. Read them first.
 
 **Read, then compare.** Serial mode only. The loader shows for 2–3 seconds, so `frame-doctor.sh`
 starts mtkclient first and then restarts the frame:
@@ -541,15 +563,14 @@ Build and check on the computer:
 ```sh
 python3 -I tools/build.py --kiosk-apk /path/to/your-kiosk.apk
 zsh tools/run_tests.sh
-cat build/out/SHA256SUMS
 grep "combined vbmeta digest" build/out/test-output.txt | sed -n 2p   # the digest the frame will report
-shasum -a 256 build/work/patched-super.img                            # the whole of super after the write
 ```
 
 - **Check:** `build.py` prints `backup ok`, `key ok`, `generators ok`, two `read back ok` lines and a
-  clean `e2fsck`. `run_tests.sh` ends `SUMMARY: 0 test(s) failed`. It writes `SHA256SUMS` only then.
+  clean `e2fsck`. `run_tests.sh` prints `SUMMARY: 0 test(s) failed`. It writes
+  `build/out/SHA256SUMS` only then. **Stop here unless it did.**
 
-Put the images and the stock copies on the frame, and look before writing:
+Put the images and the stock copies on the frame:
 
 ```sh
 adb shell mkdir -p /data/local/tmp/lx
@@ -559,204 +580,105 @@ adb push build/work/stock/vbmeta.img        /data/local/tmp/lx/stock-vbmeta.img
 adb push build/work/stock/vbmeta_system.img /data/local/tmp/lx/stock-vbmeta_system.img
 ```
 
-Root shell:
+Print the four expected hashes as assignments, and paste the four lines into the root shell:
 
 ```sh
-cd /data/local/tmp/lx && sha256sum *.img
-sha256sum /dev/block/by-name/super /dev/block/by-name/vbmeta /dev/block/by-name/vbmeta_system
-S=$(readlink /dev/block/by-name/super); cat /sys/class/block/${S##*/}/start
-blockdev --getro /dev/block/by-name/super /dev/block/by-name/vbmeta /dev/block/by-name/vbmeta_system
+awk '$2 == "product.img" { print "P=" $1 } $2 == "vbmeta_system.img" { print "VS=" $1 } $2 == "vbmeta.img" { print "VB=" $1 }' build/out/SHA256SUMS
+echo "SUPER_AFTER=$(shasum -a 256 build/work/patched-super.img | cut -d' ' -f1)"
 ```
-
-- **Check before the write:** the three new files match `SHA256SUMS`. The stock files are
-  `c5384ae1…` (`stock-product.img`), `e8ceb483…` and `cecf0e04…`. The live partitions are
-  `47a75dd0…`, `e8ceb483…`, `cecf0e04…`. The start sector is `520704`. Each `getro` is `0`.
 
 **The risk here.** The three writes cannot be made atomic. For a few seconds the flash is
 inconsistent. A read of `product` in that window, or a power cut, can leave a frame that does not
-start. So: stop Android first, write as one command with no pause, read nothing from `/product`.
+start. So the block stops Android first, writes as one command with no pause, and reads nothing
+from `/product`.
 
-Root shell, with the owner's yes. Rehearse first with `of=/dev/null` and no `seek=`:
-
-```sh
-stop; sync
-cd /data/local/tmp/lx &&
-  dd if=product.img       of=/dev/block/by-name/super bs=4096 seek=32512 conv=notrunc,fsync &&
-  dd if=vbmeta_system.img of=/dev/block/by-name/vbmeta_system bs=4096 conv=notrunc,fsync &&
-  dd if=vbmeta.img        of=/dev/block/by-name/vbmeta bs=4096 conv=notrunc,fsync &&
-  sync && echo WRITES-DONE
-for p in super vbmeta vbmeta_system; do blockdev --flushbufs /dev/block/by-name/$p; done
-sha256sum /dev/block/by-name/super /dev/block/by-name/vbmeta /dev/block/by-name/vbmeta_system
-```
-
-- **Check before any restart:** `super` equals the hash of `patched-super.img`. `vbmeta` and
-  `vbmeta_system` equal their lines in `SHA256SUMS`. Only then `reboot`.
-- **Check after the start:** `ro.boot.verifiedbootstate` is `green`, `ro.boot.vbmeta.device_state`
-  is `locked`, `ro.boot.vbmeta.digest` is the digest you noted, `pm path <your kiosk package>` is
-  under `/product/app/`, and `getprop init.svc.photoframe` is `stopped` until a `boot.sh` exists.
-- **Way back, root shell still up:** do not restart. Run the same three `dd` lines with the three
-  `stock-` files, flush, and read back `47a75dd0…`, `e8ceb483…`, `cecf0e04…`. Then `reboot`.
-- **Way back, frame does not start:** `bash tools/frame-doctor.sh restore-set stock` through the
-  loader port. It writes `product` by byte offset. **We never ran that on the frame.** It is tested
-  on a model only. Our `product` restores on the frame were done by the recovery (step 6).
-
-### Step 6. Our recovery, and the known-good set
-
-```sh
-python3 -I tools/test_logosign.py --build     # the recovery tests include the logo tests
-python3 -I tools/recbuild.py
-python3 -I tools/recverify.py build/out-recovery/recovery-rescue.img --stock "$BACKUP/recovery.img" \
-  --expect-changed prop.default,system/bin/rescue.sh,system/etc/init/hw/init.rc
-python3 -I tools/test_recovery.py
-( cd build/out-recovery && shasum -a 256 -c SHA256SUMS )
-```
-
-- **Check:** `recovery-stock-resigned.img` is `14950f34…`, byte for byte the stock one. That proves
-  the packer, the key and the signer. `recverify.py` ends `RESULT: PASS`. The tests end
-  `ALL PASS (173 checks)`. With the tool versions in the tools README, `recovery-rescue.img` is
-  `780f0a87096639994194075fe4ef85b4d126fcfe384176daab70c0d249a10225`.
-
-Write it through the loader port:
-
-```sh
-bash tools/frame-doctor.sh restore recovery ours --dry-run
-bash tools/frame-doctor.sh restore recovery ours
-```
-
-Writing `recovery` does not change how Android starts. The bootloader reads it only when the note
-says so.
-
-**Android puts the stock recovery back.** A vendor script, `/vendor/bin/install-recovery.sh`,
-rewrites `recovery` at every start. We cover it with a do-nothing script early in the start (step 8).
-Until that is in place, expect `status` to show the stock recovery again after a restart.
-
-**First start, the careful way.** Use a note that tells the stock recovery program to leave at
-once. That program is unchanged in our image. Root shell:
+**Root shell**, with the owner's yes. The block writes only if all of this holds: the three new
+files have the hashes you pasted, the three stock copies are the stock ones, the three live
+partitions are still stock, `super` starts at sector 520704, and none of the three is read-only.
 
 ```sh
 cd /data/local/tmp/lx
-{ printf 'boot-recovery'; dd if=/dev/zero bs=51 count=1 2>/dev/null
-  printf 'recovery\n--just_exit\n'; dd if=/dev/zero bs=1963 count=1 2>/dev/null; } > note-exit.bin
-wc -c note-exit.bin                                          # 2048
-dd if=/dev/block/by-name/para bs=2048 count=1 2>/dev/null | sha256sum   # all zeros: e5a00aa9…
-dd if=note-exit.bin of=/dev/block/by-name/para bs=2048 count=1 conv=notrunc; sync
-dd if=/dev/block/by-name/para of=para.now bs=2048 count=1 2>/dev/null; cmp para.now note-exit.bin && reboot
+h() { sha256sum "$1" | cut -d' ' -f1; }
+D=/dev/block/by-name
+S=$(readlink $D/super)
+if [ -n "$P" ] && [ -n "$VS" ] && [ -n "$VB" ] &&
+   [ "$(h product.img)" = "$P" ] && [ "$(h vbmeta_system.img)" = "$VS" ] && [ "$(h vbmeta.img)" = "$VB" ] &&
+   [ "$(h stock-product.img)" = c5384ae1b53f444af60ef53735086c5e6c284df42912bbcedb314a2fb560d788 ] &&
+   [ "$(h stock-vbmeta.img)" = e8ceb4834050f0a0c49a05d8f2dabf73671b5aafefa9520e301e3e3cf1c8a6c4 ] &&
+   [ "$(h stock-vbmeta_system.img)" = cecf0e040df5d2c59735b10815b867227ebeb541e9b1a6fb8ad902c697194cbb ] &&
+   [ "$(h $D/super)" = 47a75dd03635c7a1d40e757a034ade0bce057f8429c15f2e732116cd3c231d01 ] &&
+   [ "$(h $D/vbmeta)" = e8ceb4834050f0a0c49a05d8f2dabf73671b5aafefa9520e301e3e3cf1c8a6c4 ] &&
+   [ "$(h $D/vbmeta_system)" = cecf0e040df5d2c59735b10815b867227ebeb541e9b1a6fb8ad902c697194cbb ] &&
+   [ "$(cat /sys/class/block/${S##*/}/start)" = 520704 ] &&
+   [ "$(blockdev --getro $D/super)$(blockdev --getro $D/vbmeta)$(blockdev --getro $D/vbmeta_system)" = 000 ]; then
+  stop; sync
+  dd if=product.img       of=$D/super bs=4096 seek=32512 conv=notrunc,fsync &&
+  dd if=vbmeta_system.img of=$D/vbmeta_system bs=4096 conv=notrunc,fsync &&
+  dd if=vbmeta.img        of=$D/vbmeta bs=4096 conv=notrunc,fsync &&
+  sync && echo WRITES-DONE
+else
+  echo "STOP: a check failed. Nothing was written."
+fi
 ```
 
-- **Check:** the frame restarts into Android by itself within about a minute. `/cache/rescue.marker`
-  says `note at start: boot-recovery --just_exit (ours)` and `list: none`. The first 2048 bytes of
-  `para` are zeros again. The hashes of `boot`, `logo`, `vbmeta`, `vbmeta_system` and `super` are
-  unchanged.
-- **If `para` was not all zeros before the write:** stop. A reset or an update is pending.
-
-Then store the known-good set, from a running, green Android:
+**Stop here unless it printed `WRITES-DONE`.** After `STOP`, nothing was written: find out why.
+Then read back, same root shell, before any restart:
 
 ```sh
-bash tools/frame-doctor.sh store
-bash tools/frame-doctor.sh status
+for p in super vbmeta vbmeta_system; do blockdev --flushbufs $D/$p; done
+if [ -n "$SUPER_AFTER" ] && [ "$(h $D/super)" = "$SUPER_AFTER" ] &&
+   [ "$(h $D/vbmeta)" = "$VB" ] && [ "$(h $D/vbmeta_system)" = "$VS" ]; then
+  echo READBACK-OK
+else
+  echo "READBACK-WRONG: do not restart. Put stock back."
+fi
 ```
 
-- **Check:** `store` ends `DONE: known-good set stored and read back.` `status` shows five list
-  lines that say `matches the frame`.
-- **Way back:** `bash tools/frame-doctor.sh restore recovery stock`. The store is files in
-  `/cache/rescue`. `bash tools/frame-doctor.sh clear-note` removes our note and no other.
-- A factory reset wipes `cache`. Run `store` again afterwards. Run it after every flash too.
-
-### Step 7. The `boot` wrapper, as a guarded flash
-
-**Before you start, all of these must be true.** The wrapper arms the note at every start. Without
-a working all clear, every later restart goes through recovery, and the third stays there.
-
-1. The arming and the all clear from step 8 are on the frame and you have seen them work: our note
-   is in `para` right after a start, and 5 minutes later the first 2048 bytes are zeros again.
-2. `bash tools/frame-doctor.sh status` says healthy, with the store complete and holding the stock
-   `boot`.
-3. These pass:
+- **Only after `READBACK-OK`:** `reboot`.
+- **Check after the start:** `ro.boot.verifiedbootstate` is `green`, `ro.boot.vbmeta.device_state`
+  is `locked`, `ro.boot.vbmeta.digest` is the digest you noted, `pm path <your kiosk package>` is
+  under `/product/app/`, and `getprop init.svc.photoframe` is `stopped` until a `boot.sh` exists.
+- **Way back, root shell still up** (after `READBACK-WRONG`, or a `dd` that failed part-way): do
+  not restart. This block checks the three stock copies, writes them and reads back:
 
 ```sh
-python3 -I tools/bootbuild.py
-( cd build/out-boot && shasum -a 256 -c SHA256SUMS )
-python3 -I tools/bootverify.py build/out-boot/boot-wrap-recovery.img --stock "$BACKUP/boot.img" \
-  --expect-changed init,init.real --real recovery --wrapper build/out-boot/bootwrap.elf
-python3 -I src/bootwrap/initscan.py
-python3 -I tools/test_bootwrap.py
+cd /data/local/tmp/lx
+h() { sha256sum "$1" | cut -d' ' -f1; }
+D=/dev/block/by-name
+if [ "$(h stock-product.img)" = c5384ae1b53f444af60ef53735086c5e6c284df42912bbcedb314a2fb560d788 ] &&
+   [ "$(h stock-vbmeta.img)" = e8ceb4834050f0a0c49a05d8f2dabf73671b5aafefa9520e301e3e3cf1c8a6c4 ] &&
+   [ "$(h stock-vbmeta_system.img)" = cecf0e040df5d2c59735b10815b867227ebeb541e9b1a6fb8ad902c697194cbb ]; then
+  stop; sync
+  dd if=stock-product.img       of=$D/super bs=4096 seek=32512 conv=notrunc,fsync &&
+  dd if=stock-vbmeta_system.img of=$D/vbmeta_system bs=4096 conv=notrunc,fsync &&
+  dd if=stock-vbmeta.img        of=$D/vbmeta bs=4096 conv=notrunc,fsync && sync
+  for p in super vbmeta vbmeta_system; do blockdev --flushbufs $D/$p; done
+  if [ "$(h $D/super)" = 47a75dd03635c7a1d40e757a034ade0bce057f8429c15f2e732116cd3c231d01 ] &&
+     [ "$(h $D/vbmeta)" = e8ceb4834050f0a0c49a05d8f2dabf73671b5aafefa9520e301e3e3cf1c8a6c4 ] &&
+     [ "$(h $D/vbmeta_system)" = cecf0e040df5d2c59735b10815b867227ebeb541e9b1a6fb8ad902c697194cbb ]; then
+    echo STOCK-BACK-OK
+  else
+    echo "STOCK-BACK-WRONG: do not restart. Run this block again."
+  fi
+else
+  echo "STOP: the stock copies on the frame are not right. Nothing was written."
+fi
 ```
 
-- **Check:** `boot-stock-resigned.img` is `d232adc9…`, the stock one. `bootverify.py` ends
-  `RESULT: PASS`. `initscan.py` ends `RESULT: PROVEN`. The tests say `Ran 52 tests` and `OK`.
-  With our compiler the image is `2ed44261404a8893b7a901a62ec0e8bacf92ca63afe29a76fbb063833fa4a25c`.
-  Another compiler may give other bytes. Then `bootverify.py` is your check, and `<new>` below is
-  your own hash from `build/out-boot/SHA256SUMS`.
+  Restart only after `STOCK-BACK-OK`.
+- **Way back, frame does not start:** `bash tools/frame-doctor.sh restore-set stock` through the
+  loader port. It writes `product` by byte offset. **We never ran that on the frame.** It is tested
+  on a model only. Our `product` restores on the frame were done by the recovery (step 7).
 
-**7a. Prove the way back first.** A write of the same bytes, through the loader port:
-
-```sh
-bash tools/frame-doctor.sh restore boot stock
-```
-
-- **Check:** `boot: read back from the frame, correct.`, green. If this does not pass, stop. There
-  is no net for the next part.
-
-**7b. Guard the list.** The `boot` line expects the new image. Its stored copy stays the stock one.
-
-```sh
-adb shell su 0 cat /cache/rescue/list > build/list.now
-NEW=$(awk '$2 == "boot-wrap-recovery.img" { print $1 }' build/out-boot/SHA256SUMS)
-awk -v n="$NEW" 'NR == 1 { print; print "guarded"; next } $1 == "boot" { $2 = n } { print }' build/list.now > build/list.guarded
-diff build/list.now build/list.guarded     # one added line, guarded; one changed hash, on the boot line
-adb push build/list.guarded /data/local/tmp/lx/list.guarded
-adb push build/out-boot/boot-wrap-recovery.img /data/local/tmp/lx/boot-new.img
-adb push "$BACKUP/boot.img" /data/local/tmp/lx/boot-stock.img
-```
-
-**7c. Arm, write, read back.** Root shell, with the owner's yes:
-
-```sh
-cd /data/local/tmp/lx && sha256sum boot-new.img boot-stock.img /dev/block/by-name/boot   # <new>, d232adc9…, d232adc9…
-cp list.guarded /cache/rescue/list.new && sync && mv /cache/rescue/list.new /cache/rescue/list
-rm -f /cache/rescue/rung /cache/rescue/attempts; sync
-{ printf 'boot-recovery'; dd if=/dev/zero bs=2035 count=1 2>/dev/null; } > note.bin    # 2048 bytes
-dd if=note.bin of=/dev/block/by-name/para bs=2048 count=1 conv=notrunc; sync
-dd if=/dev/block/by-name/para of=para.now bs=2048 count=1 2>/dev/null; cmp para.now note.bin || echo NOTE-NOT-SET
-stop; sync
-dd if=boot-new.img of=/dev/block/by-name/boot bs=1048576 conv=notrunc,fsync
-blockdev --flushbufs /dev/block/by-name/boot; sha256sum /dev/block/by-name/boot
-```
-
-- **Check before the restart:** no `NOTE-NOT-SET`, and `boot` reads back as `<new>`. Then `reboot`.
-  If it reads back as anything else, write `boot-stock.img` the same way, read back `d232adc9…`,
-  and put `list.now` back.
-- **What happens:** recovery starts first because of the note. It finds exactly the new image,
-  leaves it, clears the note and restarts. Then Android starts.
-- **Check after the start:** green, locked, `boot` is `<new>`. `dmesg | grep bootwrap` shows
-  `bootwrap: start`, then `bootwrap: para was empty: armed boot-recovery, read back ok` with a
-  device number, then `bootwrap: done, starting init.real`. After the all clear `para` is zeros again.
-
-**7d. After the all clear,** take the guard off and store the new set:
-
-```sh
-grep -v '^guarded$' build/list.guarded > build/list.after
-adb push build/list.after /data/local/tmp/lx/list.after
-adb shell su 0 sh -c "'cp /data/local/tmp/lx/list.after /cache/rescue/list.new && sync && mv /cache/rescue/list.new /cache/rescue/list && sync'"
-bash tools/frame-doctor.sh store
-```
-
-- **What the guard does not catch:** an image that was written correctly and still does not start.
-  No note is set by anyone then. The net is 7a: `bash tools/frame-doctor.sh restore boot stock`.
-- **Way back, Android up:** `dd` `boot-stock.img` back as in 7c, read back `d232adc9…`, restart,
-  then `store`, so the list expects the stock `boot` again.
-- **The side effect:** section 9. A restart within 5 minutes of a start goes through recovery first.
-
-### Step 8. The `/data` side
+### Step 6. The `/data` side, first part
 
 No flash. A factory reset wipes all of it. The hook from step 5 runs
 `/data/local/photoframe/early.sh` at `post-fs-data` and `/data/local/photoframe/boot.sh` after
 start-up, both as root. Ours are part of the owner's dashboard set-up and are not in this PR. These
-are the commands they run. Do the all clear before step 7.
+are the commands they run. The note handling comes later, in step 8.
 
-**Early, before Wi-Fi (`early.sh`).** Keep our recovery, switch Android's own rescue party off,
-put the firewall up, arm the note (the same lines as the all clear below, the other way round: write
-`para.note` only when `para` is all zeros, then read it back):
+**Early, before Wi-Fi (`early.sh`).** Cover the vendor script that rewrites `recovery` at every
+start, switch Android's own rescue party off, put the firewall up:
 
 ```sh
 mount -o bind /data/local/photoframe/keep-recovery.sh /vendor/bin/install-recovery.sh   # a script that only exits 0
@@ -773,33 +695,12 @@ done
 Ours checks each rule with `-C` first and re-checks every 10 seconds, because Android's network
 service rebuilds its chains. If the firewall script is missing, nothing else is started.
 
-- **Check:** `iptables -S OUTPUT` and `ip6tables -S OUTPUT` start with the loopback accept, the
-  kiosk accept and the reject, in that order. `iptables -S INPUT` has the 5555 drop.
-- **Way back:** delete the rules with `-D`, or restart without the script.
+- **Check, after a restart:** `grep install-recovery /proc/mounts` shows the cover. **Step 7 needs
+  it.** `iptables -S OUTPUT` and `ip6tables -S OUTPUT` start with the loopback accept, the kiosk
+  accept and the reject, in that order. `iptables -S INPUT` has the 5555 drop.
+- **Way back:** delete the rules with `-D`, or remove the script and restart.
 
-**The all clear, after 5 healthy minutes (`boot.sh`).** Only once the kiosk has been seen in front
-with a live page and the frame has been up 300 seconds. It clears the ladder counter first, then
-the note, and only a note that is exactly ours:
-
-```sh
-rm -f /cache/rescue/rung /cache/rescue/attempts; sync
-P=/dev/block/by-name/para; T=/data/local/tmp/lx; mkdir -p $T
-dd if=/dev/zero of=$T/para.zero bs=2048 count=1 2>/dev/null
-{ printf 'boot-recovery'; dd if=/dev/zero bs=2035 count=1 2>/dev/null; } > $T/para.note
-dd if=$P of=$T/para.cur bs=2048 count=1 2>/dev/null
-if cmp -s $T/para.cur $T/para.note; then
-  dd if=$T/para.zero of=$P bs=2048 count=1 conv=notrunc 2>/dev/null; sync
-  dd if=$P of=$T/para.cur bs=2048 count=1 2>/dev/null; cmp -s $T/para.cur $T/para.zero && echo "note cleared"
-fi
-```
-
-A safe-mode start (`/cache/rescue/safe` exists) must not do this. [STORE-FORMAT.md](../scripts/lexar-px110/STORE-FORMAT.md)
-has the full contract between Android and the recovery, with the 15-minute deadline.
-
-- **Check:** after 5 minutes `para` is zeros and `/cache/rescue/rung` is gone.
-- **Way back:** `bash tools/frame-doctor.sh safe off` resets the counters and our note.
-
-**WebView 106.** A folder with a WebView 106 APK named `webview.apk` and its unpacked
+**WebView 106 (`boot.sh`).** A folder with a WebView 106 APK named `webview.apk` and its unpacked
 `lib/arm/*.so`. We do not redistribute the APK.
 
 ```sh
@@ -811,7 +712,7 @@ stop; start
   after the `stop; start`.
 - **Way back:** restart. The mount is gone. Remove the folder and it stays gone.
 
-**DuraSpeed off.**
+**DuraSpeed off (`boot.sh`).**
 
 ```sh
 setprop persist.vendor.duraspeed.support 0
@@ -822,15 +723,279 @@ setprop persist.vendor.duraspeed.app.on 0
   does not name it.
 - **Way back:** set both to `1` and restart.
 
-### Step 9. Optional: the first picture
+### Step 7. Our recovery, and the known-good set
+
+**Before you start:** the cover from step 6 is live. `adb shell su 0 grep install-recovery /proc/mounts`
+prints a line. Without it Android writes the stock recovery back at the next start, and the first
+start below would run the stock recovery, not ours.
+
+```sh
+python3 -I tools/test_logosign.py --build     # the recovery tests include the logo tests
+python3 -I tools/recbuild.py
+python3 -I tools/recverify.py build/out-recovery/recovery-rescue.img --stock "$BACKUP/recovery.img" \
+  --expect-changed prop.default,system/bin/rescue.sh,system/etc/init/hw/init.rc
+python3 -I tools/test_recovery.py
+( cd build/out-recovery && shasum -a 256 -c SHA256SUMS )
+```
+
+- **Check:** `recovery-stock-resigned.img` is `14950f34…`, byte for byte the stock one. That proves
+  the packer, the key and the signer. `recverify.py` ends `RESULT: PASS`. The tests end
+  `ALL PASS (173 checks)`. With the tool versions in the tools README, `recovery-rescue.img` is
+  `780f0a87096639994194075fe4ef85b4d126fcfe384176daab70c0d249a10225`. **Stop here unless all pass.**
+
+Write it through the loader port:
+
+```sh
+bash tools/frame-doctor.sh restore recovery ours --dry-run
+bash tools/frame-doctor.sh restore recovery ours
+bash tools/frame-doctor.sh status
+```
+
+- **Check:** the restore prints `recovery: read back from the frame, correct.` After the restart,
+  `status` still labels `recovery` as `ours, recovery`. If it says `factory`, the cover is not
+  working: go back to step 6.
+
+Writing `recovery` does not change how Android starts. The bootloader reads it only when the note
+says so.
+
+**First start, the careful way.** Use a note that tells the stock recovery program to leave at
+once. That program is unchanged in our image. **Root shell.** The block writes the note only if
+the first 2048 bytes of `para` are all zeros. Anything else there is a pending reset or update,
+and it is left alone:
+
+```sh
+cd /data/local/tmp/lx
+PARA=/dev/block/by-name/para
+{ printf 'boot-recovery'; dd if=/dev/zero bs=51 count=1 2>/dev/null
+  printf 'recovery\n--just_exit\n'; dd if=/dev/zero bs=1963 count=1 2>/dev/null; } > note-exit.bin
+dd if=/dev/zero of=zero.bin bs=2048 count=1 2>/dev/null
+dd if=$PARA of=para.now bs=2048 count=1 2>/dev/null
+if [ "$(wc -c < note-exit.bin)" -eq 2048 ] && [ "$(wc -c < para.now)" -eq 2048 ] && cmp -s para.now zero.bin; then
+  dd if=note-exit.bin of=$PARA bs=2048 count=1 conv=notrunc 2>/dev/null; sync
+  dd if=$PARA of=para.now bs=2048 count=1 2>/dev/null
+  if cmp -s para.now note-exit.bin; then echo NOTE-SET; else echo "NOTE-NOT-SET: do not restart"; fi
+else
+  echo "STOP: para is not empty (a reset or an update is pending), or it could not be read. Nothing was written."
+fi
+```
+
+- **Only after `NOTE-SET`:** `reboot`.
+- **Check:** the frame restarts into Android by itself within about a minute. `/cache/rescue.marker`
+  says `note at start: boot-recovery --just_exit (ours)` and `list: none`. The first 2048 bytes of
+  `para` are zeros again. The hashes of `boot`, `logo`, `vbmeta`, `vbmeta_system` and `super` are
+  unchanged.
+- **After `STOP`:** nothing was written. Do not go on until you know what the note in `para` is.
+
+Then store the known-good set, from a running, green Android:
+
+```sh
+bash tools/frame-doctor.sh store
+bash tools/frame-doctor.sh status
+```
+
+- **Check:** `store` ends `DONE: known-good set stored and read back.` `status` shows five list
+  lines that say `matches the frame`.
+- **Way back:** `bash tools/frame-doctor.sh restore recovery stock`. The store is files in
+  `/cache/rescue`. `bash tools/frame-doctor.sh clear-note` removes our note and no other.
+- A factory reset wipes `cache`. Run `store` again afterwards. Run it after every flash too.
+
+### Step 8. The `/data` side, second part: arming and the all clear
+
+Only after step 7. From here a restart in the first 5 minutes goes through our recovery, and the
+ladder counts it (section 9).
+
+**Arm the note, early (`early.sh`).** Only over an empty `para`:
+
+```sh
+PARA=/dev/block/by-name/para; T=/data/local/tmp/lx; mkdir -p $T
+dd if=/dev/zero of=$T/para.zero bs=2048 count=1 2>/dev/null
+{ printf 'boot-recovery'; dd if=/dev/zero bs=2035 count=1 2>/dev/null; } > $T/para.note
+dd if=$PARA of=$T/para.cur bs=2048 count=1 2>/dev/null
+if [ "$(wc -c < $T/para.cur)" -eq 2048 ] && cmp -s $T/para.cur $T/para.zero; then
+  dd if=$T/para.note of=$PARA bs=2048 count=1 conv=notrunc 2>/dev/null; sync
+  dd if=$PARA of=$T/para.cur bs=2048 count=1 2>/dev/null
+  cmp -s $T/para.cur $T/para.note && echo "note armed" || echo "note did not read back"
+elif cmp -s $T/para.cur $T/para.note; then
+  echo "note already armed"
+else
+  echo "para holds something else, left alone"
+fi
+```
+
+**The all clear, after 5 healthy minutes (`boot.sh`).** Only once the kiosk has been seen in front
+with a live page and the frame has been up 300 seconds. It clears the ladder counter first, then
+the note, and only a note that is exactly ours:
+
+```sh
+rm -f /cache/rescue/rung /cache/rescue/attempts; sync
+PARA=/dev/block/by-name/para; T=/data/local/tmp/lx; mkdir -p $T
+dd if=/dev/zero of=$T/para.zero bs=2048 count=1 2>/dev/null
+{ printf 'boot-recovery'; dd if=/dev/zero bs=2035 count=1 2>/dev/null; } > $T/para.note
+dd if=$PARA of=$T/para.cur bs=2048 count=1 2>/dev/null
+if cmp -s $T/para.cur $T/para.note; then
+  dd if=$T/para.zero of=$PARA bs=2048 count=1 conv=notrunc 2>/dev/null; sync
+  dd if=$PARA of=$T/para.cur bs=2048 count=1 2>/dev/null
+  cmp -s $T/para.cur $T/para.zero && echo "note cleared" || echo "note did not clear"
+elif cmp -s $T/para.cur $T/para.zero; then
+  echo "no note"
+else
+  echo "para holds something else, left alone"
+fi
+```
+
+A safe-mode start (`/cache/rescue/safe` exists) must not do the all clear.
+[STORE-FORMAT.md](../scripts/lexar-px110/STORE-FORMAT.md) has the full contract between Android
+and the recovery, with the 15-minute deadline.
+
+- **Check:** right after a start, `bash tools/frame-doctor.sh status` says `Note in para: OURS`.
+  Five minutes later it says `Note in para: none`, and `/cache/rescue/rung` is gone. Restart once
+  inside the 5 minutes: the frame goes through recovery, comes back by itself, and the all clear
+  follows. **Step 9 needs all of this.**
+- **Way back:** remove the two pieces from your scripts. `bash tools/frame-doctor.sh safe off`
+  resets the counters and our note.
+
+### Step 9. The `boot` wrapper, as a guarded flash
+
+**Before you start, all of these must be true:**
+
+1. The arming and the all clear from step 8 are on the frame and you have seen them work.
+2. `bash tools/frame-doctor.sh status` says healthy, with the store complete and holding the stock
+   `boot`.
+3. These pass:
+
+```sh
+python3 -I tools/bootbuild.py
+( cd build/out-boot && shasum -a 256 -c SHA256SUMS )
+python3 -I tools/bootverify.py build/out-boot/boot-wrap-recovery.img --stock "$BACKUP/boot.img" \
+  --expect-changed init,init.real --real recovery --wrapper build/out-boot/bootwrap.elf
+python3 -I src/bootwrap/initscan.py
+python3 -I tools/test_bootwrap.py
+```
+
+- **Check:** `boot-stock-resigned.img` is `d232adc9…`, the stock one. `bootverify.py` ends
+  `RESULT: PASS`. `initscan.py` ends `RESULT: PROVEN`. The tests say `Ran 52 tests` and `OK`.
+  With our compiler the image is `2ed44261404a8893b7a901a62ec0e8bacf92ca63afe29a76fbb063833fa4a25c`.
+  Another compiler may give other bytes. Then `bootverify.py` is your check. **Stop here unless
+  all pass.**
+
+**9a. Prove the way back first.** A write of the same bytes, through the loader port:
+
+```sh
+bash tools/frame-doctor.sh restore boot stock
+```
+
+- **Check:** `boot: read back from the frame, correct.`, green. If this does not pass, stop. There
+  is no net for the next part.
+
+**9b. Make the guarded list on the computer.** The `boot` line expects the new image. Its stored
+copy stays the stock one.
+
+```sh
+adb shell su 0 cat /cache/rescue/list > build/list.now
+NEW=$(awk '$2 == "boot-wrap-recovery.img" { print $1 }' build/out-boot/SHA256SUMS)
+awk -v n="$NEW" 'NR == 1 { print; print "guarded"; next } $1 == "boot" { $2 = n } { print }' build/list.now > build/list.guarded
+diff build/list.now build/list.guarded
+adb push build/list.guarded /data/local/tmp/lx/list.guarded
+adb push build/out-boot/boot-wrap-recovery.img /data/local/tmp/lx/boot-new.img
+adb push "$BACKUP/boot.img" /data/local/tmp/lx/boot-stock.img
+echo "NEW=$NEW"      # paste this line into the root shell
+```
+
+- **Check:** `diff` shows exactly one added line, `guarded`, and one changed hash, on the `boot`
+  line. **Stop here unless it does.**
+
+**9c. Arm, write, read back.** **Root shell**, with the owner's yes, after pasting the `NEW=` line.
+The block goes on only if all of this holds: `boot-new.img` has the hash in `NEW`, `boot-stock.img`
+and the live `boot` are the stock one, the pushed list is whole, guarded and expects `NEW`, and
+`para` is empty or holds our plain note. Then it puts the list in, arms the note and reads it
+back. Only with the note armed does it stop Android and write `boot`:
+
+```sh
+cd /data/local/tmp/lx
+h() { sha256sum "$1" | cut -d' ' -f1; }
+D=/dev/block/by-name
+STOCK=d232adc9af4f5dfe12c6c8bc6548519ef2dc113693e1cc7ad9665b7041718172
+{ printf 'boot-recovery'; dd if=/dev/zero bs=2035 count=1 2>/dev/null; } > note.bin
+dd if=/dev/zero of=zero.bin bs=2048 count=1 2>/dev/null
+dd if=$D/para of=para.now bs=2048 count=1 2>/dev/null
+if [ -n "$NEW" ] && [ "$NEW" != $STOCK ] &&
+   [ "$(h boot-new.img)" = "$NEW" ] && [ "$(h boot-stock.img)" = $STOCK ] && [ "$(h $D/boot)" = $STOCK ] &&
+   [ "$(head -n 1 list.guarded)" = "rescue-list 1" ] && [ "$(tail -n 1 list.guarded)" = end ] &&
+   grep -q '^guarded$' list.guarded && grep -q "^boot $NEW " list.guarded &&
+   [ "$(wc -c < note.bin)" -eq 2048 ] && { cmp -s para.now zero.bin || cmp -s para.now note.bin; }; then
+  if cp list.guarded /cache/rescue/list.new && sync && mv /cache/rescue/list.new /cache/rescue/list &&
+     cmp -s list.guarded /cache/rescue/list; then
+    rm -f /cache/rescue/rung /cache/rescue/attempts; sync
+    dd if=note.bin of=$D/para bs=2048 count=1 conv=notrunc 2>/dev/null; sync
+    dd if=$D/para of=para.now bs=2048 count=1 2>/dev/null
+    if cmp -s para.now note.bin; then
+      stop; sync
+      dd if=boot-new.img of=$D/boot bs=1048576 conv=notrunc,fsync
+      blockdev --flushbufs $D/boot
+      if [ "$(h $D/boot)" = "$NEW" ]; then echo BOOT-READBACK-OK; else echo "BOOT-READBACK-WRONG: do not restart. Put the stock boot back."; fi
+    else
+      echo "STOP: the note did not read back. boot was not written."
+    fi
+  else
+    echo "STOP: the guarded list did not go in. The note and boot were not written."
+  fi
+else
+  echo "STOP: a check failed. The list, the note and boot were not written."
+fi
+```
+
+- **Only after `BOOT-READBACK-OK`:** `reboot`.
+- **After `STOP`:** read which one. `boot` was not written.
+- **After `BOOT-READBACK-WRONG`:** do not restart. Put the stock `boot` back, same root shell:
+
+```sh
+cd /data/local/tmp/lx
+h() { sha256sum "$1" | cut -d' ' -f1; }
+D=/dev/block/by-name
+STOCK=d232adc9af4f5dfe12c6c8bc6548519ef2dc113693e1cc7ad9665b7041718172
+if [ "$(h boot-stock.img)" = $STOCK ]; then
+  stop; sync
+  dd if=boot-stock.img of=$D/boot bs=1048576 conv=notrunc,fsync
+  blockdev --flushbufs $D/boot
+  if [ "$(h $D/boot)" = $STOCK ]; then echo STOCK-BOOT-BACK-OK; else echo "STOCK-BOOT-BACK-WRONG: do not restart. Run this block again."; fi
+else
+  echo "STOP: boot-stock.img on the frame is not the stock boot. Nothing was written."
+fi
+```
+
+  After `STOCK-BOOT-BACK-OK`, put `build/list.now` back as the list (as in 9d, with `list.now`),
+  then restart.
+- **What happens after `reboot`:** recovery starts first because of the note. It finds exactly the
+  new image, leaves it, clears the note and restarts. Then Android starts.
+- **Check after the start:** green, locked, `boot` is `NEW`. `dmesg | grep bootwrap` shows
+  `bootwrap: start`, then `bootwrap: para was empty: armed boot-recovery, read back ok` with a
+  device number, then `bootwrap: done, starting init.real`. After the all clear `para` is zeros again.
+
+**9d. After the all clear,** take the guard off and store the new set. The list goes in only if it
+is whole:
+
+```sh
+grep -v '^guarded$' build/list.guarded > build/list.after
+[ "$(head -n 1 build/list.after)" = "rescue-list 1" ] && [ "$(tail -n 1 build/list.after)" = end ] &&
+  adb push build/list.after /data/local/tmp/lx/list.after &&
+  adb shell su 0 sh -c "'cp /data/local/tmp/lx/list.after /cache/rescue/list.new && sync && mv /cache/rescue/list.new /cache/rescue/list && sync'"
+bash tools/frame-doctor.sh store
+```
+
+- **What the guard does not catch:** an image that was written correctly and still does not start.
+  No note is set by anyone then. The net is 9a: `bash tools/frame-doctor.sh restore boot stock`.
+- **Way back, Android up:** the stock-`boot` block above, restart, then `store`, so the list
+  expects the stock `boot` again.
+- **The side effect:** section 9. A restart within 5 minutes of a start goes through recovery first.
+
+### Step 10. Optional: the first picture
 
 A PNG, exactly 2000×1200, 8 bits per channel, no transparency.
 
 ```sh
 python3 -I tools/logo-from-splash.py /path/to/picture.png build/out-logo/logo-splash.img
 python3 -I tools/logoverify.py build/out-logo/logo-splash.img
-( cd build/out-logo && grep -v ' logo-splash.img$' SHA256SUMS > S.new
-  shasum -a 256 logo-splash.img >> S.new && mv S.new SHA256SUMS )
+( cd build/out-logo && { grep -v ' logo-splash.img$' SHA256SUMS; shasum -a 256 logo-splash.img; } > S.new && mv S.new SHA256SUMS )
 bash tools/frame-doctor.sh restore logo ours --dry-run
 bash tools/frame-doctor.sh restore logo ours
 bash tools/frame-doctor.sh store
@@ -839,6 +1004,8 @@ bash tools/frame-doctor.sh store
 - **Check:** the build ends `verified        logoverify.py: PASS`. The restore reads back correct.
   The frame starts green with your picture.
 - **Way back:** `bash tools/frame-doctor.sh factory-logo`.
+- `frame-doctor.sh` writes no image that has no line in `SHA256SUMS`. The third line above adds it.
+  `test_logosign.py --build` rewrites its own three lines there and keeps yours.
 - Our own first logo write was the stock pictures with only the signing changed. It tested the
   signature and nothing else. The picture came second.
 
