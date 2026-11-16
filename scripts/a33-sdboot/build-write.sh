@@ -18,7 +18,8 @@ MKIMAGE="$ROOT/diagnostics/a33-sdboot/build/tools/mkimage"
 # TESTED in patch-boot.py. Add a board only by a reviewed PR, after patch-boot.py's checks pass on
 # its verified dump.
 TESTED="d71c313ddaa4693948acb20af7740ccb56c88bf9376746a47fce2d00c14fc6a4 15886336 PF1007L 20260113
-529ef1ee32e546e847f532c640922800d05edff986bb819f6dd9fa38c3c650be 14911488 SOMY M10R7_20260313"
+529ef1ee32e546e847f532c640922800d05edff986bb819f6dd9fa38c3c650be 14911488 SOMY M10R7_20260313
+4eb4a3bdf6a14b8239c6870f23bd29715ab1e46fbb4ae996bd5d593377c47b3b 14962688 ALONG B-102K-Z_20240110"
 
 case "$MODE" in
   apply)   NEW=boot-patched.img;  OLD=boot-original.img ;;
