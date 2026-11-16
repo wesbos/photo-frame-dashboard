@@ -105,10 +105,23 @@ Android 6 frames (PF1007L, BIUFRAME) don't have `cmd package set-home-activity`.
 command, open the Home chooser instead, then tap **Home HQ** and **Always** on the frame. Keep
 another launcher installed so **Open launcher** has somewhere to go.
 
+With another launcher already installed, the chooser offers it first and puts Home HQ under **Use a
+different app**. Tapping Home HQ there only selects it: the kiosk opens, which looks like success,
+but Android has recorded a last-chosen entry rather than a default. Tap Home HQ, then **Always** on
+the row that comes back.
+
 ```sh
 adb shell am start -a android.intent.action.MAIN -c android.intent.category.HOME
-adb shell 'grep -A2 "<preferred-activities" /data/system/users/0/package-restrictions.xml'   # check it stuck
+# Must print one line naming the kiosk. Nothing means the choice did not stick.
+adb shell 'grep -o "<item name=[^>]*always=\"true\"" /data/system/users/0/package-restrictions.xml'
 ```
+
+Check `always="true"`, not the presence of an entry: a last-chosen selection writes an
+`always="false"` item into the same `<preferred-activities>` block, so a check that only looks for
+the block passes while the frame still shows the chooser at every boot. The only visible sign is
+that chooser, and with `KIOSK` set in `scripts/pf1007l-boot/frame-boot.conf` the boot hook starts
+the kiosk over it, so even that is hidden: the frame reaches the dashboard and only the log says
+what happened.
 
 The kiosk then opens the saved URL at boot, and the Home button returns to it. If the page
 fails to load at boot because Wi-Fi isn't up yet, the kiosk keeps retrying. In the controls,

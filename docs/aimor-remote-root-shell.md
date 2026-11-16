@@ -103,6 +103,14 @@ Extract the dex files from the odex before you decompile.
 - `com.DeviceTest` runs as the system user. Its receiver `EnableAppReceiver` has no permission.
   Any app can send it `android.rockchip.devicetest.action.APP_STATE_CHANGE`.
   The receiver then enables or disables the named component of any package.
+- The `su` in the table above is world-executable and, unlike the AOSP `su`, does not restrict
+  its callers to root and the shell, so an ordinary app uid becomes root with no prompt. Shown on
+  `20260519` by dropping to an app uid first: `su 10035 /system/xbin/su 0 id` returns
+  `uid=0(root)`. [pf1007l-start-here.md](pf1007l-start-here.md) warns about this (#24) and the
+  [Route S report](pf1007l-macos-20260519-route-s-report.md) tightened the mode, but T8 never
+  does: it closes the vendor's remote path, not the local one. Step 8 does. Other A33 frames ship
+  a setuid `su` whose root is capability-stripped (#111, #122); this is about who may call the
+  binary, not what it can do once called.
 
 ## 7. Check your frame
 
@@ -158,6 +166,20 @@ Do these steps in sequence.
    Each disabled package must show `enabled="2"`.
 7. After the reboot, do the check in section 7 again.
    The command must show no connection to port 7806.
+8. Consider taking `su` away from apps, which steps 1 to 7 do not do:
+
+   ```sh
+   adb shell 'mount -o remount,rw /system && chmod 06750 /system/xbin/su \
+     && sync && mount -o remount,ro /system'
+   adb shell 'ls -l /system/xbin/su'                        # expect -rwsr-s---
+   adb shell '/system/xbin/su 10035 /system/xbin/su 0 id'   # expect Permission denied
+   ```
+
+   Root and the `shell` group keep it, so root ADB and the scripts in this repository are
+   unaffected; only apps lose it. Check the second command still returns `uid=10035` without the
+   nested call, or the test proves nothing. The shipped mode is `06755`, read from a factory
+   `/system` image, so `chmod 06755` is the exact undo. Do this only once you have persistent root
+   ADB, and not if you rely on a root app on the frame.
 
 ## 9. Undo
 
