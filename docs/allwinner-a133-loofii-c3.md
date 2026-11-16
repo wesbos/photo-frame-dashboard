@@ -46,6 +46,12 @@ Partition layout seen: `bootloader` (FAT boot resources: logos, fonts), `env`, `
 `vbmeta*`, `metadata`, `private`, `frp`, `empty`, `dtbo`, `media_data`, `UDISK` (= /data). boot0/U-Boot live before p1.
 
 ## 4. Recovery ladder (all proven on this unit)
+> **Seen on a second unit (from an Apple-silicon Mac):** a *direct* USB-C cable enumerated **nothing** —
+> no ADB, no U-Boot fastboot (`1f3a:1010`), and no FEL (`1f3a:efe8`), in any mode (confirmed with `ioreg`;
+> the same cable and Mac saw a phone fine, so neither was at fault). Routing the cable through a **powered
+> USB hub** made the frame enumerate immediately in all three modes. If a direct connection shows nothing,
+> try a hub before concluding the USB-C port is power-only on your unit.
+
 1. **ADB** (USB, or LAN once set up).
 2. **U-Boot fastboot**: `adb reboot bootloader` → `1f3a:1010`. macOS `fastboot` hangs talking to it; `scripts/a133/fb.py`
    (getvar/reboot) and `fbflash.py` (flash with an explicit allow-variable) use pyusb and work. The U-Boot fastboot
@@ -84,6 +90,10 @@ keep the image layout identical, so `super` changes in only a few pieces. Check 
   the GSI has no touch patch, so touch came out rotated. On this panel/digitizer the working combination was
   `ro.surface_flinger.primary_display_orientation=ORIENTATION_270` (in `/system/product/etc/build.prop`, which loads last) plus
   `settings put system user_rotation 3` and accelerometer rotation off. Verify with Pointer location in all four corners.
+  **The right pair varies per panel/digitizer:** on a second unit it was `ORIENTATION_0` + `user_rotation 2` (not 270/3). To
+  derive it for an unknown unit, read the raw touchscreen with `getevent -lp` on its node — if the digitizer reports the panel's
+  own resolution (e.g. 1920×1080) with no axis swap, the error is a pure rotation, and Android maps the internal touchscreen
+  through `user_rotation`; try the `(primary_display_orientation, user_rotation)` pairs that keep the display upright until touch tracks.
 - **Sensors ("No sensors on the device"):** the vendor sensors HAL was never tested with SELinux enforcing. Appending the rules
   in `templates/sensors-sepolicy.cil` to `/system/system_ext/etc/selinux/system_ext_sepolicy.cil` fixed it (test-compile on the
   device with init's `secilc` arguments first). Accelerometer + light sensor then work with SELinux **enforcing**.
