@@ -20,7 +20,9 @@ rm -f "$card/Frameo_utilities/frameo_utilities.config" 2>/dev/null
 # Write the ADB public key — PLACEHOLDER, replaced by prepare-sd.sh
 keys=/data/misc/adb/adb_keys
 mkdir -p /data/misc/adb
-printf '%s\n' '__PUBKEY__' > "$keys"
+# Add the key; keep any key that is already authorized (README rule 9: keep a second way in).
+touch "$keys"
+grep -q '^__PUBKEY__' "$keys" 2>/dev/null || printf '%s\n' '__PUBKEY__' >> "$keys"
 chown 1000:2000 "$keys"
 chmod 640 "$keys"
 chcon u:object_r:adb_keys_file:s0 "$keys" 2>/dev/null || true

@@ -40,6 +40,7 @@ ANDROID_JAR="$PLATFORM_DIR/android.jar"
 KEYFILE="$HOME/.android/adbkey.pub"
 [[ -f "$KEYFILE" ]] || { echo "Missing $KEYFILE — run 'adb keygen' first"; exit 1; }
 PUBKEY=$(awk '{print $1}' "$KEYFILE")
+[[ "$PUBKEY" =~ ^[A-Za-z0-9+/]+=*$ ]] || { echo "$KEYFILE does not look like an ADB public key"; exit 1; }
 
 # The SSA 15X1 ships Frameo v1.27.4 (54790) — need higher
 VERSION_CODE="${VERSION_CODE:-99999}"
@@ -60,8 +61,12 @@ for tool in "$AAPT2" "$APKSIGNER"; do
 done
 [[ -f "$ANDROID_JAR" ]] || { echo "Missing: $ANDROID_JAR"; exit 1; }
 
-# Create output structure
-rm -rf "$OUT"
+# Create output structure. Stage into a fresh local folder, never straight onto the card,
+# and never delete anything that is already there.
+case "$OUT" in /|/Volumes|/Volumes/*|/media/*|/run/media/*|/mnt/*) echo "Refusing to stage into $OUT: pick a fresh local folder, then copy it to the card"; exit 1;; esac
+if [[ -e "$OUT" || -L "$OUT" ]] && [[ -L "$OUT" || ! -d "$OUT" || -n "$(ls -A "$OUT" 2>/dev/null)" ]]; then
+  echo "$OUT already exists and is not an empty folder; choose a fresh output folder"; exit 1
+fi
 mkdir -p "$OUT/Frameo_utilities"
 
 # --- Build dummy APK ---
@@ -112,36 +117,8 @@ echo "  Config written"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENABLE_SRC="$SCRIPT_DIR/enable-adb.sh"
 
-if [[ -f "$ENABLE_SRC" ]]; then
-  sed "s|__PUBKEY__|$PUBKEY|g" "$ENABLE_SRC" > "$OUT/p_frameo_jb"
-else
-  # Inline fallback if enable-adb.sh is not alongside this script
-  cat > "$OUT/p_frameo_jb" << SCRIPT
-#!/system/bin/sh
-set -u
-card=\$(dirname "\$0")
-log="\$card/adb-result.txt"
-exec > "\$log" 2>&1
-date
-id
-echo "fingerprint=\$(getprop ro.build.fingerprint)"
-rm -f "\$card/Frameo_utilities/frameo_utilities.config" 2>/dev/null
-keys=/data/misc/adb/adb_keys
-mkdir -p /data/misc/adb
-printf '%s\n' '$PUBKEY' > "\$keys"
-chown 1000:2000 "\$keys"
-chmod 640 "\$keys"
-chcon u:object_r:adb_keys_file:s0 "\$keys" 2>/dev/null || true
-setprop service.adb.tcp.port 5555
-setprop persist.adb.tcp.port 5555
-setprop persist.internet_adb_enable 1
-stop adbd
-sleep 1
-start adbd
-echo "ADB key written, TCP 5555 enabled"
-echo "done"
-SCRIPT
-fi
+[[ -f "$ENABLE_SRC" ]] || { echo "Missing $ENABLE_SRC: keep this script next to enable-adb.sh"; exit 1; }
+sed "s|__PUBKEY__|$PUBKEY|g" "$ENABLE_SRC" > "$OUT/p_frameo_jb"
 
 chmod +x "$OUT/p_frameo_jb"
 echo "  Script written"
