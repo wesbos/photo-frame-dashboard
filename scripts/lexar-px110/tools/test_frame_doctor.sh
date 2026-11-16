@@ -270,6 +270,29 @@ check "store refuses when the frame is not green" [ $RC != 0 -a ! -e "$FAKE/cach
 reset_frame; ANSWER=no; run store; ANSWER=yes
 check "store without yes: nothing stored" [ ! -e "$FAKE/cache/rescue/list" ]
 
+echo "== no serial: every path that writes or depends on adb refuses before anything else"
+run_noserial() { OUT=$(printf '%s\n' "$ANSWER" | env -u ANDROID_SERIAL -u PX110_SERIAL bash "$DOC" "$@" 2>&1); RC=$?; }
+small_sum() { { cat "$FAKE"/dev/{logo,recovery,boot,vbmeta,vbmeta_system,para}; product_hash; } | shasum | cut -d' ' -f1; }
+refused_noserial() { [ $RC != 0 ] && echo "$OUT" | grep -q "SERIAL is not set" && ! echo "$OUT" | grep -q "ABOUT TO" && no_frame_writes; }
+for st in device absent; do   # Android up, and Android down with the loader on USB (the case that used to write blind)
+  for c in "restore logo stock" "restore product ours" "restore-set stock" "restore-set ours" "factory-logo" "clear-note" "safe on" "safe off" "store"; do
+    reset_frame; echo $st > "$FAKE/state"; [ $st = absent ] && { echo "0e8d:2000" > "$FAKE/usb"; echo device > "$FAKE/after_reboot"; }
+    printf 'boot-recovery' | dd of="$FAKE/dev/para" bs=1 conv=notrunc 2>/dev/null
+    before=$(small_sum)
+    run_noserial $c
+    check "no serial, frame $st: '$c' refused, no plan shown, nothing sent to the frame" refused_noserial
+    check "  ...and no partition changed" [ "$(small_sum)" = "$before" ]
+  done
+done
+reset_frame; run_noserial restore lk stock
+check "no serial: the never-write list is still refused first" has "never-write list"
+reset_frame; run_noserial status
+check "no serial: status still runs, reads only, and says the serial is missing" [ -n "$(echo "$OUT" | grep 'SERIAL is not set')" -a ! -s "$FAKE/mtk.log" ]
+
+echo "== store needs the mtkclient folder (it stages the stock product copy there)"
+reset_frame; OUT=$(printf 'yes\n' | env -u PX110_MTK_DIR bash "$DOC" store 2>&1); RC=$?
+check "store without MTK_DIR: refused with the real reason, nothing stored" [ $RC != 0 -a -n "$(echo "$OUT" | grep 'MTK_DIR is not set up')" -a ! -e "$FAKE/cache/rescue/list" ]
+
 echo "== misc"
 run help; check "help prints the usage" has "frame-doctor.sh restore"
 run frobnicate; check "unknown command refused" [ $RC != 0 ]

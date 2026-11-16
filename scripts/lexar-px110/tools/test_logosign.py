@@ -85,9 +85,17 @@ def build():
     logocodec.png(TESTPNG, W, H, test_picture_rgba())
     subprocess.run(SIGN + ['resign', STOCK, RESIGNED], check=True)
     subprocess.run(SIGN + ['make', STOCK, TESTPNG, TESTIMG], check=True)
-    with open(os.path.join(OUT, 'SHA256SUMS'), 'w') as f:
-        for name in ('logo-stock-resigned.img', 'logo-test.img', 'logo-test.png'):
+    mine = ('logo-stock-resigned.img', 'logo-test.img', 'logo-test.png')
+    sums = os.path.join(OUT, 'SHA256SUMS')
+    # Lines for other files (logo-splash.img, added by hand after logo-from-splash.py) are kept as they are.
+    # frame-doctor.sh still checks each file against its line before any write.
+    kept = [l for l in (open(sums).read().splitlines() if os.path.exists(sums) else [])
+            if l.strip() and l.split()[-1] not in mine]
+    with open(sums, 'w') as f:
+        for name in mine:
             f.write('%s  %s\n' % (hashlib.sha256(open(os.path.join(OUT, name), 'rb').read()).hexdigest(), name))
+        for l in kept:
+            f.write(l + '\n')
 
 
 def diff_ranges(a, b):

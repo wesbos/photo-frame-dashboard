@@ -48,7 +48,8 @@ cp unit.conf.example unit.conf
 python3 -I tools/px110conf.py show      # what the tools see
 ```
 
-Your serial goes in `unit.conf` (or `ANDROID_SERIAL`) and nowhere else. No tool has one built in.
+Your serial goes in `unit.conf` (or `ANDROID_SERIAL`) and nowhere else. No tool has one built in, and
+`frame-doctor.sh` will not write, store or clear anything without it.
 
 ## The files
 
@@ -71,7 +72,7 @@ Your serial goes in `unit.conf` (or `ANDROID_SERIAL`) and nowhere else. No tool 
 | `tools/logoverify.py`, `certverify.py` | Independent checkers for the MediaTek two-certificate signature | No |
 | `tools/frame-doctor.sh` | Says what state the frame is in. Restores `logo`, `recovery`, `boot`, `vbmeta`, `vbmeta_system`, `product` through the loader port. Stores the known-good set in `cache` | **Yes**, after `yes` |
 | `mtkclient-px110.patch` | Our four changes to mtkclient, for commit `118a000a` | No |
-| `tools/test_*.py`, `test_frame_doctor.sh` | Tests. No frame needed, none touched | No |
+| `tools/test_*.py`, `test_frame_doctor.sh` | Tests, `test_refusals.py` among them. No frame needed, none touched | No |
 
 Comments inside `src/recovery/*`, `src/photoframe.rc` and `src/bootwrap/bootwrap.c` still say `patch/...`
 for paths. That was this folder's name where it was written. The files are left byte for byte as they
@@ -83,11 +84,13 @@ went into the images on the frame, so that a rebuild gives the same bytes.
 
 1. refuses the never-write list first: `preloader lk lk2 seccfg tee1 tee2 frp md_udc nvdata nvram proinfo persist rpmb`;
 2. refuses anything not on its allow-list of six;
-3. checks the image file's size and its SHA-256 against the recorded one. No recorded hash, no write;
-4. checks over adb that `super` starts where the `product` offset assumes (when adb is up);
-5. shows the plan and waits for the typed word `yes`. `--dry-run` shows the plan and stops;
-6. ends every loader-port job with the watchdog restart;
-7. reads every written partition back from the frame and compares.
+3. refuses to go on without your frame's `SERIAL`: without it adb cannot see the frame, so the layout
+   check and the read-back could not happen;
+4. checks the image file's size and its SHA-256 against the recorded one. No recorded hash, no write;
+5. checks over adb that `super` starts where the `product` offset assumes (when adb is up);
+6. shows the plan and waits for the typed word `yes`. `--dry-run` shows the plan and stops;
+7. ends every loader-port job with the watchdog restart;
+8. reads every written partition back from the frame and compares.
 
 `rescue.sh` has its own rules, listed in [STORE-FORMAT.md](STORE-FORMAT.md): five regions with fixed
 offsets, copies checked three ways before a write, read back after, its own note only.
@@ -97,7 +100,9 @@ offsets, copies checked three ways before a write, read back after, its own note
 ```sh
 python3 -I tools/test_recovery.py          # 173 checks
 python3 -I tools/test_bootwrap.py          # 52 tests, about two minutes
-bash tools/test_frame_doctor.sh            # 91 checks
+bash tools/test_frame_doctor.sh            # 130 checks
+python3 -I tools/test_refusals.py          # 27 checks: changed backups, another layout, wrong keys are refused
+bash tools/test_howto_blocks.sh            # 30 checks: the root-shell blocks of the page's section 16, on stand-ins
 python3 -I tools/test_logosign.py --build  # 22 checks; makes build/out-logo first
 python3 -I tools/test_logo_from_splash.py  # 47 checks
 python3 -I tools/test_logocodec.py         # 9 checks
@@ -105,7 +110,7 @@ zsh tools/run_tests.sh                     # 11 tests on the product set
 ```
 
 They need your backup, the keys and the built images. Without a backup or keys each one prints `SKIP`
-with the reason and exits 0. Nothing private is shipped to stand in for them.
+with the reason and exits 0 (`test_refusals.py` still runs its four `fetch-keys.sh` checks). Nothing private is shipped to stand in for them.
 
 ## What a rebuild gave us
 

@@ -7,11 +7,12 @@ Apply with:  git -C <your mtkclient checkout> checkout 118a000a83ea31c4f427fe522
              git -C <your mtkclient checkout> apply --check <this file>   (must print nothing)
              git -C <your mtkclient checkout> apply <this file>
 
-What it changes (three files, nothing else):
+What it changes: four changes in three files, nothing else.
   1. seriallib.py   the reply wait in serial mode is at least 5 s instead of 0.25 s.
-  2. Port.py        a loader that is already in command mode is recognised; late echo bytes are dropped;
-                    the echo read after each handshake byte waits up to 1 s.
-  3. mtk_da_handler.py   `reset` restarts the frame through the chip's watchdog (two register writes:
+  2. Port.py        the handshake recognises a loader that is already in command mode, and drops late
+                    echo bytes before the next command.
+  3. Port.py        the echo read after each byte sent waits up to 1 s instead of not waiting.
+  4. mtk_da_handler.py   `reset` restarts the frame through the chip's watchdog (two register writes:
                     0x22000014 to 0x10007000, then 0x1209 to 0x10007014; nothing on flash) instead of
                     asking the loader to shut down and wait for the cable to be pulled, which leaves this
                     frame stuck. MTK_RESET_POWEROFF=1 gives the original behaviour back.

@@ -83,6 +83,9 @@ size_of() {
   esac
 }
 need_backup() { [ -n "$BACKUP" ] && [ -d "$BACKUP" ] || die "BACKUP_DIR is not set or is not a folder (unit.conf or PX110_BACKUP_DIR): the doctor compares against your own backup"; }
+need_serial() {   # every path that writes, or that judges the frame over adb, must know which frame it is talking to
+  [ -n "$SERIAL" ] || die "SERIAL is not set (unit.conf, PX110_SERIAL or ANDROID_SERIAL). Without it the doctor cannot see the frame over adb, so it could not check where product sits or read a write back. Nothing was done."
+}
 need_mtk() {
   [ -n "${FRAME_DOCTOR_MTK:-}" ] && [ -n "$MTKDIR" ] && return 0
   [ -n "$MTKDIR" ] && [ -f "$MTKDIR/repo/mtk.py" ] && [ -x "$MTKDIR/venv/bin/python" ] ||
@@ -368,7 +371,7 @@ do_restore() {   # do_restore <family> <part>...
     in_list "$p" "$NEVER" && die "'$p' is on the never-write list. The doctor will not touch it."
     in_list "$p" "$ALLOWED" || die "'$p' is not a partition the doctor may write. Allowed: $ALLOWED"
   done
-  need_backup; need_mtk
+  need_serial; need_backup; need_mtk
   detect_state
   case "$STATE" in unauthorized|brom) die "the frame is in a state the doctor cannot work from ($STATE); run status" ;; esac
   if [ "$STATE" = android ] || [ "$STATE" = recovery ]; then
@@ -445,6 +448,7 @@ cmd_restart() {
 need_adb() { detect_state; case "$STATE" in android|recovery) ;; *) die "this needs the frame on adb (Android or our recovery); it is: $STATE" ;; esac; }
 
 cmd_safe() {
+  need_serial
   need_adb
   case "${1:-}" in
     on) confirm "set the safe-start flag (/cache/rescue/safe): from the next restart Android starts in safe mode
@@ -470,6 +474,7 @@ elif cmp -s $T/.c $T/.z; then echo NOTE-NONE; else echo NOTE-FOREIGN; fi; rm -f 
 }
 
 cmd_clear_note() {
+  need_serial
   detect_state
   if [ "$STATE" = loader ] || [ "$STATE" = nothing ]; then
     need_backup; need_mtk
@@ -492,7 +497,7 @@ cmd_clear_note() {
 }
 
 cmd_store() {   # store what the frame runs now as the known-good set, from this computer's own copies
-  need_backup
+  need_serial; need_backup; need_mtk    # need_mtk: a stock product copy is cut from the backup into MTK_DIR/reads/doctor
   need_adb
   [ "$STATE" = android ] || die "store the set from a running Android, so that what is stored is known to start"
   [ "$(dsh 'getprop ro.boot.verifiedbootstate')" = green ] || die "the frame is not green; not storing this as known-good"
