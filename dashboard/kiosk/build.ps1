@@ -8,7 +8,9 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
 $sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "$env:LOCALAPPDATA\Android\Sdk" }
-$bt  = "$sdk\build-tools\34.0.0"
+# d8 from build-tools 34 crashes (NullPointerException) with some newer JDKs, such as JDK 25;
+# then point BUILD_TOOLS at a newer version, e.g. $env:BUILD_TOOLS = "$sdk\build-tools\36.0.0"
+$bt  = if ($env:BUILD_TOOLS) { $env:BUILD_TOOLS } else { "$sdk\build-tools\34.0.0" }
 $jar = "$sdk\platforms\android-34\android.jar"
 $ks  = "$env:USERPROFILE\.android\debug.keystore"
 if (-not (Test-Path $jar)) { throw "android.jar not found at $jar" }
