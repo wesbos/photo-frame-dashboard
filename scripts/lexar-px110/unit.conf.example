@@ -1,0 +1,50 @@
+# Settings for the Lexar Pexar PX-110 tools. Copy to unit.conf (git ignores it) and fill in.
+# One NAME=value per line, no spaces around "=". "~" and paths relative to this folder are understood.
+# The environment wins: PX110_BACKUP_DIR=... overrides BACKUP_DIR here. Nothing in this file is ever sent anywhere.
+# See what the tools make of it:  python3 -I tools/px110conf.py show
+
+# Your frame's adb serial, as `adb devices` prints it. Only frame-doctor.sh uses it. Never commit it.
+SERIAL=
+
+# Your own backup of the frame: one <partition>.img per partition, frame.sha256 and partition-table.txt
+# (docs/lexar-pexar-px-110.md, "Reproduce it", step 2). Read only. Keep it private.
+BACKUP_DIR=
+
+# Where fetch-keys.sh puts the published keys. Default: keys/ in this folder (ignored by git).
+#KEY_DIR=keys
+
+# Where the tools write images, logs and scratch files. Default: build/ in this folder (ignored by git).
+#BUILD_DIR=build
+
+# The kiosk APK that build.py puts into product as a system app (this repository's own kiosk build),
+# and the name it gets there: /product/app/<KIOSK_NAME>/<KIOSK_NAME>.apk. Default name: the APK's file name.
+KIOSK_APK=
+#KIOSK_NAME=
+# The kiosk APK the frame has run until now, if any: run_tests.sh checks the new one is signed with the same key.
+#KIOSK_PREVIOUS_APK=
+
+# e2fsprogs (debugfs, e2fsck, dumpe2fs). Leave empty if they are on the PATH.
+# Homebrew keeps them off the PATH: use the output of `brew --prefix e2fsprogs` followed by /sbin.
+E2FSPROGS_DIR=
+
+# The ARM tools bootbuild.py needs. Leave empty to take clang, arm-none-eabi-ld and arm-none-eabi-strip from the PATH.
+#CLANG=
+#ARM_LD=
+#ARM_STRIP=
+
+# Only for run_tests.sh tests 8 and 11 (aapt2, apksigner): an Android SDK build-tools folder and a Java home.
+#ANDROID_BUILD_TOOLS=
+#JAVA_HOME=
+
+# adb, if it is not on the PATH.
+#ADB=
+
+# For frame-doctor.sh: a folder holding repo/ (mtkclient at the commit named in mtkclient-px110.patch, with that
+# patch applied) and venv/ (the Python environment mtkclient runs in). The doctor stages files in reads/doctor
+# inside it. The path from repo/ to reads/doctor must not contain spaces.
+MTK_DIR=
+# Where libusb's library is, if mtkclient cannot find it by itself (Homebrew: `brew --prefix`/lib).
+#LIBUSB_DIR=
+
+# Optional: the start of ro.boot.vbmeta.digest for the set you flashed, so `frame-doctor.sh status` can say it matches.
+#GOOD_DIGEST=

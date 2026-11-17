@@ -1,0 +1,14 @@
+# ---- Added by patch/tools/recbuild.py from patch/src/recovery/init.rescue.rc
+# The automatic restore. Runs once, as root, in the `recovery` domain (the only root domain the
+# recovery policy has). It is in the default class, so `class_start default` starts it, next to
+# the stock `recovery` program, which is left as it is.
+service rescue /system/bin/sh /system/bin/rescue.sh
+    user root
+    group root
+    seclabel u:r:recovery:s0
+    oneshot
+
+# Before the stock program starts (it clears the note in `para` within a second or two): copy the
+# note aside so rescue.sh can tell whose it was. Blocking, a fraction of a second.
+on post-fs-data
+    exec u:r:recovery:s0 root root -- /system/bin/sh /system/bin/rescue.sh snapshot
