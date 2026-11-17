@@ -12,6 +12,9 @@ the [SI006](si006-uhale.md), [VTimes VT01001](vtimes-vt01001.md),
 [Sammix AW105](sammix-aw105-uhale.md) and [HSB / F10](uhale-hsb-f10.md)
 reports — same partition layout before userdata — under a new vendor brand and
 a newer build (`W26.22.2-16`). The FEL and Rockchip loader routes do not apply.
+The [Frameo HRF102](frameo-hrf102.md) is a close sibling (also Frameo `v1.30.19`); on that unit
+USB died about 80 s after every boot until `persist.sys.usb.config` was changed from `ptp,adb`
+to `adb`. Whether that explains the drops here is untested.
 
 ## Confirmed identity
 
