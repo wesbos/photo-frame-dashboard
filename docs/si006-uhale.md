@@ -24,6 +24,10 @@ The [VTimes VT01001](vtimes-vt01001.md) calendar is the same `si006asb` product 
 brand. This guide's WebView overlay and CA roots worked on it unchanged; the way in was the HSB / F10
 USB keyboard route.
 
+The [Frameo HRF102 ("SBUSFGT HY02C")](frameo-hrf102.md) is the same product with Frameo as the
+vendor app. Its `/system/etc/security/adb_keys` ships a factory key that boot copies in; check
+what yours holds before appending to it.
+
 ## Confirmed identity
 
 | Field | Observed value |

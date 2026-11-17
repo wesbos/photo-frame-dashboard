@@ -11,6 +11,7 @@ overlay and CA root steps worked unchanged. The way in was different: ADB was al
 USB, but the vendor app has no working hidden menu, so the
 [HSB / F10 USB keyboard route](uhale-hsb-f10.md#1-open-the-browser-through-usb-hid)
 was used to reach the browser. The Allwinner FEL routes and Rockchip loaders do not apply.
+The [Frameo HRF102](frameo-hrf102.md) used the same route.
 
 ## Confirmed identity
 
