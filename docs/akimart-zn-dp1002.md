@@ -348,6 +348,25 @@ line described below, apply the `persist.sys.usb.config` fix first.
 
 [Amazon India B0FB929WRN](https://www.amazon.in/dp/B0FB929WRN), reported in the [#303 discussion](https://github.com/wesbos/photo-frame-dashboard/pull/303): same identity, partition map and 32 MiB boot hash as the fourth unit, and the same garbled `/vendor/build.prop` line. After one untouched reboot with Frameo disabled, UsbDeviceManager's failsafe fell back to plain `adb` about 38 s after boot, so ADB survived that boot. The `persist.sys.usb.config=adb` fix then gave a clean boot with no failsafe fallback. The FOTA restart loop (62 crashes in 4 minutes) and the `pm hide com.adups.fota` fix were both confirmed. `adb_keys` held the same invalid factory key. So `SSA_Frame_20260721` does not always lose USB ADB at boot; set `persist.sys.usb.config` first to be safe.
 
+## Fifth unit: moonka ZN-DP1002 (Windows)
+
+Another moonka unit, bought from [Amazon.com B09QX7M71C](https://www.amazon.com/dp/B09QX7M71C), firmware `SSA_Frame_20260420`, WebView 106, 160 dpi. Host: Windows 11, USB ADB
+with a USB-A to USB-C data cable. It runs the [Home HQ kiosk](../dashboard/kiosk/README.md) as HOME,
+with the navigation service, and Frameo and both updaters disabled, as on the units above.
+
+- **Building the kiosk on Windows:** with JDK 25, `build.ps1` failed in build-tools 34's `d8`
+  (`NullPointerException ... String.length()`), the same crash `build.sh` warns about. Pointing it
+  at build-tools 36.0.0's `d8` built a working APK.
+- **Fully Kiosk first:** the owner started with Fully Kiosk Browser's free version. After every
+  reboot it turned the paid Kiosk Mode back on, which put a buy-a-license watermark over the
+  dashboard. Home HQ replaced it; Fully is still installed but unused.
+- **Wi-Fi with the screen asleep:** Wi-Fi dropped while the screen slept, as on the
+  [second unit](#second-unit-dxmart-zn-dp1002-2026-10-15-macos). The screen is kept on, dimmed,
+  and the dashboard shows its own night clock instead.
+- **No PIR on this unit:** the driver is present and `/sys/bnd/pir_sensor_status` exists, but it
+  always read `0`. No sensor appears to be fitted, so the PIR guess below doesn't apply to every
+  unit.
+
 ## Guesses, not confirmed
 
 - Android probably writes `package-restrictions.xml` a few seconds after `pm disable-user`, and
