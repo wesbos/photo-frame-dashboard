@@ -416,6 +416,123 @@ The U-Boot patch that needed `git apply --unidiff-zero` was START STOP
 (`pf1007l-v2025.10-start-stop.patch`, which has no context lines). The no-HS patch applies with a
 plain `git apply` after the base patch.
 
+## SOMY ZC002 on firmware `ZC002_20251114`
+
+USB ADB authorized out of the box, and Frameo powers an offline frame off by itself.
+
+Another SOMY ZC002, on a build **older** than the documented `ZC002_20260313`. Three
+things differ from the units above, including the
+[PR #73](https://github.com/wesbos/photo-frame-dashboard/pull/73) SOMY unit:
+
+1. USB ADB was **authorized on first contact**, with no prompt on screen (like the Frameo 102K in
+   [#111](https://github.com/wesbos/photo-frame-dashboard/pull/111)). No key had to be written.
+2. Frameo **powers the frame off by itself** when it is offline, in two different ways. Either one
+   kills long ADB jobs such as backups.
+3. Plugging the frame (on its wall adapter) straight into a laptop **cut the laptop's power**.
+
+Everything here was read over ADB. No partition was written. Unique identifiers (serial, MAC
+addresses, Frameo peer ID, account details, Wi-Fi), backups and the vendor APK are left out.
+
+### Identity
+
+| Item | Observed value |
+| --- | --- |
+| About screen | Hardware brand and model number `DPF ZC002`; Frameo v1.28.14 (58400) |
+| Firmware / build | `ZC002_20251114` (build date 2025-11-14) |
+| Build fingerprint | `Allwinner/astar_xr819/astar-xr819:6.0.1/MOB30R/20251114:eng/test-keys` |
+| Properties | brand `SOMY`; model, name and device `ZC002`; manufacturer `Allwinner`; `ro.build.type=user` |
+| Android / kernel | Android 6.0.1, API 23; Linux 3.4.39; armv7l |
+| Platform | `astar`, hardware `sun8i`, board `exdroid` |
+| Memory / display | 1,027,036 kB RAM, `ro.config.low_ram=true`; 1280x800, density 160 |
+| WebView | 106.0.5249.126 |
+| SystemUI | Installed but disabled (`enabled=2`, factory state): no status or navigation bar |
+| Frameo package | `net.frameo.frame`, shipped as a priv-app under a different file name: `/system/priv-app/Manufacturertest/Manufacturertest.apk` |
+| eMMC | 60,620,800 sectors (31,037,849,600 bytes), same as the first Pastigio unit; the PR #73 unit's was larger |
+| Partitions | Same starts as the [PR #73 SOMY unit](#somy-zc002-unit-identity), including its 1,572,864-sector cache. `/data` (p1, `UDISK`) starts at 4268032 and is 56,352,768 sectors: it ends **exactly** at the end of the eMMC, unlike the PR #73 unit |
+| Boot image | Legacy `ANDROID!`, page 2048, kernel 10,165,848 B, **ramdisk 4,741,174 B** (`20260313`: 4,741,158), `vmalloc=384M` |
+| Boot SHA-256, first 14,911,488 bytes (header + kernel + ramdisk) | `68f943a10377247ffd59586e7ebf2b2d88fd68fee838879941f5e595fb4df621` |
+| USB | Normal Android `1f3a:1001`; `1f3a:efe8` for about 3 s at power-on (not a usable FEL window) |
+
+The boot image is a different build: don't reuse the `20260313` boot patch or its hashes.
+
+### ADB and root
+
+- `adb devices` showed `device` (authorized) the first time it was plugged in. Nothing appeared
+  on screen (SystemUI is disabled, so no prompt could have).
+- `persist.sys.usb.config=adb` (the PR #73 unit had `none`), `ro.secure=1`, `ro.debuggable=0`,
+  `ro.adb.secure=1`. No network ADB by default (no `*.adb.tcp.port` property).
+- **Not checked:** whether `/data/misc/adb/adb_keys` already held a key from the factory. If you
+  have this build, `su 0 ls -l /data/misc/adb/` answers it read-only.
+- `/system/bin/su` is setuid root. `su 0 id` gives `uid=0(root)` with no prompt, context
+  `u:r:shell:s0`, `CapBnd`/`CapEff` `ffffffe0000000c0` (same as the
+  [second Pastigio unit](#second-pastigio-unit)), so expect `/system` remounts
+  to fail. SELinux is `Permissive`.
+- Security note for owners: on this build, anyone with a USB cable and a minute at the frame gets a
+  root shell, with nothing shown on screen. Treat physical access as full access.
+
+### Frameo powers an offline frame off by itself
+
+Neither of these is a power fault: the events log shows no power-source change,
+`/sys/class/power_supply` is empty, there is no `last_kmsg` or pstore, and the dropbox only has
+`SYSTEM_BOOT`. The frame goes fully off (no backlight, no USB) and doesn't restart by itself.
+
+#### 1. Sleep schedule plus the clock reset
+
+The frame has no RTC battery. Offline, the clock starts at **2025-01-01 00:00** at every boot,
+which falls inside any overnight sleep window set in Frameo (this unit had one). Frameo then
+shows a one-minute "tap anywhere to cancel" countdown and shuts down, with an `RTC_WAKEUP` alarm
+for 07:00. A backup over ADB died this way about 4.5 minutes in. Turning sleep mode off in Frameo's
+settings, then restarting, removed the alarm.
+
+#### 2. Auto standby when there are no photos
+
+With sleep mode off, Frameo still showed **"Powering off in 02:00 — Press anywhere to cancel"**
+after a while without touches (seen at about 8.5, 25 and 42 minutes after boot). It leaves no
+logcat line. Reading Frameo v1.28.14's code (classes `AutoStandbyDelegate`, `AutoStandbyActivity`,
+`MediaRepository`):
+
+- It is armed only when the frame has **no photos** (none in Frameo's library or on external
+  storage) and no backup or archive is running.
+- Idle timeout 10 minutes; the countdown dialog covers the last 2 minutes. A touch, a user
+  interaction or leaving the screen resets it.
+- At the end: if Frameo has saved Wi-Fi connection details, it only turns the **screen off**. If
+  the frame has **never been on Wi-Fi**, it runs `svc power shutdown`: a full power-off.
+
+So a new, offline, empty frame (the usual state while you're working on it) powers itself off
+about 10 minutes after the last touch.
+
+#### Ways round it
+
+- Tap the screen during long jobs (each touch resets the timer).
+- Turn off sleep mode in Frameo's settings and restart.
+- Adding any photo should disarm auto standby (from the code; not tested here).
+- Once a kiosk replaces Frameo as Home, disable Frameo:
+  `adb shell su 1000 pm disable-user net.frameo.frame` (undo: `su 1000 pm enable net.frameo.frame`).
+  The plain shell user is refused on this build; `su 1000` works. Done on this unit, with the kiosk
+  coming up as Home after a reboot; no countdown has been seen since.
+
+### Power and USB cautions
+
+- **Don't plug the frame straight into a laptop while it's on its wall adapter.** Through a
+  USB-C to USB-A adapter, the laptop lost power instantly (no panic report).
+  Suspected back-feed; not proven. With a powered USB hub between the two (TP-Link UH720) the
+  laptop has been fine since.
+- On hub power alone, the frame booted, then the screen went black while Android kept running.
+  Plugging in the wall adapter didn't wake it. Unplugging both, then **wall adapter first, then USB
+  into the hub**, worked.
+
+### Tools on this build
+
+- `/system/bin/dd` is toolbox dd: reads at `skip` past 2 GiB return 0 bytes. `toybox dd` seeks
+  correctly (checked against ext4 backup superblocks deep in `UDISK`).
+- No `sha256sum`, `awk` or busybox; `sha1sum`, `toybox base64`, `toybox cmp` and `toybox timeout`
+  are there.
+- Every block device is `brw------- root:root` except `misc` (p8, `system:system 0660`) and
+  `frp` (p13, `system:system 0600`). `su 0` lacks `CAP_DAC_OVERRIDE`, so it gets "Permission
+  denied" on those two; `su 1000` reads them.
+- `adb exec-out 'su 0 dd ... 2>/dev/null'` is binary-clean. Keep `2>/dev/null` **inside** the
+  quotes, or dd's status lines end up in the data.
+
 ## What remains untested or unpublished
 
 - On the first Pastigio unit: the repository's complete PF1007L Route U / Route S, and
