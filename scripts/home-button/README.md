@@ -111,3 +111,27 @@ adb -d uninstall com.photoframe.homebutton
 
 Uninstalling removes its service, overlay permission and saved position. No
 system APK or boot partition is modified.
+
+## CYPID C1 native navigation bar
+
+[`scripts/cypid-c1-nav`](../cypid-c1-nav) is a separate, experimental helper for the
+CYPID C1 firmware `YHK.C-calendar-A333-1506-D2048-K692-V10-216-C1.0.20260801`.
+That unit showed the native navigation bar after setting `navigationbars_state` to `1`,
+but it reverted to `2` after a power cycle. Home and Back worked by hand before that cycle.
+
+The boot-restoration behavior is **not yet tested on the device or across a reboot**. It is
+disabled until the owner opts in, checks the exact model and build before writing, and attempts the setting once
+at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission which must be granted
+separately; it has no internet or overlay permission. A vendor background manager or a later
+power-mode change may still undo its setting. Uninstalling the helper stops future attempts,
+but does not restore the current navigation setting.
+
+Build only, with JDK 17, SDK build-tools 36.0.0, and platform android-37.0:
+
+```sh
+ANDROID_HOME=/path/to/sdk JAVA_HOME=/path/to/jdk bash scripts/cypid-c1-nav/build.sh
+```
+
+The output and signing key stay in ignored `diagnostics/cypid-c1/nav-helper/`. The build does
+not install anything. Follow the [backup and approval rules](../../README.md#rules-we-learned-the-hard-way)
+before trying it on a device.
