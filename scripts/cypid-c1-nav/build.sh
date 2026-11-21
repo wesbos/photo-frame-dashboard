@@ -16,7 +16,7 @@ work="$(mktemp -d "$OUT/build.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/classes" "$work/dex"
 "$BT/aapt2" link -o "$work/base.apk" -I "$JAR" \
-    --manifest "$SRC/AndroidManifest.xml" --version-code 2 --version-name 1.1
+    --manifest "$SRC/AndroidManifest.xml" --version-code 3 --version-name 1.2
 "$JAVA/bin/javac" --release 8 -classpath "$JAR" -d "$work/classes" \
     "$SRC"/src/com/photoframe/c1nav/*.java
 "$JAVA/bin/java" -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 \

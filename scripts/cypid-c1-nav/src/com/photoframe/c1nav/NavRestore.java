@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Settings;
+import android.util.Log;
 
 final class NavRestore {
     static final String PREFERENCES = "c1_navigation";
@@ -27,19 +28,16 @@ final class NavRestore {
             return "WRITE_SECURE_SETTINGS is not granted; no setting changed.";
         }
         try {
-            if (Settings.Global.getInt(context.getContentResolver(), STATE, 0)
-                    != SHOW_NAVIGATION_BAR
-                    && !Settings.Global.putInt(context.getContentResolver(), STATE,
-                            SHOW_NAVIGATION_BAR)) {
+            // This vendor key is hidden from ordinary apps on Android 15, even with
+            // WRITE_SECURE_SETTINGS. A successful write is a request, not readback.
+            if (!Settings.Global.putInt(context.getContentResolver(), STATE,
+                    SHOW_NAVIGATION_BAR)) {
                 return "Android refused the navigation setting.";
-            }
-            if (Settings.Global.getInt(context.getContentResolver(), STATE, 0)
-                    != SHOW_NAVIGATION_BAR) {
-                return "Navigation setting did not remain enabled.";
             }
             return null;
         } catch (SecurityException denied) {
-            return "Android denied the navigation setting.";
+            Log.w("C1NavRestore", "Navigation setting write denied", denied);
+            return "Android denied writing the navigation setting.";
         }
     }
 }

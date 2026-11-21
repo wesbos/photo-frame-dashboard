@@ -34,7 +34,7 @@ public final class MainActivity extends Activity {
             if (error != null) {
                 status.setText(error);
             } else if (preferences.edit().putBoolean(NavRestore.ENABLED, true).commit()) {
-                status.setText("Boot restore enabled. Check it after a reboot.");
+                status.setText("Boot restore enabled. Check the bar now and after a reboot.");
             } else {
                 status.setText("The bar was requested, but the boot preference could not be saved.");
             }

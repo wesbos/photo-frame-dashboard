@@ -119,12 +119,17 @@ CYPID C1 firmware `YHK.C-calendar-A333-1506-D2048-K692-V10-216-C1.0.20260801`.
 That unit showed the native navigation bar after setting `navigationbars_state` to `1`,
 but it reverted to `2` after a power cycle. Home and Back worked by hand before that cycle.
 
-The boot-restoration behavior is **not yet tested on the device or across a reboot**. It is
-disabled until the owner opts in, checks the exact model and build before writing, and attempts the setting once
-at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission which must be granted
-separately; it has no internet or overlay permission. A vendor background manager or a later
-power-mode change may still undo its setting. Uninstalling the helper stops future attempts,
-but does not restore the current navigation setting.
+Version 1.1's opt-in failed on the C1 with a security denial. The firmware's Settings provider
+restricts reads of this hidden key by ordinary apps even with `WRITE_SECURE_SETTINGS`; that is
+the likely cause. Version 1.2 requests the write without reading the key, so its success message
+means the request was accepted, **not** that the bar was verified. Check the setting over ADB and
+the controls by hand. Version 1.2 has not been tested on the device or across a reboot.
+
+The helper is disabled until the owner opts in, checks the exact model and build before writing,
+and attempts the setting once at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission
+which must be granted separately; it has no internet or overlay permission. A vendor background
+manager or a later power-mode change may still undo its setting. Uninstalling the helper stops
+future attempts, but does not restore the current navigation setting.
 
 Build only, with JDK 17, SDK build-tools 36.0.0, and platform android-37.0:
 

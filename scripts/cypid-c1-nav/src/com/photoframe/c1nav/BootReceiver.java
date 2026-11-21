@@ -12,7 +12,7 @@ public final class BootReceiver extends BroadcastReceiver {
                 .getBoolean(NavRestore.ENABLED, false)) return;
         String error = NavRestore.restore(context);
         if (error == null) {
-            Log.i("C1NavRestore", "Boot navigation setting verified");
+            Log.i("C1NavRestore", "Boot navigation request accepted; readback unavailable");
         } else {
             Log.w("C1NavRestore", error);
         }
