@@ -121,9 +121,10 @@ but it reverted to `2` after a power cycle. Home and Back worked by hand before 
 
 Version 1.1's opt-in failed on the C1 with a security denial. The firmware's Settings provider
 restricts reads of this hidden key by ordinary apps even with `WRITE_SECURE_SETTINGS`; that is
-the likely cause. Version 1.2 requests the write without reading the key, so its success message
-means the request was accepted, **not** that the bar was verified. Check the setting over ADB and
-the controls by hand. Version 1.2 has not been tested on the device or across a reboot.
+the likely cause. Version 1.2 requests the write without reading the key, so its status means the
+request was accepted, **not** that the bar was verified. In one live test, the owner enabled
+version 1.2 and ADB observed the setting change from `2` to `1` with a visible bar. Boot delivery
+and persistence have not been tested.
 
 The helper is disabled until the owner opts in, checks the exact model and build before writing,
 and attempts the setting once at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission
