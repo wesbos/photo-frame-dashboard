@@ -123,8 +123,10 @@ Version 1.1's opt-in failed on the C1 with a security denial. The firmware's Set
 restricts reads of this hidden key by ordinary apps even with `WRITE_SECURE_SETTINGS`; that is
 the likely cause. Version 1.2 requests the write without reading the key, so its status means the
 request was accepted, **not** that the bar was verified. In one live test, the owner enabled
-version 1.2 and ADB observed the setting change from `2` to `1` with a visible bar. Boot delivery
-and persistence have not been tested.
+version 1.2 and ADB observed the setting change from `2` to `1` with a visible bar. After one
+software reboot, the first boot-complete check still showed `2`; Android delivered the helper's
+boot receiver later, and ADB then showed `1` and a visible bar. A second reboot and a power cycle
+with the helper enabled have not been tested.
 
 The helper is disabled until the owner opts in, checks the exact model and build before writing,
 and attempts the setting once at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission
