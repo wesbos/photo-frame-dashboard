@@ -125,9 +125,9 @@ the likely cause. Version 1.2 requests the write without reading the key, so its
 request was accepted, **not** that the bar was verified. In one live test, the owner enabled
 version 1.2 and ADB observed the setting change from `2` to `1` with a visible bar. After one
 software reboot, the first boot-complete check still showed `2`; Android delivered the helper's
-boot receiver later, and ADB then showed `1` and a visible bar. The owner confirmed Home and Back
-worked by hand after that reboot. A second reboot and a power cycle with the helper enabled have
-not been tested.
+boot receiver later, and ADB then showed `1` and a visible bar. After that reboot and a later
+restart following FEL research, the owner confirmed Home and Back worked by hand; Settings → Apps
+was also reachable. A cold power cycle with the helper enabled has not been separately established.
 
 The helper is disabled until the owner opts in, checks the exact model and build before writing,
 and attempts the setting once at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission

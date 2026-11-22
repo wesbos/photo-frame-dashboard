@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build and sign only. Never installs an APK or changes a connected device.
 set -euo pipefail
+umask 077
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SRC="$ROOT/scripts/cypid-c1-nav"
 SDK="${ANDROID_HOME:?Set ANDROID_HOME to the Android SDK}"
