@@ -823,3 +823,68 @@ The first screenshots on the hosted demo showed the fixed 1280-wide stage (96 px
 Verified on the panel: the two-finger hold opens the kiosk controls and reaches Android Settings.
 
 Not tested on this unit: loader mode, firmware restore, motion/PIR, the vendor boot animation, the factory test app `com.szclink.app.cldevicetest`, whether the system `Frameo` copy returns after a factory reset.
+
+## Ninth unit: firmware v2026051219, Frameo v1.32.18, Windows host (2026-11-22)
+
+A `FRAME156` on firmware `v2026051219`, the first Windows-hosted report for this model. Host:
+Windows 11, Git Bash, platform-tools 37.0.3 (ADB 1.0.41). USB-A to USB-C data cable.
+
+| Observation | Value |
+| --- | --- |
+| `ro.product.model` / `ro.product.device` | `FRAME156` / `FRAME156` |
+| Firmware | `FrameO.DP105F.v2026051219` |
+| Fingerprint | `rockchip/rk3326_32bit/rk3326_32bit:8.1.0/OC/192521:user/release-keys` |
+| Android / API / patch | 8.1.0 / 27 / 2020-11-05 |
+| ABI | `armeabi-v7a`, `ro.config.low_ram=true` |
+| Display | 1920x1080, 170 dpi |
+| eMMC | 61,071,360 sectors (31,268,536,320 bytes) |
+| WebView | `com.android.webview` 106.0.5249.126 |
+| Frameo | `net.frameo.frame` v1.32.18 |
+| Root / SELinux | Shipped `su -c id` returns uid 0 without a prompt; `Permissive` |
+| ADB settings | `persist.sys.usb.config=adb`, `adb_enabled=1` |
+
+### ADB authorization on Windows
+
+With Frameo **Settings → About → Beta Program → ADB Access** on and computer photo transfer off,
+the host showed `unauthorized`. No dialog appeared on the frame (SystemUI likely disabled).
+**Toggling ADB Access off and on with the USB cable connected** changed the state from
+`unauthorized` to `device`. No key injection, loader or ADB server restart was needed. The
+authorization survived a reboot.
+
+### Backup on Windows (verified)
+
+Each partition was backed up individually through the partition device node (`mmcblk2pN`),
+using `dd | base64` on the frame and `tr -d '\r' | base64 -d` on the host.
+
+**The `adb exec-out` CRLF issue is confirmed on Windows:** a raw `dd` stream through
+`exec-out su -c` was 98 bytes too long for a 512 KiB partition. The base64 workaround
+produced exact bytes.
+
+All 16 regions (pre-partition area through `frp`) passed exact byte count, SHA-256 and no
+0xCC filler. Five independent re-reads (`boot`, `recovery`, `uboot`, `kernel`, `vendor`) all
+matched. `userdata`, `cache`, `mmcblk2boot0/1` and `rpmb` were not captured.
+
+| Partition | SHA-256 |
+| --- | --- |
+| `boot` (39,845,888 bytes) | `84524aa9c4c8fd519037062a629f3c3ba286c6929d5afe18c15535f319ca939a` |
+| `kernel` (33,554,432 bytes) | `2481302c300c6e871a008f13a7003601ed50cbee2a5be466aef23da0868edbd7` |
+| `recovery` (73,400,320 bytes) | `bfaaebf520f085f549c7724e810fcd4dc884b595379731abb8b141a8f3aed565` |
+
+### Kiosk setup
+
+The kiosk (`dashboard/kiosk`, `com.wesbos.homehq` v1.2) was installed and set as HOME using the
+`--ez home true` then `cmd package set-home-activity` order. `pm disable-user --user 0` was run for
+`com.muxintu.app.mxota`, `net.frameo.frame` and `com.szclink.app.cldevicetest`. After a reboot the
+kiosk was HOME (`mResumedActivity: com.wesbos.homehq/.Home`), `sys.boot_completed=1`, and all three
+packages stayed disabled. No `/system` or flash partition was written.
+
+### mDNS `.local` does not resolve
+
+Same as the [fourth unit](#fourth-unit-firmware-v2026051219-tested-on-macos-2026-10-18):
+`ping homeassistant.local` returns `unknown host`. Use an IP address or a DNS name that the network
+resolves. This is an Android 8.1 limitation, not a frame-specific issue.
+
+### Not tested
+
+Loader mode, firmware restore, motion/PIR, WebView upgrade, network ADB persistence, the vendor
+boot animation, and whether Frameo returns after a factory reset.
