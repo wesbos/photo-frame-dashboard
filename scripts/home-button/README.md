@@ -111,3 +111,36 @@ adb -d uninstall com.photoframe.homebutton
 
 Uninstalling removes its service, overlay permission and saved position. No
 system APK or boot partition is modified.
+
+## CYPID C1 native navigation bar
+
+[`scripts/cypid-c1-nav`](../cypid-c1-nav) is a separate, experimental helper for the
+CYPID C1 firmware `YHK.C-calendar-A333-1506-D2048-K692-V10-216-C1.0.20260801`.
+That unit showed the native navigation bar after setting `navigationbars_state` to `1`,
+but it reverted to `2` after a power cycle. Home and Back worked by hand before that cycle.
+
+Version 1.1's opt-in failed on the C1 with a security denial. The firmware's Settings provider
+restricts reads of this hidden key by ordinary apps even with `WRITE_SECURE_SETTINGS`; that is
+the likely cause. Version 1.2 requests the write without reading the key, so its status means the
+request was accepted, **not** that the bar was verified. In one live test, the owner enabled
+version 1.2 and ADB observed the setting change from `2` to `1` with a visible bar. After one
+software reboot, the first boot-complete check still showed `2`; Android delivered the helper's
+boot receiver later, and ADB then showed `1` and a visible bar. After that reboot and a later
+restart following FEL research, the owner confirmed Home and Back worked by hand; Settings → Apps
+was also reachable. A cold power cycle with the helper enabled has not been separately established.
+
+The helper is disabled until the owner opts in, checks the exact model and build before writing,
+and attempts the setting once at boot. It requests `WRITE_SECURE_SETTINGS`, a broad permission
+which must be granted separately; it has no internet or overlay permission. A vendor background
+manager or a later power-mode change may still undo its setting. Uninstalling the helper stops
+future attempts, but does not restore the current navigation setting.
+
+Build only, with JDK 17, SDK build-tools 36.0.0, and platform android-37.0:
+
+```sh
+ANDROID_HOME=/path/to/sdk JAVA_HOME=/path/to/jdk bash scripts/cypid-c1-nav/build.sh
+```
+
+The output and signing key stay in ignored `diagnostics/cypid-c1/nav-helper/`. The build does
+not install anything. Follow the [backup and approval rules](../../README.md#rules-we-learned-the-hard-way)
+before trying it on a device.
