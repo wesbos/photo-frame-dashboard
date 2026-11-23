@@ -46,3 +46,13 @@
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.34, 1.56, .64, 1);
 }
+
+/* Dark mode — uses the same filter as the nightdash idle screen */
+.stage[data-mode="dark"] { background: #000; }
+.stage[data-mode="dark"] > .rail,
+.stage[data-mode="dark"] > .views,
+.stage[data-mode="dark"] > .sheet-layer,
+.stage[data-mode="dark"] > .toasts,
+.stage[data-mode="dark"] > .demo {
+  filter: invert(1) hue-rotate(180deg) grayscale(1) sepia(1) saturate(5) hue-rotate(-38deg) brightness(.62);
+}

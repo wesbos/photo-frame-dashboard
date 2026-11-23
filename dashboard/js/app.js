@@ -89,8 +89,33 @@
   };
 
   // ------------------------------------------------------------ calendar helpers
+  // Expand recurring events into concrete instances within a 90-day window
+  function expandRecurring(events) {
+    var out = [], now = App.now(), windowStart = App.addDays(App.dayStart(now), -45), windowEnd = App.addDays(App.dayStart(now), 45);
+    events.forEach(function (e) {
+      if (!e.repeat) { out.push(e); return; }
+      var dur = e.end - e.start;
+      var cursor = new Date(+e.start);
+      for (var i = 0; i < 200; i++) {
+        if (cursor > windowEnd) break;
+        if (cursor >= windowStart) {
+          var inst = Object.assign({}, e, { id: e.id + '_' + i, start: new Date(+cursor), end: new Date(+cursor + dur), _parent: e.id });
+          out.push(inst);
+        }
+        if (e.repeat === 'daily') cursor.setDate(cursor.getDate() + 1);
+        else if (e.repeat === 'weekly') cursor.setDate(cursor.getDate() + 7);
+        else if (e.repeat === 'weekdays') {
+          do { cursor.setDate(cursor.getDate() + 1); } while (cursor.getDay() === 0 || cursor.getDay() === 6);
+        }
+        else if (e.repeat === 'biweekly') cursor.setDate(cursor.getDate() + 14);
+        else if (e.repeat === 'monthly') cursor.setMonth(cursor.getMonth() + 1);
+        else { out.push(e); break; }
+      }
+    });
+    return out;
+  }
   App.events = function () {
-    var list = D.events.slice();
+    var list = expandRecurring(D.events);
     var today = App.dayStart(App.now());
     if (App.calMode === 'busy') list = list.concat(D.busyExtras);
     if (App.calMode === 'empty') list = list.filter(function (e) { return e.allDay || !App.sameDay(e.start, today); });
@@ -333,7 +358,7 @@
 
   // ------------------------------------------------------------ boot
   App.start = function () {
-    App.setTime(15, 18); // demo default: a busy weekday afternoon
+    App.setTime(null); // use real time
     fit();
     window.addEventListener('resize', fit);
     // Switch tabs the instant a finger lands (pointerdown), not on release. Keyboard "clicks"
@@ -353,7 +378,7 @@
     setInterval(tick, 1000);
     App.emit('ready');
     refreshStale(1500);
-    setTimeout(function () { App.toast('Tip: press and hold the <b>clock</b> in the sidebar for demo controls', { ms: 6000, icon: 'bolt' }); }, 1200);
+    setTimeout(function () { App.toast('Tip: press and hold the <b>clock</b> in the sidebar for settings', { ms: 6000, icon: 'bolt' }); }, 1200);
   };
   document.addEventListener('DOMContentLoaded', function () { App.start(); });
 })();

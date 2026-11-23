@@ -72,7 +72,7 @@ import java.util.Map;
  */
 public class MainActivity extends Activity {
   static final String TAG = "HomeHQ";
-  static final String DEFAULT_URL = "https://home-dashboard.wesbos.workers.dev/";
+  static final String DEFAULT_URL = "http://homeassistant.local:8123";
   static final String PREFS = "kiosk";
   static final String PREF_URL = "url";
   static final String PREF_MENU_BUTTON = "menu_button";
@@ -443,6 +443,19 @@ public class MainActivity extends Activity {
         || u.getPort() != LOCAL_PORT) return null;
     String path = u.getPath();
     if (path == null || path.isEmpty()) path = "/";
+
+    // Proxy: /__proxy__?url=<encoded-url> fetches the URL natively, bypassing CORS.
+    // Used by the dashboard to sync external ICS calendar feeds.
+    if ("/__proxy__".equals(path)) {
+      String target = u.getQueryParameter("url");
+      Log.i(TAG, "Proxy request: " + (target != null ? target.substring(0, Math.min(80, target.length())) : "null"));
+      if (target == null || (!target.startsWith("https://") && !target.startsWith("http://"))) {
+        Map<String, String> h = new HashMap<>();
+        return new WebResourceResponse("text/plain", "utf-8", 400, "Bad Request", h, null);
+      }
+      return proxyFetch(target);
+    }
+
     if (path.endsWith("/")) path += "index.html";
     Map<String, String> headers = new HashMap<>();
     headers.put("Cache-Control", "no-cache");
@@ -455,6 +468,29 @@ public class MainActivity extends Activity {
     } catch (IOException e) {
       Log.w(TAG, "No bundled file for " + path);
       return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, null);
+    }
+  }
+
+  /** Fetches a URL natively and returns the body as a WebResourceResponse. */
+  private WebResourceResponse proxyFetch(String target) {
+    Map<String, String> headers = new HashMap<>();
+    headers.put("Access-Control-Allow-Origin", "*");
+    headers.put("Cache-Control", "no-cache");
+    try {
+      HttpURLConnection c = (HttpURLConnection) new URL(target).openConnection();
+      c.setConnectTimeout(15000);
+      c.setReadTimeout(15000);
+      c.setInstanceFollowRedirects(true);
+      int code = c.getResponseCode();
+      Log.i(TAG, "Proxy response: " + code + " from " + target.substring(0, Math.min(80, target.length())));
+      InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
+      String mime = c.getContentType();
+      if (mime == null) mime = "text/plain";
+      if (mime.contains(";")) mime = mime.substring(0, mime.indexOf(";")).trim();
+      return new WebResourceResponse(mime, "utf-8", code, "OK", headers, in);
+    } catch (IOException e) {
+      Log.w(TAG, "Proxy fetch failed: " + e.getMessage());
+      return new WebResourceResponse("text/plain", "utf-8", 502, "Bad Gateway", headers, null);
     }
   }
 

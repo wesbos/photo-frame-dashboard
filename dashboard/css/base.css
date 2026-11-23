@@ -145,7 +145,7 @@ button.card:active, .h-hero:active, .h-photo:active { transform: scale(.985); }
 }
 .chip.is-on { background: var(--ink); color: var(--paper); }
 .chip--ghost { background: transparent; border: 2px solid var(--line); }
-.evs .chip, .chip[style] { background: rgb(var(--c-rgb) / .14); padding-left: 6px; }
+.evs .chip, .chip[style] { background: rgba(0,0,0,.08); padding-left: 6px; }
 
 .pill {
   display: inline-flex; align-items: center; gap: 8px;
@@ -271,27 +271,113 @@ button.card:active, .h-hero:active, .h-photo:active { transform: scale(.985); }
 .tk-btn--light.tk-btn--solid { background: #fff; color: var(--alert); }
 
 
-/* ---------------------------------------------------------------- demo drawer */
+/* ---------------------------------------------------------------- settings drawer */
 .demo { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 90; pointer-events: none; }
-.demo.is-open { pointer-events: auto; background: rgba(0, 0, 0, .3); }
+.demo.is-open { pointer-events: auto; background: rgba(0, 0, 0, .4); }
 .demo-panel {
-  position: absolute; right: 0; top: 0; bottom: 0; width: 460px; padding: 28px;
-  background: var(--ink); color: #fff; overflow: auto;
-  transform: translateX(100%);
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  background: #1a1a1a; color: #e8e4dc; overflow: auto;
+  transform: translateY(100%);
+  transition: transform .35s cubic-bezier(.2, .8, .2, 1);
+  display: flex; flex-direction: column;
 }
 .demo.is-open .demo-panel { transform: none; }
-.demo-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
-.demo-head h2 { font-size: 44px; line-height: 1; }
-.demo-x { width: var(--tap); height: var(--tap); border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .1); }
-.demo-sec { margin-bottom: 22px; }
-.demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.demo-grid button {
-  min-height: var(--tap); border-radius: 14px; padding: 0 16px;
-  background: rgba(255, 255, 255, .1);
-  font-size: 18px; font-weight: 700;
+
+/* header */
+.cfg-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 0; flex-shrink: 0; }
+.cfg-title { font-size: 36px; line-height: 1; color: #fff; }
+.cfg-close { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); }
+.cfg-close:active { background: rgba(255,255,255,.2); }
+
+/* tabs */
+.cfg-tabs { display: flex; gap: 4px; padding: 20px 32px 0; flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+.cfg-tab {
+  padding: 12px 20px; font-size: 17px; font-weight: 700; color: rgba(255,255,255,.5);
+  border-bottom: 3px solid transparent; margin-bottom: -1px; border-radius: 0;
 }
-.demo-grid button:active, .demo-grid button.is-on { background: #fff; color: var(--ink); }
-.demo-note { font-size: 16px; color: rgba(255, 255, 255, .6); }
+.cfg-tab.is-on { color: #fff; border-bottom-color: #fff; }
+.cfg-tab:active { color: #fff; }
+
+/* body */
+.cfg-body { flex: 1; overflow: auto; padding: 24px 32px; max-width: 680px; }
+.cfg-footer { padding: 0 32px 24px; font-size: 14px; color: rgba(255,255,255,.35); flex-shrink: 0; max-width: 680px; }
+
+/* shared form elements */
+.cfg-input {
+  min-height: 48px; border-radius: 12px; padding: 0 14px;
+  background: rgba(255,255,255,.08); color: #fff; font-size: 17px;
+  border: 1px solid rgba(255,255,255,.1); width: 100%;
+}
+.cfg-input:focus { border-color: rgba(255,255,255,.35); outline: none; background: rgba(255,255,255,.12); }
+.cfg-input--grow { flex: 1; }
+.cfg-input--sm { width: 72px; flex: none; text-align: center; }
+.cfg-input--color { width: 48px; height: 48px; flex: none; padding: 2px; border-radius: 50%; cursor: pointer; }
+.cfg-input--emoji { width: 56px; flex: none; text-align: center; font-size: 22px; }
+.cfg-select {
+  min-height: 48px; border-radius: 12px; padding: 0 12px;
+  background: rgba(255,255,255,.08); color: #fff; font-size: 17px;
+  border: 1px solid rgba(255,255,255,.1);
+}
+.cfg-select:focus { border-color: rgba(255,255,255,.35); outline: none; }
+.cfg-label { display: block; font-size: 14px; font-weight: 700; color: rgba(255,255,255,.5); margin-bottom: 6px; letter-spacing: .05em; text-transform: uppercase; }
+
+/* rows */
+.cfg-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.cfg-row { display: flex; align-items: center; gap: 10px; }
+.cfg-row--toggle { justify-content: space-between; padding: 12px 0; font-size: 18px; font-weight: 600; }
+.cfg-field { margin-bottom: 16px; }
+.cfg-add-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+.cfg-empty { padding: 24px; text-align: center; color: rgba(255,255,255,.3); font-size: 16px; }
+
+/* avatar */
+.cfg-avatar {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; font-weight: 800; font-size: 18px;
+}
+
+/* chore row */
+.cfg-emoji { font-size: 22px; flex-shrink: 0; width: 32px; text-align: center; }
+.cfg-chore-title { flex: 1; font-size: 17px; font-weight: 600; }
+.cfg-chore-who { font-size: 14px; color: rgba(255,255,255,.45); flex-shrink: 0; }
+
+/* buttons */
+.cfg-btn {
+  min-height: 48px; border-radius: 12px; padding: 0 20px;
+  font-size: 17px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;
+}
+.cfg-btn--solid { background: #fff; color: #1a1a1a; }
+.cfg-btn--solid:active { background: #ddd; }
+.cfg-btn--outline { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); color: #fff; }
+.cfg-btn--outline:active { background: rgba(255,255,255,.18); }
+.cfg-btn--add { background: rgba(255,255,255,.12); color: #fff; flex-shrink: 0; }
+.cfg-btn--add:active { background: rgba(255,255,255,.25); }
+.cfg-icon-btn {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; background: rgba(255,255,255,.06); color: rgba(255,255,255,.4);
+}
+.cfg-icon-btn:active { background: rgba(229,38,30,.3); color: #E5261E; }
+.cfg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+
+/* toggle switch */
+.cfg-toggle {
+  width: 56px; height: 32px; border-radius: 16px; padding: 3px;
+  background: rgba(255,255,255,.15); position: relative; cursor: pointer;
+  transition: background .2s;
+}
+.cfg-toggle.is-on { background: #00A36C; }
+.cfg-toggle-knob {
+  display: block; width: 26px; height: 26px; border-radius: 50%; background: #fff;
+  transition: transform .2s;
+}
+.cfg-toggle.is-on .cfg-toggle-knob { transform: translateX(24px); }
+
+/* routine segments (chores tab) */
+.cfg-seg { display: flex; gap: 4px; margin-bottom: 16px; background: rgba(255,255,255,.06); border-radius: 12px; padding: 4px; }
+.cfg-seg-btn { flex: 1; padding: 10px; border-radius: 10px; font-size: 16px; font-weight: 700; color: rgba(255,255,255,.5); }
+.cfg-seg-btn.is-on { background: rgba(255,255,255,.15); color: #fff; }
+.cfg-routine { display: none; }
+.cfg-routine.is-visible { display: block; }
+.cfg-hint { font-size: 14px; color: rgba(255,255,255,.35); margin-top: 16px; line-height: 1.5; }
 
 /* ---------------------------------------------------------------- night dashboard (tap on night clock) */
 .stage[data-mode="nightdash"] > .rail,
