@@ -1,5 +1,0 @@
-blank_issues_enabled: true
-contact_links:
-  - name: PF1007L start here
-    url: https://github.com/wesbos/photo-frame-dashboard/blob/main/docs/pf1007l-start-here.md
-    about: Run the test sequence before reporting a PF1007L.

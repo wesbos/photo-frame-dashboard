@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var D = window.DATA;
-  var PX = 72, START = 6, END = 23; // 72px per hour, 6 AM → 11 PM
+  var PX = 72, START = 0, END = 24; // 72px per hour, 12 AM → 12 AM (full 24 hours)
   var V = { mode: 'day', date: null, el: null, scroll: null };
   var MODES = [['day', 'Today'], ['3day', '3 Day'], ['week', 'Week'], ['month', 'Month']];
 
@@ -224,7 +224,7 @@
     if ((t = e.target.closest('[data-ev]'))) return App.eventSheet(App.findEvent(t.dataset.ev));
     if ((t = e.target.closest('[data-more]'))) return moreSheet(t.dataset.more.split(','));
     if ((t = e.target.closest('[data-nav]'))) return nav(+t.dataset.nav);
-    if ((t = e.target.closest('[data-today]'))) { V.date = App.dayStart(App.now()); if (V.mode === 'month') V.date.setDate(1); V.scroll = null; return render(); }
+    if ((t = e.target.closest('[data-today]'))) { V.date = App.dayStart(App.now()); V.mode = 'day'; V.scroll = null; return render(); }
     // button[data-mode], not [data-mode]: #stage also carries data-mode, for the display mode
     // (day / ambient / night), and is an ancestor of everything, so the bare selector matched
     // it on every click in this view. This branch then swallowed clicks meant for the ones
@@ -232,6 +232,7 @@
     // stage's attribute instead, which is why tapping any day in Month opened the 1st.
     if ((t = e.target.closest('button[data-mode]'))) {
       V.mode = t.dataset.mode;
+      if (V.mode === 'day') V.date = App.dayStart(App.now());
       if (V.mode === 'month') V.date = new Date(V.date.getFullYear(), V.date.getMonth(), 1);
       V.scroll = null;
       return render();
@@ -253,23 +254,192 @@
   }
 
   // ------------------------------------------------------------ sheets
+  function remindLabel(mins) {
+    if (!mins) return 'None';
+    return mins >= 60 ? (mins / 60) + ' hour before' : mins + ' min before';
+  }
+  var REMIND_OPTS = [[0, 'None'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hour']];
+  var REPEAT_LABELS = { daily: 'Daily', weekdays: 'Weekdays', weekly: 'Weekly', biweekly: 'Every 2 weeks', monthly: 'Monthly' };
+
   App.eventSheet = function (e) {
     if (!e) return;
     var p = App.evColor(e), fam = App.isFamily(e);
+    var parentEvent = e._parent ? D.events.filter(function (ev) { return ev.id === e._parent; })[0] : e;
+    var curRemind = parentEvent.remind != null ? parentEvent.remind : 15;
+    var dur = Math.round((e.end - e.start) / 60000);
+    var durLabel = dur >= 60 ? (dur / 60) + 'h' : dur + 'm';
+    var color = p.color, ink = p.ink;
+
     App.sheet(
-      '<div class="evs" style="' + App.pstyle(p) + '">' +
-      '<div class="evs-band"><div class="label label--on">' + App.fmt.rel(e.start) + ' · ' + App.fmt.month(e.start) + ' ' + e.start.getDate() + '</div>' +
-      '<h2 class="serif">' + App.esc(e.title) + '</h2>' +
-      '<div class="evs-time num">' + (e.allDay ? 'All day' : App.fmt.range(e.start, e.end)) + '</div></div>' +
-      '<div class="evs-body">' +
-      (e.travel ? '<div class="evs-row evs-leave">' + App.icon('car', 28) + '<div><b>Leave by ' + App.fmt.time(App.leaveBy(e)) + '</b><span>' + e.travel + ' min drive in current traffic</span></div></div>' : '') +
-      (e.loc ? '<div class="evs-row">' + App.icon('pin', 28) + '<div><b>' + App.esc(e.loc) + '</b><span>Tap to send directions to phone</span></div></div>' : '') +
-      '<div class="evs-row">' + App.icon('person', 28) + '<div class="evs-people">' + (fam ? D.people : e.people.map(App.person)).map(function (x) {
-        return '<span class="chip" style="' + App.pstyle(x) + '">' + App.avatar(x, 32) + x.name + '</span>';
-      }).join('') + '</div></div>' +
-      (e.notes ? '<div class="evs-notes serif">“' + App.esc(e.notes) + '”</div>' : '') +
-      '</div></div>', { cls: 'sheet--event' });
+      '<div class="sheet-pad add">' +
+      '<div style="background:' + color + ';color:' + ink + ';padding:28px 32px 24px;border-radius:var(--r);margin:-34px -36px 24px">' +
+      '<div class="label label--on" style="opacity:.75">' + App.fmt.rel(e.start) + ' \xb7 ' + App.fmt.month(e.start) + ' ' + e.start.getDate() + '</div>' +
+      '<h2 class="serif" style="font-size:48px;line-height:1;margin:8px 0 12px">' + App.esc(e.title) + '</h2>' +
+      '<div class="num" style="font-size:22px">' + (e.allDay ? 'All day' : App.fmt.range(e.start, e.end) + ' (' + durLabel + ')') + '</div>' +
+      '</div>' +
+      (e.loc ? '<div class="label">Location</div><p style="font-size:18px;margin:0 0 16px">' + App.esc(e.loc) + '</p>' : '') +
+      (e.travel ? '<p style="font-size:18px;color:var(--alert);font-weight:700;margin:0 0 16px">' + App.icon('car', 20) + ' Leave by ' + App.fmt.time(App.leaveBy(e)) + ' (' + e.travel + ' min drive)</p>' : '') +
+      (e.repeat ? '<div class="label">Repeat</div><p style="font-size:18px;margin:0 0 16px">' + (REPEAT_LABELS[e.repeat] || e.repeat) + '</p>' : '') +
+      '<div class="label">Who</div><div class="add-who">' + (fam ? D.people : e.people.map(App.person)).filter(Boolean).map(function (x) {
+        return '<button class="who-btn is-on" style="' + App.pstyle(x) + ';pointer-events:none">' + App.avatar(x, 56) + '<span>' + x.name + '</span></button>';
+      }).join('') + '</div>' +
+      '<div class="label">Reminder</div><div class="chips">' + REMIND_OPTS.map(function (r) {
+        return '<button class="chip' + (r[0] === curRemind ? ' is-on' : '') + '" data-set-remind="' + r[0] + '">' + r[1] + '</button>';
+      }).join('') + '</div>' +
+      (e.notes ? '<div class="label">Notes</div><div class="serif" style="font-size:22px;line-height:1.3;padding-top:4px;font-style:italic;color:var(--ink-2)">\u201c' + App.esc(e.notes) + '\u201d</div>' : '') +
+      '<div class="sheet-actions"><button class="btn btn--ghost" data-delete-event>' + App.icon('x', 18) + ' Delete</button><button class="btn btn--solid" data-edit-event>' + App.icon('edit', 18) + ' Edit</button></div>' +
+      '</div>', {
+      cls: 'sheet--wide',
+      onMount: function (s, close) {
+        s.addEventListener('click', function (ev) {
+          var t = ev.target.closest('[data-set-remind]');
+          if (t) {
+            var val = +t.dataset.setRemind;
+            parentEvent.remind = val;
+            saveEvents();
+            App.$$('[data-set-remind]', s).forEach(function (b) { b.classList.toggle('is-on', b === t); });
+            App.toast('Reminder: ' + remindLabel(val), { icon: 'bell' });
+            return;
+          }
+          if (ev.target.closest('[data-edit-event]')) {
+            close();
+            editEventSheet(parentEvent);
+            return;
+          }
+          if (ev.target.closest('[data-delete-event]')) {
+            D.events = D.events.filter(function (x) { return x.id !== parentEvent.id; });
+            saveEvents();
+            close();
+            render();
+            App.emit('data');
+            App.toast('Deleted <b>' + App.esc(parentEvent.title) + '</b>', { icon: 'check' });
+            return;
+          }
+        });
+      }
+    });
   };
+
+  function editEventSheet(e) {
+    var now = App.now();
+    var days = [0, 1, 2, 3, 4, 5, 6];
+    var ideas = ['Soccer', 'Playdate', 'Dentist', 'Dinner out', 'Swim', 'Birthday party'];
+    var repeats = [['', 'Once'], ['daily', 'Daily'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']];
+    var reminders = [[0, 'None'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hour']];
+    var durs = [[15, '15m'], [30, '30m'], [45, '45m'], [60, '1h'], [90, '1.5h'], [120, '2h'], [180, '3h']];
+    var curDay = Math.round((App.dayStart(e.start) - App.dayStart(now)) / 86400000);
+    if (curDay < 0) curDay = 0;
+    var curH24 = e.start.getHours();
+    var curHour = curH24 === 0 ? 12 : (curH24 > 12 ? curH24 - 12 : curH24);
+    var curMin = e.start.getMinutes();
+    var curAmpm = curH24 >= 12 ? 'PM' : 'AM';
+    var curDur = Math.round((e.end - e.start) / 60000);
+    var curRepeat = e.repeat || '';
+    var curRemind = e.remind != null ? e.remind : 15;
+    function to24(h, m, ampm) {
+      var h24 = h % 12;
+      if (ampm === 'PM') h24 += 12;
+      return ('0' + h24).slice(-2) + ':' + ('0' + m).slice(-2);
+    }
+    var st = { who: e.people.slice(), day: curDay, hour: curHour, min: curMin, ampm: curAmpm, dur: curDur, repeat: curRepeat, remind: curRemind };
+    var hours = [1,2,3,4,5,6,7,8,9,10,11,12];
+    var mins = [0,5,10,15,20,25,30,35,40,45,50,55];
+
+    App.sheet(
+      '<div class="sheet-pad add">' +
+      '<div class="label">Edit event</div>' +
+      '<input class="big-input serif" data-f="title" value="' + App.esc(e.title) + '">' +
+      '<div class="chips">' + ideas.map(function (i) { return '<button class="chip chip--ghost" data-idea="' + i + '">' + i + '</button>'; }).join('') + '</div>' +
+      '<div class="label">Who</div><div class="add-who">' + D.people.map(function (p) {
+        return '<button class="who-btn' + (st.who.indexOf(p.id) > -1 ? ' is-on' : '') + '" data-who="' + p.id + '" style="' + App.pstyle(p) + '">' + App.avatar(p, 56) + '<span>' + p.name + '</span></button>';
+      }).join('') + '<button class="who-btn' + (st.who.length >= D.ALL.length ? ' is-on' : '') + '" data-who="all" style="' + App.pstyle(D.family) + '">' + App.avatar(D.family, 56) + '<span>Everyone</span></button></div>' +
+      '<div class="add-row"><div><div class="label">When</div><div class="chips">' + days.map(function (i) {
+        var d = App.addDays(now, i);
+        return '<button class="chip' + (i === curDay ? ' is-on' : '') + '" data-dayi="' + i + '">' + (i < 2 ? App.fmt.rel(d) : App.fmt.dayShort(d) + ' ' + d.getDate()) + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Hour</div><div class="chips">' + hours.map(function (h) {
+        return '<button class="chip' + (h === curHour ? ' is-on' : '') + '" data-hour="' + h + '">' + h + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Minute</div><div class="chips">' + mins.map(function (m) {
+        return '<button class="chip' + (m === curMin ? ' is-on' : '') + '" data-min="' + m + '">' + ('0' + m).slice(-2) + '</button>';
+      }).join('') + '</div></div>' +
+      '<div><div class="label">AM / PM</div><div class="chips">' +
+      '<button class="chip' + (curAmpm === 'AM' ? ' is-on' : '') + '" data-ampm="AM">AM</button>' +
+      '<button class="chip' + (curAmpm === 'PM' ? ' is-on' : '') + '" data-ampm="PM">PM</button>' +
+      '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Length</div><div class="chips">' + durs.map(function (t) {
+        return '<button class="chip' + (t[0] === curDur ? ' is-on' : '') + '" data-dur="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Repeat</div><div class="chips">' + repeats.map(function (r) {
+        return '<button class="chip' + (r[0] === curRepeat ? ' is-on' : '') + '" data-repeat="' + r[0] + '">' + r[1] + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Reminder</div><div class="chips">' + reminders.map(function (r) {
+        return '<button class="chip' + (r[0] === curRemind ? ' is-on' : '') + '" data-remind="' + r[0] + '">' + r[1] + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="sheet-actions"><button class="btn btn--ghost" data-close>Cancel</button><button class="btn btn--solid" data-save-edit>Save changes</button></div>' +
+      '</div>', {
+      cls: 'sheet--wide',
+      onMount: function (s, close) {
+        var input = s.querySelector('[data-f=title]');
+        s.addEventListener('click', function (ev) {
+          var t = ev.target.closest('button');
+          if (!t) return;
+          if (t.dataset.idea) { input.value = t.dataset.idea; }
+          if (t.dataset.who) {
+            if (t.dataset.who === 'all') st.who = st.who.length >= D.ALL.length ? [] : D.ALL.slice();
+            else { var i = st.who.indexOf(t.dataset.who); if (i > -1) st.who.splice(i, 1); else st.who.push(t.dataset.who); }
+            App.$$('[data-who]', s).forEach(function (b) {
+              b.classList.toggle('is-on', b.dataset.who === 'all' ? st.who.length >= D.ALL.length : st.who.indexOf(b.dataset.who) > -1);
+            });
+          }
+          ['dayi', 'dur'].forEach(function (k) {
+            if (t.dataset[k] != null) {
+              App.$$('[data-' + k + ']', s).forEach(function (b) { b.classList.toggle('is-on', b === t); });
+              if (k === 'dayi') st.day = +t.dataset.dayi; else st.dur = +t.dataset.dur;
+            }
+          });
+          if (t.dataset.hour != null) {
+            st.hour = +t.dataset.hour;
+            App.$$('[data-hour]', s).forEach(function (b) { b.classList.toggle('is-on', +b.dataset.hour === st.hour); });
+          }
+          if (t.dataset.min != null) {
+            st.min = +t.dataset.min;
+            App.$$('[data-min]', s).forEach(function (b) { b.classList.toggle('is-on', +b.dataset.min === st.min); });
+          }
+          if (t.dataset.ampm) {
+            st.ampm = t.dataset.ampm;
+            App.$$('[data-ampm]', s).forEach(function (b) { b.classList.toggle('is-on', b.dataset.ampm === st.ampm); });
+          }
+          if (t.dataset.repeat != null) {
+            st.repeat = t.dataset.repeat;
+            App.$$('[data-repeat]', s).forEach(function (b) { b.classList.toggle('is-on', b.dataset.repeat === st.repeat); });
+          }
+          if (t.dataset.remind != null) {
+            st.remind = +t.dataset.remind;
+            App.$$('[data-remind]', s).forEach(function (b) { b.classList.toggle('is-on', +b.dataset.remind === st.remind); });
+          }
+          if (t.hasAttribute('data-save-edit')) {
+            var title = input.value.trim() || e.title;
+            e.title = title;
+            e.people = st.who.length ? st.who.slice() : e.people;
+            var timeStr = to24(st.hour, st.min, st.ampm);
+            var start = App.addDays(App.dayStart(now), st.day), p = timeStr.split(':');
+            start.setHours(+p[0], +p[1]);
+            e.start = start;
+            e.end = new Date(+start + st.dur * 60000);
+            e.repeat = st.repeat || undefined;
+            e.remind = st.remind;
+            saveEvents();
+            close();
+            V.date = App.dayStart(start); V.mode = V.mode === 'month' ? 'day' : V.mode; V.scroll = null;
+            render();
+            App.emit('data');
+            App.toast('Updated <b>' + App.esc(title) + '</b>', { icon: 'check' });
+          }
+        });
+      }
+    });
+  }
 
   function moreSheet(ids) {
     var list = ids.map(App.findEvent).filter(Boolean);
@@ -281,16 +451,32 @@
     });
   }
 
+  function saveEvents() {
+    // Persist only user-created events (those with an id starting with 'e' or a timestamp)
+    var serializable = D.events.map(function (e) {
+      return { id: e.id, title: e.title, people: e.people, start: +e.start, end: +e.end, allDay: e.allDay || false, loc: e.loc || '', notes: e.notes || '', travel: e.travel || 0, repeat: e.repeat || '', remind: e.remind != null ? e.remind : 15 };
+    });
+    try { localStorage.setItem('hq-events', JSON.stringify(serializable)); } catch (ex) {}
+  }
+
   function addSheet() {
     var now = App.now();
-    var st = { who: [], day: 0, time: '15:30', dur: 60, title: '' };
-    var days = [0, 1, 2, 3, 4];
-    var times = [['08:00', '8 AM'], ['12:00', 'Noon'], ['15:30', '3:30 PM'], ['16:30', '4:30 PM'], ['18:00', '6 PM'], ['19:30', '7:30 PM']];
+    var defH = now.getHours(), defHour = defH === 0 ? 12 : (defH > 12 ? defH - 12 : defH);
+    var defMin = Math.ceil(now.getMinutes() / 15) * 15; if (defMin >= 60) { defMin = 0; defHour = (defHour % 12) + 1; }
+    var defAmpm = defH >= 12 ? 'PM' : 'AM';
+    var st = { who: [], day: 0, hour: defHour, min: defMin, ampm: defAmpm, dur: 60, title: '', repeat: '', remind: 15 };
+    var days = [0, 1, 2, 3, 4, 5, 6];
+    var hours = [1,2,3,4,5,6,7,8,9,10,11,12];
+    var mins = [0,5,10,15,20,25,30,35,40,45,50,55];
+    var durs = [[15, '15m'], [30, '30m'], [45, '45m'], [60, '1h'], [90, '1.5h'], [120, '2h'], [180, '3h']];
     var ideas = ['Soccer', 'Playdate', 'Dentist', 'Dinner out', 'Swim', 'Birthday party'];
+    var repeats = [['', 'Once'], ['daily', 'Daily'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly']];
+    var reminders = [[0, 'None'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hour']];
+    function to24(h, m, ampm) { var h24 = h % 12; if (ampm === 'PM') h24 += 12; return ('0' + h24).slice(-2) + ':' + ('0' + m).slice(-2); }
     App.sheet(
       '<div class="sheet-pad add">' +
       '<div class="label">New event</div>' +
-      '<input class="big-input serif" placeholder="What’s happening?" data-f="title">' +
+      '<input class="big-input serif" placeholder="What\'s happening?" data-f="title">' +
       '<div class="chips">' + ideas.map(function (i) { return '<button class="chip chip--ghost" data-idea="' + i + '">' + i + '</button>'; }).join('') + '</div>' +
       '<div class="label">Who</div><div class="add-who">' + D.people.map(function (p) {
         return '<button class="who-btn" data-who="' + p.id + '" style="' + App.pstyle(p) + '">' + App.avatar(p, 56) + '<span>' + p.name + '</span></button>';
@@ -299,11 +485,24 @@
         var d = App.addDays(now, i);
         return '<button class="chip' + (i === 0 ? ' is-on' : '') + '" data-dayi="' + i + '">' + (i < 2 ? App.fmt.rel(d) : App.fmt.dayShort(d) + ' ' + d.getDate()) + '</button>';
       }).join('') + '</div></div></div>' +
-      '<div class="add-row"><div><div class="label">Time</div><div class="chips">' + times.map(function (t) {
-        return '<button class="chip' + (t[0] === st.time ? ' is-on' : '') + '" data-time="' + t[0] + '">' + t[1] + '</button>';
+      '<div class="add-row"><div><div class="label">Hour</div><div class="chips">' + hours.map(function (h) {
+        return '<button class="chip' + (h === st.hour ? ' is-on' : '') + '" data-hour="' + h + '">' + h + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Minute</div><div class="chips">' + mins.map(function (m) {
+        return '<button class="chip' + (m === st.min ? ' is-on' : '') + '" data-min="' + m + '">' + ('0' + m).slice(-2) + '</button>';
       }).join('') + '</div></div>' +
-      '<div><div class="label">Length</div><div class="chips">' + [[30, '30m'], [60, '1h'], [120, '2h']].map(function (t) {
+      '<div><div class="label">AM / PM</div><div class="chips">' +
+      '<button class="chip' + (st.ampm === 'AM' ? ' is-on' : '') + '" data-ampm="AM">AM</button>' +
+      '<button class="chip' + (st.ampm === 'PM' ? ' is-on' : '') + '" data-ampm="PM">PM</button>' +
+      '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Length</div><div class="chips">' + durs.map(function (t) {
         return '<button class="chip' + (t[0] === st.dur ? ' is-on' : '') + '" data-dur="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Repeat</div><div class="chips">' + repeats.map(function (r) {
+        return '<button class="chip' + (r[0] === st.repeat ? ' is-on' : '') + '" data-repeat="' + r[0] + '">' + r[1] + '</button>';
+      }).join('') + '</div></div></div>' +
+      '<div class="add-row"><div><div class="label">Reminder</div><div class="chips">' + reminders.map(function (r) {
+        return '<button class="chip' + (r[0] === st.remind ? ' is-on' : '') + '" data-remind="' + r[0] + '">' + r[1] + '</button>';
       }).join('') + '</div></div></div>' +
       '<div class="sheet-actions"><button class="btn btn--ghost" data-close>Cancel</button><button class="btn btn--solid" data-save>Add to calendar</button></div>' +
       '</div>', {
@@ -315,31 +514,56 @@
           if (!t) return;
           if (t.dataset.idea) { input.value = t.dataset.idea; }
           if (t.dataset.who) {
-            if (t.dataset.who === 'all') st.who = st.who.length === 4 ? [] : D.ALL.slice();
+            if (t.dataset.who === 'all') st.who = st.who.length === D.ALL.length ? [] : D.ALL.slice();
             else { var i = st.who.indexOf(t.dataset.who); if (i > -1) st.who.splice(i, 1); else st.who.push(t.dataset.who); }
             App.$$('[data-who]', s).forEach(function (b) {
-              b.classList.toggle('is-on', b.dataset.who === 'all' ? st.who.length === 4 : st.who.indexOf(b.dataset.who) > -1);
+              b.classList.toggle('is-on', b.dataset.who === 'all' ? st.who.length === D.ALL.length : st.who.indexOf(b.dataset.who) > -1);
             });
           }
-          ['dayi', 'time', 'dur'].forEach(function (k) {
+          ['dayi', 'dur'].forEach(function (k) {
             if (t.dataset[k] != null) {
               App.$$('[data-' + k + ']', s).forEach(function (b) { b.classList.toggle('is-on', b === t); });
-              if (k === 'dayi') st.day = +t.dataset.dayi; else if (k === 'dur') st.dur = +t.dataset.dur; else st.time = t.dataset.time;
+              if (k === 'dayi') st.day = +t.dataset.dayi; else st.dur = +t.dataset.dur;
             }
           });
+          if (t.dataset.hour != null) {
+            st.hour = +t.dataset.hour;
+            App.$$('[data-hour]', s).forEach(function (b) { b.classList.toggle('is-on', +b.dataset.hour === st.hour); });
+          }
+          if (t.dataset.min != null) {
+            st.min = +t.dataset.min;
+            App.$$('[data-min]', s).forEach(function (b) { b.classList.toggle('is-on', +b.dataset.min === st.min); });
+          }
+          if (t.dataset.ampm) {
+            st.ampm = t.dataset.ampm;
+            App.$$('[data-ampm]', s).forEach(function (b) { b.classList.toggle('is-on', b.dataset.ampm === st.ampm); });
+          }
+          if (t.dataset.repeat != null) {
+            st.repeat = t.dataset.repeat;
+            App.$$('[data-repeat]', s).forEach(function (b) { b.classList.toggle('is-on', b.dataset.repeat === st.repeat); });
+          }
+          if (t.dataset.remind != null) {
+            st.remind = +t.dataset.remind;
+            App.$$('[data-remind]', s).forEach(function (b) { b.classList.toggle('is-on', +b.dataset.remind === st.remind); });
+          }
           if (t.hasAttribute('data-save')) {
             var title = input.value.trim() || 'New event';
-            var who = st.who.length ? st.who.slice() : ['jordan'];
-            var start = App.addDays(App.dayStart(now), st.day), p = st.time.split(':');
+            var who = st.who.length ? st.who.slice() : ['paxton'];
+            var timeStr = to24(st.hour, st.min, st.ampm);
+            var start = App.addDays(App.dayStart(now), st.day), p = timeStr.split(':');
             start.setHours(+p[0], +p[1]);
             var e = { id: D._eid(), title: title, people: who, start: start, end: new Date(+start + st.dur * 60000) };
+            if (st.repeat) e.repeat = st.repeat;
+            e.remind = st.remind;
             D.events.push(e);
+            saveEvents();
             close();
             V.date = App.dayStart(start); V.mode = V.mode === 'month' ? 'day' : V.mode; V.scroll = null;
             render();
             App.emit('data');
-            App.toast('Added <b>' + App.esc(title) + '</b> · ' + App.fmt.rel(start) + ' ' + App.fmt.time(start), {
-              icon: 'calendar', undo: function () { D.events.splice(D.events.indexOf(e), 1); render(); App.emit('data'); }
+            var repeatLabel = st.repeat ? ' · repeats ' + st.repeat : '';
+            App.toast('Added <b>' + App.esc(title) + '</b> · ' + App.fmt.rel(start) + ' ' + App.fmt.time(start) + repeatLabel, {
+              icon: 'calendar', undo: function () { D.events.splice(D.events.indexOf(e), 1); saveEvents(); render(); App.emit('data'); }
             });
           }
         });
@@ -383,4 +607,5 @@
     if (line) { line.style.top = y(now) + 'px'; line.querySelector('span').textContent = App.fmt.time(now, false); }
   });
   App.on('time', function () { V.date = App.dayStart(App.now()); V.scroll = null; });
+  App.on('data', function () { if (App.current === 'calendar') render(); });
 })();
