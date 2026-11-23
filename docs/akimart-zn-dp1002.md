@@ -348,6 +348,59 @@ line described below, apply the `persist.sys.usb.config` fix first.
 
 [Amazon India B0FB929WRN](https://www.amazon.in/dp/B0FB929WRN), reported in the [#303 discussion](https://github.com/wesbos/photo-frame-dashboard/pull/303): same identity, partition map and 32 MiB boot hash as the fourth unit, and the same garbled `/vendor/build.prop` line. After one untouched reboot with Frameo disabled, UsbDeviceManager's failsafe fell back to plain `adb` about 38 s after boot, so ADB survived that boot. The `persist.sys.usb.config=adb` fix then gave a clean boot with no failsafe fallback. The FOTA restart loop (62 crashes in 4 minutes) and the `pm hide com.adups.fota` fix were both confirmed. `adb_keys` held the same invalid factory key. So `SSA_Frame_20260721` does not always lose USB ADB at boot; set `persist.sys.usb.config` first to be safe.
 
+## Fifth unit: REUMAR, `SSA_Frame_20251217` (2026-11-23, macOS)
+
+A fifth owner's frame. Frameo's About screen says **REUMAR ZN-DP1002**. It runs firmware between
+the [first unit's](#identity-from-adb) and the [fourth unit's](#fourth-unit-dxmart-ssa_frame_20260721-2026-11-10-macos).
+Host: macOS on Apple silicon, USB ADB through a USB-A to USB-C data cable. The kiosk setup below
+was done over USB.
+
+- **Identity:** `ro.build.display.id` is `SSA_Frame_20251217` and the fingerprint is
+  `rockchip/rk3326_go/rk3326_go:8.1.0/OC/025023:user/release-keys`. Model `Frame`, brand `SSA`,
+  manufacturer `rockchip`, Android 8.1 / API 27, the 2020-06-05 patch, kernel 4.4.138, about
+  954 MiB RAM, 1280×800 at 160 dpi, `ro.debuggable=1`, `ro.adb.secure=1`, SELinux permissive,
+  `su 0 <cmd>` as root (`su -c` fails), and WebView 106.0.5249.126. The only hardware sensor is
+  an accelerometer; there is no light sensor.
+- **Firmware:** the 32 MiB boot partition SHA-256 is the same `4ed777af…891b` as above, and the
+  recovery partition is 128 MiB. No `/system/bin/iotv`, no such process.
+- **Frameo:** v1.29.12 in `/system/priv-app`; no newer copy was installed in `/data/app`. It
+  listened on TCP 44720 on all interfaces. Both updaters ran: `com.adups.fota` 5.26 and
+  `android.rockchip.update.service`. The frame shipped with time zone `America/Los_Angeles`.
+- **No USB-config bug on this build:** line 80 of `/vendor/build.prop` is
+  `persist.sys.usb.config=mtp`, a valid value (read as root; the shell user can't read the file).
+  `sys.usb.config` read `mtp,adb`, and USB ADB came back by itself after each of two reboots,
+  the second one after Frameo was disabled. So the
+  [fourth unit's fix](#fourth-unit-dxmart-ssa_frame_20260721-2026-11-10-macos) was not needed;
+  the garbled line seems to have arrived after `20251217`.
+- **First connection showed `unauthorized` with no prompt.** `/data/misc/adb/adb_keys` held a
+  factory key whose line starts with a comma, so it is invalid and was not accepted. Turning
+  Frameo's ADB access switch off and on with the cable already plugged in brought up the
+  "Allow USB debugging" prompt.
+- **Network ADB that survives a reboot:** `adb shell su 0 setprop persist.adb.tcp.port 5555`, then
+  `adb tcpip 5555`. After two reboots adbd listened on 5555 again with `service.adb.tcp.port`
+  empty, so the persistent property alone is enough on this build. A host whose key was already
+  authorized over USB connected over TCP with no new prompt. A connection from an unknown key was
+  not tried. Undo: `su 0 setprop persist.adb.tcp.port ""`.
+- **Updaters:** `pm disable-user --user 0` plus `su 0 pm hide` on both packages left them at
+  `enabled=3`, `hidden=true` with no process, across both reboots.
+- **Kiosk:** Home HQ, built with `DEFAULT_URL` set to a LAN Home Assistant over plain HTTP,
+  rendered HA's login page on the first launch, about 3 s after `am start`. After the owner logged in, the
+  dashboard came back logged in after each reboot. Home was set with
+  `--ez home true` and `set-home-activity`. The navigation service was enabled over ADB as on the
+  [first unit](#setup-performed-2026-10-13), and the owner checked by hand on the panel:
+  two-finger menu → Android settings → Apps → **Back** → **Dashboard**.
+- **Disabling Frameo:** `su 0 pm disable-user --user 0 net.frameo.frame`, then 30 s later
+  `package-restrictions.xml` showed `enabled="3"`. After `sync` and a reboot the kiosk was Home,
+  Frameo and both updaters were `enabled=3` with no process, the navigation service was bound and
+  Wi-Fi was connected.
+- **Screen:** `settings put global stay_on_while_plugged_in 7` and `secure screensaver_enabled 0`
+  keep the panel awake (`screen_off_timeout` was already at its maximum). `system
+  screen_brightness 60` set the backlight to 60 of 255. Whether Wi-Fi still drops while asleep on
+  this build was not tested, because the screen no longer sleeps.
+- **Time zone:** the frame's tzdata is `2024b`. British Columbia moved to permanent UTC−7 in
+  2026 (tz `2026a`), so `America/Vancouver` reads UTC−8 here all winter. `America/Whitehorse`
+  (permanent UTC−7 since 2020) gives the right time on this tzdata.
+
 ## Guesses, not confirmed
 
 - Android probably writes `package-restrictions.xml` a few seconds after `pm disable-user`, and
