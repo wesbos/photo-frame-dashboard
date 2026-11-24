@@ -11,6 +11,7 @@ public class FrameApplication extends Application {
         if (runtime == null) {
             runtime = GeckoRuntime.create(this, new GeckoRuntimeSettings.Builder()
                     .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_DARK)
+                    .consoleOutput(false)
                     .remoteDebuggingEnabled(false).build());
         }
         return runtime;

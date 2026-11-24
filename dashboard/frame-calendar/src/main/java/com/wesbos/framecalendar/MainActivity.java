@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
             }
         });
         session.open(((FrameApplication) getApplication()).runtime());
+        applyConsoleFlag(getIntent());
         browser.setSession(session);
         ((FrameApplication) getApplication()).runtime().getWebExtensionController()
                 .ensureBuiltIn("resource://android/assets/frame-panel/", "frame-panel@framecalendar.local")
@@ -348,11 +349,19 @@ public class MainActivity extends Activity {
                         : PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
     }
 
+    private void applyConsoleFlag(Intent intent) {
+        if (intent.hasExtra("debug")) {
+            ((FrameApplication) getApplication()).runtime().getSettings()
+                    .setConsoleOutputEnabled(intent.getBooleanExtra("debug", false));
+        }
+    }
+
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
         importConfig(intent);
         applyHome(intent);
+        applyConsoleFlag(intent);
         zone = ZoneId.of(prefs.getString("timezone", "Europe/London"));
         generation++;
         loadCalendars();

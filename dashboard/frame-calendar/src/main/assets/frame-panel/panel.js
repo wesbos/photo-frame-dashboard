@@ -19,6 +19,14 @@
   let discoveryRunning = false;
   let lastDiscovery = 0;
   let lastStatus = "";
+  function copyJson(value) {
+    return JSON.parse(JSON.stringify(value?.wrappedJSObject || value));
+  }
+  async function request(hass, message) {
+    // Promise results cross Firefox's Xray boundary. Copy JSON into the
+    // extension realm before reading fields or calling array methods.
+    return copyJson(await hass.connection.sendMessagePromise(cloneInto(message, window)));
+  }
   const report = text => {
     if (text !== lastStatus) {
       lastStatus = text;
@@ -64,7 +72,7 @@
     discoveryRunning = true;
     lastDiscovery = Date.now();
     try {
-      const panels = await hass.connection.sendMessagePromise(cloneInto({ type: "get_panels" }, window));
+      const panels = await request(hass, { type: "get_panels" });
       const frame = Object.entries(panels).find(([path, panel]) =>
         path.toLowerCase() === "frame" || panel.title?.toLowerCase() === "frame");
       if (frame) {
@@ -74,12 +82,14 @@
         report("Frame - live");
       } else {
         const path = location.pathname.split("/")[1];
-        const dashboards = await hass.connection.sendMessagePromise(
-          cloneInto({ type: "lovelace/dashboards/list" }, window));
+        const dashboards = await request(hass, { type: "lovelace/dashboards/list" });
         for (const dashboard of dashboards) {
           if (panels[dashboard.url_path]?.component_name !== "lovelace") continue;
-          const lovelace = await hass.connection.sendMessagePromise(
-            cloneInto({ type: "lovelace/config", url_path: dashboard.url_path }, window));
+          const lovelace = await request(hass, { type: "lovelace/config", url_path: dashboard.url_path });
+          if (!Array.isArray(lovelace.views)) {
+            if (lovelace.strategy) continue;
+            throw new Error("Home Assistant returned a dashboard without views");
+          }
           const index = lovelace.views.findIndex(view =>
             view.title?.toLowerCase() === "frame" || view.path?.toLowerCase() === "frame");
           if (index < 0) continue;
@@ -94,7 +104,7 @@
         report(label + " - Frame not found; create it in Home Assistant");
       }
     } catch (error) {
-      report("Frame discovery failed - check Home Assistant permissions");
+      report("Frame discovery failed: " + (error?.message || error?.name || "connection error"));
       console.error("Frame dashboard discovery failed", error);
     } finally {
       discoveryRunning = false;
@@ -123,14 +133,15 @@
     if (connection !== hass.connection) {
       if (unsubscribe) unsubscribe();
       connection = hass.connection;
-      const changed = exportFunction(event => {
+      const changed = exportFunction(value => {
+        const event = copyJson(value);
         const dashboard = location.pathname.split("/")[1];
         if (event.data.url_path === dashboard || (!event.data.url_path && dashboard === "lovelace")) {
           location.reload();
         }
       }, window);
       connection.subscribeEvents(changed, "lovelace_updated")
-        .then(exportFunction(remove => { unsubscribe = remove; }, window))
+        .then(exportFunction(remove => { unsubscribe = remove.wrappedJSObject || remove; }, window))
         .catch(exportFunction(error => {
           connection = undefined;
           report("Panel update subscription failed - Reload to retry");

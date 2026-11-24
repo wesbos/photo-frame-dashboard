@@ -6,7 +6,7 @@ const path = require("node:path");
 const script = fs.readFileSync(path.join(__dirname, "../main/assets/frame-panel/panel.js"), "utf8");
 
 async function run({ auth, savedAuth, origin = "https://ha.example", pathname = "/frame",
-  panels = { frame: { title: "Frame" } }, dashboards = [] } = {}) {
+  panels = { frame: { title: "Frame" } }, dashboards = [], xray = false } = {}) {
   const messages = [];
   const stored = new Map(savedAuth ? [["hassTokens", JSON.stringify(savedAuth)]] : []);
   const state = { reloads: 0, assigned: null, subscription: null, ticks: null };
@@ -17,11 +17,12 @@ async function run({ auth, savedAuth, origin = "https://ha.example", pathname = 
       return () => {};
     },
     sendMessagePromise: async message => {
-      if (message.type === "get_panels") return panels;
-      if (message.type === "lovelace/dashboards/list") return dashboards;
+      const wrap = value => xray ? { wrappedJSObject: value } : value;
+      if (message.type === "get_panels") return wrap(panels);
+      if (message.type === "lovelace/dashboards/list") return wrap(dashboards);
       assert.equal(message.type, "lovelace/config");
       assert.notEqual(message.url_path, "map", "Non-Lovelace panels must not be fetched as dashboards");
-      return { views: [{}] };
+      return wrap({ views: [{}] });
     }
   };
   const root = { appendChild() {}, querySelectorAll: () => [] };
@@ -96,5 +97,13 @@ test("non-Lovelace panels do not prevent reporting a missing Frame dashboard", a
     },
     dashboards: [{ url_path: "map" }, { url_path: "dashboard-panel" }]
   });
+
   assert.ok(messages.some(message => message.text === "Panel - Frame not found; create it in Home Assistant"));
+});
+
+test("Firefox Xray-wrapped responses and events are copied before accessing fields", async () => {
+  const { state } = await run({ xray: true, pathname: "/dashboard-panel/0" });
+  assert.equal(state.assigned, "/frame");
+  state.subscription({ wrappedJSObject: { data: { url_path: "dashboard-panel" } } });
+  assert.equal(state.reloads, 1);
 });

@@ -97,6 +97,11 @@ Select the previous launcher with **Always**. Uninstalling Frame Calendar remove
 its settings and saved logins. No flash, `/system`, vendor app, screensaver setting
 or boot partition change is required.
 
+For temporary diagnostics, launch MainActivity with `--ez debug true` to print
+browser console messages to local Android logs; `--ez debug false` turns this off.
+Console output and remote debugging are off by default. Do not publish logs
+without checking them for private dashboard data.
+
 ## Private ADB provisioning
 
 For unattended setup, a private JSON object can have the fields `personal`,
