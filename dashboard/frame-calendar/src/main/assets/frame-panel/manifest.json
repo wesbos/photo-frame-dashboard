@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Frame panel integration",
+  "version": "1.2",
+  "browser_specific_settings": {
+    "gecko": { "id": "frame-panel@framecalendar.local" }
+  },
+  "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons"],
+  "content_scripts": [{
+    "matches": ["https://*/*", "http://*/*"],
+    "js": ["panel.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }]
+}

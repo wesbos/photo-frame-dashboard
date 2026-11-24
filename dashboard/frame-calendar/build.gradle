@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application' version '8.13.2'
+}
+
+android {
+    namespace 'com.wesbos.framecalendar'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.wesbos.framecalendar'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+        ndk { abiFilters 'armeabi-v7a' }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+        coreLibraryDesugaringEnabled true
+    }
+    testOptions { unitTests.returnDefaultValues = true }
+    packaging {
+        jniLibs.useLegacyPackaging = true
+        resources.excludes += ['META-INF/DEPENDENCIES']
+        resources.merges += ['META-INF/LICENSE*', 'META-INF/NOTICE*']
+    }
+}
+
+dependencies {
+    // Firefox 144 raised the minimum to Android 8; 143 is the final Android 6 engine.
+    implementation 'org.mozilla.geckoview:geckoview:143.0.20251003115653'
+    implementation 'net.sf.biweekly:biweekly:0.6.8'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    testImplementation 'junit:junit:4.13.2'
+}

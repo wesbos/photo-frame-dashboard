@@ -77,6 +77,11 @@ built without Gradle, that shows it. Hold two fingers still for 1.5 s to open a 
 launcher, Android settings, and reloading. On frames without system navigation, optional floating
 **Back** and **Dashboard** buttons help; see the [kiosk guide](dashboard/kiosk/README.md).
 
+[`dashboard/frame-calendar/`](dashboard/frame-calendar) is a separate Android Home app
+with a dark monthly calendar on the left 75% and a live Home Assistant panel on the
+right 25%. It reads private Google/TripIt iCalendar feeds or existing Home Assistant
+calendar integrations; connections are configured privately on the frame.
+
 ## For agents: start here
 
 You are probably helping someone with a similar device plugged into a Mac over USB. Read this
