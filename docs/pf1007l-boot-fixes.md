@@ -78,6 +78,13 @@ October 2026, on a 2 A wall supply:
   verifies both directions in both families. Failed activation removes its new hooks and preserves
   previous chains; a rollback failure is logged for USB recovery. Cleanup refuses referenced chains.
   Host command-double tests cover failures and damaged rules; revised hardware behavior is untested.
+- Observed on a May `20260529` unit (macOS, [report](pf1007l-macos-20260529-adb-on-home-assistant-report.md#boot-fixes-and-the-frame-firewall)),
+  the revised firewall on hardware with `FIREWALL_ALLOW` set to one Home Assistant host on 8123,
+  `FIREWALL_DNS` set to the router and `IGNORE_IPV6_RA=1`. Boot 1 logged `rules changed during
+  activation; protection unverified` and `FIREWALL not applied`, yet the new chains were still
+  hooked first in both families with the configured rules, and `frame_firewall_monitor` was not
+  started. Boot 2 logged `applied`, with the same rules. Read `iptables -S` and `ip6tables -S`
+  rather than the log line alone.
 - Observed on a May `20260519` unit: the frame has no power supply at all —
   `/sys/class/power_supply/` is empty. `dumpsys battery` still reports `present: true, level: 100,
   AC powered: true`, which is healthd's fallback with no supply to read, not a measurement.
