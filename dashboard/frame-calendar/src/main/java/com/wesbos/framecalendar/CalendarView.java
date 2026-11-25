@@ -67,23 +67,23 @@ final class CalendarView extends View {
             float top = heading + week * weekHeight;
             paint.setColor(BORDER);
             canvas.drawLine(0, top, getWidth(), top, paint);
-            List<CalendarLayout.Span> spans = layout.spans.get(week);
-            int maxLanes = Math.max(1, (int) ((weekHeight - 55 * scale) / (22 * scale)));
-            int usedLanes = 0;
-            for (CalendarLayout.Span span : spans) {
-                if (span.lane >= maxLanes) continue;
-                usedLanes = Math.max(usedLanes, span.lane + 1);
-                RectF box = new RectF(span.first * dayWidth + 3 * scale,
-                        top + (31 + span.lane * 22) * scale,
-                        (span.last + 1) * dayWidth - 3 * scale, top + (51 + span.lane * 22) * scale);
-                paint.setColor(CalendarStore.COLORS[span.event.source]);
-                canvas.drawRoundRect(box, 4 * scale, 4 * scale, paint);
-                canvas.save();
-                canvas.clipRect(box);
-                label(canvas, ellipsis(span.event.title, box.width() - 12 * scale, 12),
-                        box.left + 6 * scale, box.top + 14 * scale, 12, BACKGROUND, false);
-                canvas.restore();
-                hits.add(new Hit(box, span.event));
+            List<CalendarLayout.Span> entries = layout.entries.get(week);
+            int slots = CalendarLayout.availableRows(weekHeight, scale);
+            int[] visible = new int[7];
+            for (int d = 0; d < 7; d++) {
+                int count = layout.days.get(week * 7 + d).size();
+                visible[d] = CalendarLayout.visibleEvents(count, slots);
+            }
+            for (CalendarLayout.Span span : entries) {
+                int start = -1;
+                for (int d = span.first; d <= span.last + 1; d++) {
+                    boolean show = d <= span.last && span.lane < visible[d];
+                    if (show && start < 0) start = d;
+                    else if (!show && start >= 0) {
+                        drawEntry(canvas, span, start, d - 1, top);
+                        start = -1;
+                    }
+                }
             }
             for (int d = 0; d < 7; d++) {
                 LocalDate date = layout.first.plusDays(week * 7L + d);
@@ -97,25 +97,9 @@ final class CalendarView extends View {
                         : Integer.toString(date.getDayOfMonth());
                 label(canvas, number, left + dayWidth / 2, top + 19 * scale, 12,
                         date.equals(today) ? BACKGROUND : date.getMonth() == month.getMonth() ? TEXT : MUTED, true);
-                float y = top + (47 + usedLanes * 22) * scale;
-                List<Event> dayEvents = layout.days.get(week * 7 + d);
-                int hidden = 0;
-                for (CalendarLayout.Span span : spans) {
-                    if (span.lane >= maxLanes && d >= span.first && d <= span.last) hidden++;
-                }
-                for (Event event : dayEvents) {
-                    if (event.allDay || event.lastDay(zone).isAfter(event.firstDay(zone))) continue;
-                    if (y > top + weekHeight - 25 * scale) { hidden++; continue; }
-                    paint.setColor(CalendarStore.COLORS[event.source]);
-                    canvas.drawCircle(left + 9 * scale, y - 4 * scale, 3 * scale, paint);
-                    String text = event.start.withZoneSameInstant(zone).format(DateTimeFormatter.ofPattern("HH:mm"))
-                            + " " + event.title;
-                    label(canvas, ellipsis(text, dayWidth - 26 * scale, 12), left + 17 * scale, y, 12, TEXT, false);
-                    hits.add(new Hit(new RectF(left, y - 16 * scale, left + dayWidth, y + 4 * scale), event));
-                    y += 21 * scale;
-                }
-                if (hidden > 0) label(canvas, hidden + " more", left + 8 * scale,
-                        top + weekHeight - 8 * scale, 11, MUTED, false);
+                int hidden = layout.days.get(week * 7 + d).size() - visible[d];
+                if (hidden > 0 && slots > 0) label(canvas, hidden + " more", left + 8 * scale,
+                        top + (42 + visible[d] * 18) * scale, 11, MUTED, false);
             }
         }
         int todayIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(layout.first, today);
@@ -129,6 +113,31 @@ final class CalendarView extends View {
                     left + dayWidth - scale, top + weekHeight - scale, paint);
             paint.setStyle(Paint.Style.FILL);
         }
+    }
+
+    private void drawEntry(Canvas canvas, CalendarLayout.Span span, int first, int last, float top) {
+        float y = top + (29 + span.lane * 18) * scale;
+        if (!span.event.allDay && !span.event.lastDay(zone).isAfter(span.event.firstDay(zone))) {
+            float left = first * dayWidth;
+            paint.setColor(CalendarStore.COLORS[span.event.source]);
+            canvas.drawCircle(left + 9 * scale, y + 9 * scale, 3 * scale, paint);
+            String text = span.event.start.withZoneSameInstant(zone)
+                    .format(DateTimeFormatter.ofPattern("HH:mm")) + " " + span.event.title;
+            label(canvas, ellipsis(text, dayWidth - 26 * scale, 12),
+                    left + 17 * scale, y + 13 * scale, 12, TEXT, false);
+            hits.add(new Hit(new RectF(left, y, left + dayWidth, y + 18 * scale), span.event));
+            return;
+        }
+        RectF box = new RectF(first * dayWidth + 3 * scale,
+                y, (last + 1) * dayWidth - 3 * scale, y + 17 * scale);
+        paint.setColor(CalendarStore.COLORS[span.event.source]);
+        canvas.drawRoundRect(box, 4 * scale, 4 * scale, paint);
+        canvas.save();
+        canvas.clipRect(box);
+        label(canvas, ellipsis(span.event.title, box.width() - 12 * scale, 12),
+                box.left + 6 * scale, box.top + 14 * scale, 12, BACKGROUND, false);
+        canvas.restore();
+        hits.add(new Hit(box, span.event));
     }
 
     private void label(Canvas c, String text, float x, float y, float size, int color, boolean center) {

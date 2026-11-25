@@ -35,10 +35,10 @@ public class CalendarTest {
         assertEquals(1, events.size());
         assertEquals(LocalDate.of(2026, 12, 8), events.get(0).lastDay(LONDON));
         CalendarLayout layout = new CalendarLayout(YearMonth.of(2026, 12), events, LONDON);
-        assertEquals(5, layout.spans.get(0).get(0).first);
-        assertEquals(6, layout.spans.get(0).get(0).last);
-        assertEquals(0, layout.spans.get(1).get(0).first);
-        assertEquals(2, layout.spans.get(1).get(0).last);
+        assertEquals(5, layout.entries.get(0).get(0).first);
+        assertEquals(6, layout.entries.get(0).get(0).last);
+        assertEquals(0, layout.entries.get(1).get(0).first);
+        assertEquals(2, layout.entries.get(1).get(0).last);
         assertEquals(0, layout.days.get(10).size());
     }
 
@@ -79,7 +79,83 @@ public class CalendarTest {
         Event a = new Event("A", "", "", start, start.plusDays(4), true, 0);
         Event b = new Event("B", "", "", start.plusDays(1), start.plusDays(6), true, 1);
         CalendarLayout layout = new CalendarLayout(YearMonth.of(2026, 12), Arrays.asList(a, b), LONDON);
-        assertNotEquals(layout.spans.get(0).get(0).lane, layout.spans.get(0).get(1).lane);
+        assertNotEquals(layout.entries.get(0).get(0).lane, layout.entries.get(0).get(1).lane);
+    }
+
+    @Test public void appointmentsUseEachDaysAvailableRowsInChronologicalOrder() {
+        ZonedDateTime sunday = FROM.atStartOfDay(LONDON);
+        Event firstBar = new Event("First bar", "", "", sunday, sunday.plusDays(2), true, 0);
+        Event secondBar = new Event("Second bar", "", "", sunday, sunday.plusDays(2), true, 1);
+        ZonedDateTime wednesday = sunday.plusDays(3);
+        Event afternoon = new Event("Afternoon", "", "", wednesday.plusHours(16), wednesday.plusHours(17), false, 0);
+        Event morning = new Event("Morning", "", "", wednesday.plusHours(9), wednesday.plusHours(10), false, 0);
+        Event overnight = new Event("Overnight", "", "", wednesday.plusHours(18), wednesday.plusDays(1).plusHours(8), false, 0);
+        CalendarLayout layout = new CalendarLayout(YearMonth.of(2026, 12),
+                Arrays.asList(afternoon, firstBar, overnight, morning, secondBar), LONDON);
+        List<CalendarLayout.Span> entries = layout.entries.get(0);
+        CalendarLayout.Span morningEntry = entries.stream().filter(e -> e.event == morning).findFirst().get();
+        CalendarLayout.Span afternoonEntry = entries.stream().filter(e -> e.event == afternoon).findFirst().get();
+        CalendarLayout.Span overnightEntry = entries.stream().filter(e -> e.event == overnight).findFirst().get();
+        assertEquals(0, morningEntry.lane);
+        assertEquals(1, afternoonEntry.lane);
+        assertEquals(2, overnightEntry.lane);
+        assertEquals(Arrays.asList(morning, afternoon, overnight), layout.days.get(3));
+    }
+
+    @Test public void spanningEventsDoNotLeaveEmptyRowsOnLessBusyDays() {
+        ZonedDateTime sunday = FROM.atStartOfDay(LONDON);
+        Event sundayOnly = new Event("Sunday", "", "", sunday, sunday.plusDays(1), true, 0);
+        Event trip = new Event("Trip", "", "", sunday, sunday.plusDays(4), true, 1);
+        Event monday = new Event("Meeting", "", "", sunday.plusDays(1).plusHours(9),
+                sunday.plusDays(1).plusHours(10), false, 0);
+        CalendarLayout layout = new CalendarLayout(YearMonth.of(2026, 12),
+                Arrays.asList(sundayOnly, trip, monday), LONDON);
+        List<CalendarLayout.Span> row = layout.entries.get(0);
+        assertTrue(row.stream().anyMatch(span -> span.event == trip && span.first == 0
+                && span.last == 0 && span.lane == 1));
+        assertTrue(row.stream().anyMatch(span -> span.event == trip && span.first == 1
+                && span.last == 3 && span.lane == 0));
+        assertTrue(row.stream().anyMatch(span -> span.event == monday && span.first == 1
+                && span.lane == 1));
+        assertEquals(Arrays.asList(trip, monday), layout.days.get(1));
+    }
+
+    @Test public void eventCapacityUsesTheLastRowUnlessOverflowNeedsIt() {
+        int rows = CalendarLayout.availableRows(104, 1);
+        assertEquals(4, rows);
+        assertEquals(4, CalendarLayout.visibleEvents(4, rows));
+        assertEquals(3, CalendarLayout.visibleEvents(5, rows));
+        assertEquals(0, CalendarLayout.visibleEvents(1, 0));
+        assertEquals(3, CalendarLayout.availableRows(87, 1));
+    }
+
+    @Test public void previewAdjacentDatesAppearOnlyAtTheOuterEdges() {
+        YearMonth december = YearMonth.of(2026, 12);
+        YearMonth january = december.plusMonths(1);
+        YearMonth february = december.plusMonths(2);
+        assertTrue(CalendarLayout.showPreviewDate(0, december, LocalDate.of(2026, 11, 29)));
+        assertFalse(CalendarLayout.showPreviewDate(0, december, LocalDate.of(2027, 1, 1)));
+        assertFalse(CalendarLayout.showPreviewDate(1, january, LocalDate.of(2026, 12, 31)));
+        assertTrue(CalendarLayout.showPreviewDate(1, january, LocalDate.of(2027, 1, 1)));
+        assertFalse(CalendarLayout.showPreviewDate(1, january, LocalDate.of(2027, 2, 1)));
+        assertFalse(CalendarLayout.showPreviewDate(2, february, LocalDate.of(2027, 1, 31)));
+        assertTrue(CalendarLayout.showPreviewDate(2, february, LocalDate.of(2027, 3, 1)));
+    }
+
+    @Test public void cacheCoversTwelveMonthsOfBrowsingIncludingPreviews() throws Exception {
+        YearMonth november = YearMonth.of(2026, 11);
+        CalendarRange range = CalendarRange.around(november, LONDON);
+        assertTrue(range.covers(november.minusMonths(1), LONDON));
+        for (int i = 0; i <= 12; i++) assertTrue(range.covers(november.plusMonths(i), LONDON));
+        assertFalse(range.covers(november.plusMonths(13), LONDON));
+        assertFalse(range.covers(november, ZoneId.of("America/New_York")));
+        String text = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" + event(
+                "UID:future\r\nDTSTART;VALUE=DATE:20261110\r\nDTEND;VALUE=DATE:20261111\r\n"
+                + "RRULE:FREQ=MONTHLY;COUNT=16\r\nSUMMARY:Monthly\r\n") + "END:VCALENDAR\r\n";
+        List<Event> events = IcsReader.read(text, range.from, range.until, LONDON, 0);
+        assertEquals(16, events.size());
+        assertEquals(LocalDate.of(2027, 11, 10), events.get(12).firstDay(LONDON));
+        assertEquals(LocalDate.of(2028, 2, 10), events.get(15).firstDay(LONDON));
     }
 
     @Test public void midnightEndDoesNotLeakIntoNextDay() {

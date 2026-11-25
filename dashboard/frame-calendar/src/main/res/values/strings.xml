@@ -1,0 +1,4 @@
+<resources>
+  <string name="navigation_label">Frame Calendar navigation</string>
+  <string name="navigation_description">Shows draggable Back and Dashboard buttons. Does not read screen content.</string>
+</resources>

@@ -56,6 +56,7 @@ final class MonthPreviewsView extends View {
             }
             for (int day = 0; day < layout.days.size(); day++) {
                 LocalDate date = layout.first.plusDays(day);
+                if (!CalendarLayout.showPreviewDate(preview, shown, date)) continue;
                 float x = left + (day % 7 + .5f) * dayWidth;
                 float y = 48 + (day / 7 + .5f) * rowHeight;
                 boolean inMonth = YearMonth.from(date).equals(shown);

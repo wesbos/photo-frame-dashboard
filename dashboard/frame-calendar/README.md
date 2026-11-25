@@ -60,16 +60,24 @@ frontend's authenticated, reconnecting websocket and reloads the current dashboa
 when its configuration changes. Live entity updates remain Home Assistant's own
 frontend behavior. Browser chrome is hidden without changing server configuration.
 The successful panel status is hidden; connection and discovery errors remain visible.
+If the panel cannot connect or gets stuck loading, it retries automatically and
+also reconnects when network access returns. A sign-in page is left uninterrupted.
 
-Calendar feeds refresh every five minutes and when changing month or pressing
-the **reload icon**. Calendar names appear only in settings and event details;
-successful refreshes do not reserve a status row. Three compact previews below
-the main grid show the following months, shading dates with events from any
-configured calendar. The grid supports Sunday-first months, four to six weeks, recurring
-events, exclusions and moved/cancelled occurrences, exclusive all-day end dates,
-and bars spanning days/weeks. Tap an event for details, or tap an empty part of a
-day to see all its events, including overflow. Unavailable feeds show an explicit
-notice; previously downloaded iCalendar feeds can still be displayed offline.
+Calendar feeds sync every five minutes, when network access returns, and when
+pressing the **reload icon**. The app expands events into a rolling cache covering
+at least 12 months ahead, plus the three previews, so navigating within that range
+does not wait for a download. Previously downloaded iCalendar feeds are loaded
+first on startup and can still be displayed offline; Home Assistant calendar
+entities require a live connection. Calendar names appear only in settings and
+event details; a thin animated line marks synchronization without moving the
+calendar. Three compact
+previews below the main grid show the following months, shading dates with events
+from any configured calendar. Only the outer edges show adjacent-month dates.
+The grid supports Sunday-first months, four to six weeks, recurring events,
+exclusions and moved/cancelled occurrences, exclusive all-day end dates, and
+bars spanning days/weeks. Events are ordered by day and fill the available space.
+Tap an event for details, or tap an empty part of a day to see all its events,
+including overflow. Unavailable feeds show an explicit notice.
 `RECURRENCE-ID;RANGE=THISANDFUTURE` is reported as unsupported rather than silently
 displaying an incorrect schedule.
 
@@ -105,8 +113,18 @@ or boot partition change is required.
 
 The dashboard does not keep the display awake. Android's existing screen timeout
 and selected screensaver still apply; dismissing the screensaver returns to the
-dashboard and refreshes the calendars. In-flight calendar updates are retained
-while the screensaver is active, so returning does not discard a completed sync.
+dashboard with a brief fade. Calendar sync and Home Assistant updates continue
+while the screensaver is showing, subject to Android's background restrictions.
+
+## Floating navigation
+
+On frames without a navigation bar, enable **Frame Calendar navigation** in
+Android **Settings > Accessibility**. Its draggable **Back** and **Dashboard**
+buttons work outside the app; Dashboard returns to Frame Calendar. The service
+does not read screen content, and hides the buttons while the calendar or
+screensaver is showing. If Home HQ's navigation is already enabled, turn it off
+after enabling Frame Calendar navigation to avoid overlapping controls.
+Disable the service in Accessibility settings to remove the buttons.
 
 For temporary diagnostics, launch MainActivity with `--ez debug true` to print
 browser console messages to local Android logs; `--ez debug false` turns this off.

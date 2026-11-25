@@ -3,9 +3,21 @@
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <queries>
+    <provider android:authorities="io.github.martinwoodward.iphotoframesaver.playback" />
+  </queries>
   <application android:name=".FrameApplication" android:label="Frame Calendar" android:icon="@drawable/calendar_icon"
       android:allowBackup="false" android:hardwareAccelerated="true"
       android:usesCleartextTraffic="true" android:theme="@android:style/Theme.Material.NoActionBar">
+    <service android:name=".NavigationService" android:exported="true"
+        android:label="@string/navigation_label"
+        android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+      <intent-filter>
+        <action android:name="android.accessibilityservice.AccessibilityService" />
+      </intent-filter>
+      <meta-data android:name="android.accessibilityservice"
+          android:resource="@xml/navigation_service" />
+    </service>
     <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
         android:screenOrientation="sensorLandscape"
         android:configChanges="orientation|screenSize|keyboardHidden">

@@ -42,6 +42,22 @@ final class CalendarStore {
         this.prefs = prefs;
     }
 
+    Result loadCached(LocalDate from, LocalDate to, ZoneId zone) {
+        Result result = new Result();
+        for (int source = 0; source < KEYS.length; source++) {
+            String url = prefs.getString(KEYS[source], "").trim();
+            if (url.isEmpty() || url.startsWith("ha:")) continue;
+            File cache = new File(context.getFilesDir(), "calendar-" + source + "-" + hash(url));
+            if (!cache.exists()) continue;
+            try (InputStream in = new FileInputStream(cache)) {
+                result.events.addAll(parse(read(in), url, from, to, zone, source));
+            } catch (IOException | JSONException | IllegalArgumentException e) {
+                Log.w("FrameCalendar", "Saved calendar source " + source + " could not be read");
+            }
+        }
+        return result;
+    }
+
     Result load(LocalDate from, LocalDate to, ZoneId zone) {
         Result result = new Result();
         accessToken = null;

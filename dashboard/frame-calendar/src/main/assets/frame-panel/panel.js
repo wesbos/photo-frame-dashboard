@@ -15,10 +15,13 @@
   let lastAuth = "";
   let connection;
   let unsubscribe;
-  let discoveredFrame = false;
+  let dashboardStatus = "";
+  let subscriptionHealthy = false;
+  let discoveryHealthy = false;
   let discoveryRunning = false;
   let lastDiscovery = 0;
   let lastStatus = "";
+  let lastState = "";
   function copyJson(value) {
     return JSON.parse(JSON.stringify(value?.wrappedJSObject || value));
   }
@@ -27,11 +30,17 @@
     // extension realm before reading fields or calling array methods.
     return copyJson(await hass.connection.sendMessagePromise(cloneInto(message, window)));
   }
-  const report = text => {
-    if (text !== lastStatus) {
+  const report = (text, state) => {
+    if (text !== lastStatus || state !== lastState) {
       lastStatus = text;
-      send({ type: "status", text }).catch(console.error);
+      lastState = state;
+      send({ type: "status", text, state }).catch(console.error);
     }
+  };
+  const reportDashboard = text => {
+    dashboardStatus = text;
+    discoveryHealthy = true;
+    if (subscriptionHealthy) report(text, "ready");
   };
   const css = `
     :host, html {
@@ -76,10 +85,9 @@
       const frame = Object.entries(panels).find(([path, panel]) =>
         path.toLowerCase() === "frame" || panel.title?.toLowerCase() === "frame");
       if (frame) {
-        discoveredFrame = true;
         const target = "/" + frame[0];
         if (location.pathname.split("/")[1] !== frame[0]) location.assign(target);
-        report("Frame - live");
+        reportDashboard("Frame - live");
       } else {
         const path = location.pathname.split("/")[1];
         const dashboards = await request(hass, { type: "lovelace/dashboards/list" });
@@ -93,25 +101,24 @@
           const index = lovelace.views.findIndex(view =>
             view.title?.toLowerCase() === "frame" || view.path?.toLowerCase() === "frame");
           if (index < 0) continue;
-          discoveredFrame = true;
           const target = "/" + dashboard.url_path + "/" + (lovelace.views[index].path ?? index);
           if (location.pathname !== target) location.assign(target);
-          report("Frame - live");
+          reportDashboard("Frame - live");
           return;
         }
-        discoveredFrame = false;
         const label = panels[path]?.title || "Home Assistant";
-        report(label + " - Frame not found; create it in Home Assistant");
+        reportDashboard(label + " - Frame not found; create it in Home Assistant");
       }
     } catch (error) {
-      report("Frame discovery failed: " + (error?.message || error?.name || "connection error"));
+      discoveryHealthy = false;
+      lastDiscovery = 0;
+      report("Frame discovery failed: " + (error?.message || error?.name || "connection error"), "connecting");
       console.error("Frame dashboard discovery failed", error);
     } finally {
       discoveryRunning = false;
     }
   }
   function tick() {
-    if (document.hidden) return;
     if (document.documentElement) style(document.documentElement);
     const auth = localStorage.getItem("hassTokens");
     if (auth && auth !== lastAuth) {
@@ -119,13 +126,15 @@
         send({ type: "auth", auth: JSON.parse(auth) }).catch(console.error);
         lastAuth = auth;
       } catch (error) {
-        report("Home Assistant login could not be read - sign in again");
+        report("Home Assistant login could not be read - sign in again", "login");
       }
     }
     const app = document.querySelector("home-assistant");
     const hass = app?.wrappedJSObject?.hass;
-    if (!hass?.connection) {
-      report("Home Assistant - sign in or reconnect");
+    if (!hass?.connection || hass.connected === false) {
+      const login = location.pathname.startsWith("/auth/");
+      report(login ? "Home Assistant - sign in" : "Home Assistant - sign in or reconnect",
+        login ? "login" : "connecting");
       return;
     }
     // Home Assistant exposes its authenticated, reconnecting websocket to the
@@ -133,6 +142,7 @@
     if (connection !== hass.connection) {
       if (unsubscribe) unsubscribe();
       connection = hass.connection;
+      subscriptionHealthy = false;
       const changed = exportFunction(value => {
         const event = copyJson(value);
         const dashboard = location.pathname.split("/")[1];
@@ -141,16 +151,21 @@
         }
       }, window);
       connection.subscribeEvents(changed, "lovelace_updated")
-        .then(exportFunction(remove => { unsubscribe = remove.wrappedJSObject || remove; }, window))
+        .then(exportFunction(remove => {
+          unsubscribe = remove.wrappedJSObject || remove;
+          subscriptionHealthy = true;
+          if (discoveryHealthy && dashboardStatus) report(dashboardStatus, "ready");
+        }, window))
         .catch(exportFunction(error => {
           connection = undefined;
-          report("Panel update subscription failed - Reload to retry");
+          subscriptionHealthy = false;
+          report("Panel update subscription failed - retrying", "connecting");
           console.error(error);
         }, window));
       lastDiscovery = 0;
     }
     discoverFrame(hass);
-    if (discoveredFrame) report("Frame - live");
+    if (discoveryHealthy && dashboardStatus) reportDashboard(dashboardStatus);
   }
   setInterval(tick, 3000);
   document.addEventListener("visibilitychange", tick);

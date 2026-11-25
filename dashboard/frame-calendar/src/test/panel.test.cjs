@@ -6,17 +6,21 @@ const path = require("node:path");
 const script = fs.readFileSync(path.join(__dirname, "../main/assets/frame-panel/panel.js"), "utf8");
 
 async function run({ auth, savedAuth, origin = "https://ha.example", pathname = "/frame",
-  panels = { frame: { title: "Frame" } }, dashboards = [], xray = false } = {}) {
+  panels = { frame: { title: "Frame" } }, dashboards = [], xray = false,
+  connected = true, hidden = false, subscriptionFailure = false, discoveryFailure = false } = {}) {
   const messages = [];
   const stored = new Map(savedAuth ? [["hassTokens", JSON.stringify(savedAuth)]] : []);
-  const state = { reloads: 0, assigned: null, subscription: null, ticks: null };
+  const state = { reloads: 0, assigned: null, subscription: null, ticks: null,
+    connected, hidden, discoveryFailure, errors: [] };
   const connection = {
     subscribeEvents: async (callback, type) => {
       assert.equal(type, "lovelace_updated");
+      if (subscriptionFailure) throw new Error("offline");
       state.subscription = callback;
       return () => {};
     },
     sendMessagePromise: async message => {
+      if (state.discoveryFailure) throw new Error("offline");
       const wrap = value => xray ? { wrappedJSObject: value } : value;
       if (message.type === "get_panels") return wrap(panels);
       if (message.type === "lovelace/dashboards/list") return wrap(dashboards);
@@ -27,7 +31,7 @@ async function run({ auth, savedAuth, origin = "https://ha.example", pathname = 
   };
   const root = { appendChild() {}, querySelectorAll: () => [] };
   vm.runInNewContext(script, {
-    URL, Date, Map, WeakSet, console,
+    URL, Date, Map, WeakSet, console: { error: (...args) => state.errors.push(args) },
     browser: { runtime: { sendNativeMessage: async (app, message) => {
       assert.equal(app, "frame");
       messages.push(message);
@@ -37,9 +41,9 @@ async function run({ auth, savedAuth, origin = "https://ha.example", pathname = 
     localStorage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value) },
     location: { origin, pathname, reload: () => state.reloads++, assign: url => { state.assigned = url; } },
     document: {
-      hidden: false, documentElement: root,
+      get hidden() { return state.hidden; }, documentElement: root,
       createElement: () => ({}), addEventListener() {},
-      querySelector: () => ({ wrappedJSObject: { hass: { connection } } })
+      querySelector: () => ({ wrappedJSObject: { hass: { connection, connected: state.connected } } })
     },
     window: {}, exportFunction: callback => callback, cloneInto: value => value,
     setInterval: callback => { state.ticks = callback; }
@@ -106,4 +110,63 @@ test("Firefox Xray-wrapped responses and events are copied before accessing fiel
   assert.equal(state.assigned, "/frame");
   state.subscription({ wrappedJSObject: { data: { url_path: "dashboard-panel" } } });
   assert.equal(state.reloads, 1);
+});
+
+test("the panel keeps monitoring updates while hidden behind the screensaver", async () => {
+  const { state, messages } = await run({ hidden: true });
+  assert.ok(messages.some(message => message.state === "ready"));
+  state.subscription({ data: { url_path: "frame" } });
+  assert.equal(state.reloads, 1);
+});
+
+test("a disconnected panel reports a retryable state until it reconnects", async () => {
+  const { state, messages } = await run({ connected: false });
+  assert.ok(messages.some(message => message.state === "connecting"));
+  assert.ok(!messages.some(message => message.state === "ready"));
+  state.connected = true;
+  state.ticks();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(messages.some(message => message.state === "ready"));
+});
+
+test("an update subscription failure is not reported as a live panel", async () => {
+  const { state, messages } = await run({ subscriptionFailure: true });
+  state.ticks();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(messages.some(message => message.state === "connecting"
+    && message.text.includes("subscription failed")));
+  assert.ok(!messages.some(message => message.state === "ready"));
+  assert.ok(state.errors.length > 0);
+});
+
+test("a failed dashboard discovery remains retryable until it succeeds", async () => {
+  const { state, messages } = await run({ discoveryFailure: true });
+  assert.ok(messages.some(message => message.state === "connecting"
+    && message.text.includes("discovery failed")));
+  assert.ok(!messages.some(message => message.state === "ready"));
+  state.discoveryFailure = false;
+  state.ticks();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(messages.at(-1).state, "ready");
+});
+
+test("a fallback dashboard reports recovery after the connection returns", async () => {
+  const { state, messages } = await run({
+    pathname: "/dashboard-panel/0",
+    panels: { "dashboard-panel": { title: "Panel", component_name: "lovelace" } },
+    dashboards: [{ url_path: "dashboard-panel" }]
+  });
+  assert.equal(messages.at(-1).state, "ready");
+  state.connected = false;
+  state.ticks();
+  assert.equal(messages.at(-1).state, "connecting");
+  state.connected = true;
+  state.ticks();
+  assert.equal(messages.at(-1).state, "ready");
+});
+
+test("a sign-in page is reported separately from retryable connection errors", async () => {
+  const { messages } = await run({ pathname: "/auth/authorize", connected: false });
+  assert.ok(messages.some(message => message.state === "login"));
+  assert.ok(!messages.some(message => message.state === "ready"));
 });

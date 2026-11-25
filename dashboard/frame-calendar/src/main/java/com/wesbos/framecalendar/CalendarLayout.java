@@ -24,7 +24,7 @@ final class CalendarLayout {
 
     final LocalDate first;
     final int weeks;
-    final List<List<Span>> spans = new ArrayList<>();
+    final List<List<Span>> entries = new ArrayList<>();
     final List<List<Event>> days = new ArrayList<>();
 
     static List<CalendarLayout> followingMonths(YearMonth month, List<Event> events, ZoneId zone) {
@@ -33,35 +33,48 @@ final class CalendarLayout {
         return result;
     }
 
+    static boolean showPreviewDate(int index, YearMonth month, LocalDate date) {
+        return YearMonth.from(date).equals(month)
+                || (index == 0 && date.isBefore(month.atDay(1)))
+                || (index == 2 && date.isAfter(month.atEndOfMonth()));
+    }
+
+    static int availableRows(float height, float scale) {
+        return Math.max(0, (int) ((height - 29 * scale) / (18 * scale)));
+    }
+
+    static int visibleEvents(int count, int rows) {
+        return count > rows ? Math.max(0, rows - 1) : count;
+    }
+
     CalendarLayout(YearMonth month, List<Event> events, ZoneId zone) {
         first = month.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
         weeks = (int) (ChronoUnit.DAYS.between(first, month.atEndOfMonth()) / 7) + 1;
         for (int i = 0; i < weeks * 7; i++) days.add(new ArrayList<>());
         List<Event> sorted = new ArrayList<>(events);
-        sorted.sort(Comparator.comparing((Event e) -> e.firstDay(zone))
-                .thenComparing((Event e) -> -ChronoUnit.DAYS.between(e.firstDay(zone), e.lastDay(zone)))
-                .thenComparing(e -> e.start));
+        sorted.sort(Comparator.comparing((Event e) -> !e.allDay).thenComparing(e -> e.start));
         for (int week = 0; week < weeks; week++) {
             LocalDate from = first.plusDays(week * 7L), to = from.plusDays(6);
             List<Span> row = new ArrayList<>();
-            List<Integer> laneEnds = new ArrayList<>();
+            int[] nextLane = new int[7];
             for (Event event : sorted) {
                 LocalDate a = event.firstDay(zone), b = event.lastDay(zone);
                 if (b.isBefore(from) || a.isAfter(to)) continue;
                 int left = (int) Math.max(0, ChronoUnit.DAYS.between(from, a));
                 int right = (int) Math.min(6, ChronoUnit.DAYS.between(from, b));
-                if (event.allDay || b.isAfter(a)) {
-                    int lane = 0;
-                    while (lane < laneEnds.size() && laneEnds.get(lane) >= left) lane++;
-                    if (lane == laneEnds.size()) laneEnds.add(right);
-                    else laneEnds.set(lane, right);
-                    row.add(new Span(event, left, right, lane));
+                int segment = left, lane = nextLane[left];
+                for (int day = left; day <= right; day++) {
+                    if (nextLane[day] != lane) {
+                        row.add(new Span(event, segment, day - 1, lane));
+                        segment = day;
+                        lane = nextLane[day];
+                    }
+                    nextLane[day]++;
+                    days.get(week * 7 + day).add(event);
                 }
-                for (int day = left; day <= right; day++) days.get(week * 7 + day).add(event);
+                row.add(new Span(event, segment, right, lane));
             }
-            spans.add(row);
+            entries.add(row);
         }
-        for (List<Event> day : days) day.sort(Comparator.comparing((Event e) -> !e.allDay)
-                .thenComparing(e -> e.start));
     }
 }

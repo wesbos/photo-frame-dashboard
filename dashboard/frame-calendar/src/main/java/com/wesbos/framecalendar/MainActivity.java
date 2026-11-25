@@ -2,22 +2,33 @@ package com.wesbos.framecalendar;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.animation.ValueAnimator;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -46,16 +57,52 @@ public class MainActivity extends Activity {
     private CalendarView calendar;
     private MonthPreviewsView previews;
     private TextView monthTitle, status, panelStatus;
+    private ProgressBar syncIndicator;
+    private GeckoView browser;
     private GeckoSession session;
     private ZoneId zone;
     private YearMonth month;
+    private CalendarRange cachedRange;
+    private CalendarStore.Result cachedCalendars;
     private int generation;
-    private boolean active, loading, panelFailed;
-    private final Runnable retryPanel = () -> { if (active) loadPanel(); };
+    private boolean active, loading, calendarRefreshPending, panelFailed, extensionReady, panelRetryScheduled;
+    private boolean refreshScheduled, connected, dreamWasActive;
+    private ValueAnimator wakeFade;
+    private final Runnable retryPanel = () -> {
+        panelRetryScheduled = false;
+        if (!extensionReady || session == null || !session.isOpen()) return;
+        if (networkAvailable()) loadPanel();
+        else {
+            panelStatus.setText("Home Assistant unavailable - waiting for network");
+            panelStatus.setVisibility(View.VISIBLE);
+            schedulePanelRetry();
+        }
+    };
     private final Runnable refresh = () -> {
-        if (active) {
-            loadCalendars();
-            scheduleRefresh();
+        refreshScheduled = false;
+        loadCalendars();
+        scheduleRefresh();
+    };
+    private final BroadcastReceiver systemEvents = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ConnectivityManager.CONNECTIVITY_ACTION.equals(action)) {
+                boolean nowConnected = networkAvailable();
+                if (!nowConnected && connected) {
+                    panelFailed = true;
+                    panelStatus.setText("Home Assistant unavailable - waiting for network");
+                    panelStatus.setVisibility(View.VISIBLE);
+                    if (extensionReady) schedulePanelRetry();
+                } else if (nowConnected && !connected) {
+                    if (extensionReady) loadPanel();
+                    loadCalendars();
+                }
+                connected = nowConnected;
+            } else if (Intent.ACTION_DREAMING_STARTED.equals(action)) {
+                dreamWasActive = true;
+            } else if (Intent.ACTION_DREAMING_STOPPED.equals(action) && active) {
+                fadeFromDream();
+            }
         }
     };
 
@@ -68,7 +115,21 @@ public class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         buildUi();
         session = new GeckoSession();
-        GeckoView browser = new GeckoView(this);
+        browser = new GeckoView(this);
+        browser.setBackgroundColor(CalendarView.BACKGROUND);
+        browser.coverUntilFirstPaint(CalendarView.BACKGROUND);
+        View surface = browser.getChildAt(0);
+        if (surface instanceof SurfaceView) {
+            ((SurfaceView) surface).getHolder().addCallback(new SurfaceHolder.Callback() {
+                @Override public void surfaceCreated(SurfaceHolder holder) { }
+                @Override public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) { }
+                @Override public void surfaceDestroyed(SurfaceHolder holder) {
+                    handler.post(() -> {
+                        if (!isDestroyed() && session != null && session.isOpen()) session.setActive(true);
+                    });
+                }
+            });
+        }
         ((LinearLayout) panelStatus.getParent()).addView(browser, new LinearLayout.LayoutParams(-1, 0, 1));
         session.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override public GeckoResult<String> onLoadError(GeckoSession s, String uri,
@@ -76,19 +137,22 @@ public class MainActivity extends Activity {
                 panelStatus.setText("Home Assistant unavailable - check Wi-Fi; Reload to retry");
                 panelStatus.setVisibility(View.VISIBLE);
                 panelFailed = true;
-                handler.removeCallbacks(retryPanel);
-                handler.postDelayed(retryPanel, 30000);
+                schedulePanelRetry();
                 return GeckoResult.fromValue("data:text/html,<body style='background:%231e1e2e;color:%23cdd6f4'>Connection unavailable</body>");
             }
         });
         session.setProgressDelegate(new GeckoSession.ProgressDelegate() {
+            @Override public void onPageStart(GeckoSession s, String url) {
+                panelFailed = true;
+                browser.coverUntilFirstPaint(CalendarView.BACKGROUND);
+                schedulePanelRetry();
+            }
             @Override public void onPageStop(GeckoSession s, boolean success) {
-                if (success && !panelFailed) handler.removeCallbacks(retryPanel);
-                else {
+                if (!success) {
                     panelStatus.setText("Home Assistant unavailable - retrying shortly");
                     panelStatus.setVisibility(View.VISIBLE);
-                    handler.removeCallbacks(retryPanel);
-                    handler.postDelayed(retryPanel, 30000);
+                    panelFailed = true;
+                    schedulePanelRetry();
                 }
             }
         });
@@ -98,6 +162,7 @@ public class MainActivity extends Activity {
         ((FrameApplication) getApplication()).runtime().getWebExtensionController()
                 .ensureBuiltIn("resource://android/assets/frame-panel/", "frame-panel@framecalendar.local")
                 .accept(extension -> handler.post(() -> {
+                    if (isDestroyed() || !session.isOpen()) return;
                     session.getWebExtensionController().setMessageDelegate(extension, new WebExtension.MessageDelegate() {
                         @Override public GeckoResult<Object> onMessage(String app, Object message, WebExtension.MessageSender sender) {
                             if (sender.session != session || !sender.isTopLevel()
@@ -120,6 +185,14 @@ public class MainActivity extends Activity {
                                     String messageText = object.optString("text", "Home Assistant");
                                     panelStatus.setText(messageText);
                                     panelStatus.setVisibility("Frame - live".equals(messageText) ? View.GONE : View.VISIBLE);
+                                    String state = object.optString("state", "connecting");
+                                    panelFailed = !"ready".equals(state) && !"login".equals(state);
+                                    if (!panelFailed) {
+                                        handler.removeCallbacks(retryPanel);
+                                        panelRetryScheduled = false;
+                                    } else {
+                                        schedulePanelRetry();
+                                    }
                                 }
                             } catch (JSONException e) {
                                 panelStatus.setText("Home Assistant integration error - Reload to retry");
@@ -128,8 +201,19 @@ public class MainActivity extends Activity {
                             return null;
                         }
                     }, "frame");
+                    extensionReady = true;
                     loadPanel();
-                }), error -> handler.post(() -> panelStatus.setText("Browser integration failed - restart the app")));
+                }), error -> handler.post(() -> {
+                    if (isDestroyed()) return;
+                    panelStatus.setText("Browser integration failed - restart the app");
+                    panelStatus.setVisibility(View.VISIBLE);
+                }));
+        connected = networkAvailable();
+        IntentFilter systemFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+        systemFilter.addAction(Intent.ACTION_DREAMING_STARTED);
+        systemFilter.addAction(Intent.ACTION_DREAMING_STOPPED);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(systemEvents, systemFilter, Context.RECEIVER_EXPORTED);
+        else registerReceiver(systemEvents, systemFilter);
         applyHome(getIntent());
     }
 
@@ -138,17 +222,19 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.HORIZONTAL);
         root.setBackgroundColor(CalendarView.BACKGROUND);
         LinearLayout left = new LinearLayout(this), right = new LinearLayout(this);
+        FrameLayout leftPane = new FrameLayout(this);
         left.setOrientation(LinearLayout.VERTICAL);
         right.setOrientation(LinearLayout.VERTICAL);
-        root.addView(left, new LinearLayout.LayoutParams(0, -1, 3));
+        root.addView(leftPane, new LinearLayout.LayoutParams(0, -1, 3));
+        leftPane.addView(left, new FrameLayout.LayoutParams(-1, -1));
         root.addView(right, new LinearLayout.LayoutParams(0, -1, 1));
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(10, 4, 10, 4);
         left.addView(toolbar, new LinearLayout.LayoutParams(-1, 56));
-        button(toolbar, "Today", () -> changeMonth(YearMonth.now(zone)));
-        button(toolbar, "<", () -> changeMonth(month.minusMonths(1)));
-        button(toolbar, ">", () -> changeMonth(month.plusMonths(1)));
+        iconButton(toolbar, R.drawable.mdi_calendar_today, "Today", () -> changeMonth(YearMonth.now(zone)));
+        iconButton(toolbar, R.drawable.mdi_chevron_left, "Previous month", () -> changeMonth(month.minusMonths(1)));
+        iconButton(toolbar, R.drawable.mdi_chevron_right, "Next month", () -> changeMonth(month.plusMonths(1)));
         monthTitle = text("", 23);
         toolbar.addView(monthTitle, new LinearLayout.LayoutParams(0, -2, 1));
         iconButton(toolbar, R.drawable.mdi_reload, "Reload", () -> { loadCalendars(); loadPanel(); });
@@ -157,9 +243,15 @@ public class MainActivity extends Activity {
         left.addView(calendar, new LinearLayout.LayoutParams(-1, 0, 1));
         previews = new MonthPreviewsView(this);
         left.addView(previews, new LinearLayout.LayoutParams(-1, 160));
-        status = text("Loading calendars...", 11);
+        status = text("", 11);
         status.setPadding(12, 6, 10, 6);
+        status.setVisibility(View.GONE);
         left.addView(status);
+        syncIndicator = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        syncIndicator.setIndeterminate(true);
+        syncIndicator.setIndeterminateTintList(ColorStateList.valueOf(CalendarView.TODAY));
+        syncIndicator.setVisibility(View.GONE);
+        leftPane.addView(syncIndicator, new FrameLayout.LayoutParams(-1, 2, Gravity.BOTTOM));
         panelStatus = text("Home Assistant - connecting...", 11);
         panelStatus.setPadding(8, 8, 8, 8);
         right.addView(panelStatus);
@@ -177,17 +269,6 @@ public class MainActivity extends Activity {
         return view;
     }
 
-    private void button(LinearLayout row, String label, Runnable action) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setTextColor(CalendarView.TEXT);
-        button.setTextSize(12);
-        button.setMinWidth(0);
-        button.setMinimumWidth(0);
-        row.addView(button, new LinearLayout.LayoutParams(-2, 44));
-        button.setOnClickListener(view -> action.run());
-    }
-
     private void iconButton(LinearLayout row, int drawable, String label, Runnable action) {
         ImageButton button = new ImageButton(this);
         button.setImageResource(drawable);
@@ -202,11 +283,12 @@ public class MainActivity extends Activity {
 
     private void changeMonth(YearMonth value) {
         month = value;
-        generation++;
-        calendar.show(month, Collections.emptyList(), zone);
-        previews.show(month, Collections.emptyList(), zone);
         updateMonthTitle();
-        loadCalendars();
+        if (!showCachedCalendars()) {
+            calendar.show(month, Collections.emptyList(), zone);
+            previews.show(month, Collections.emptyList(), zone);
+            loadCalendars();
+        }
     }
 
     private void updateMonthTitle() {
@@ -214,29 +296,50 @@ public class MainActivity extends Activity {
     }
 
     private void loadCalendars() {
-        if (loading) { calendarStatus("Calendar refresh queued..."); return; }
+        if (loading) { calendarRefreshPending = true; return; }
         loading = true;
-        int request = ++generation;
+        syncIndicator.setVisibility(View.VISIBLE);
+        int request = generation;
         YearMonth requestedMonth = month;
         ZoneId requestedZone = zone;
-        CalendarLayout layout = new CalendarLayout(requestedMonth, Collections.emptyList(), requestedZone);
-        CalendarLayout lastPreview = new CalendarLayout(requestedMonth.plusMonths(3), Collections.emptyList(), requestedZone);
-        calendarStatus("Syncing calendars...");
+        CalendarRange range = CalendarRange.around(requestedMonth, requestedZone);
+        boolean needSaved = cachedRange == null || !cachedRange.covers(requestedMonth, requestedZone);
         worker.execute(() -> {
-            CalendarStore.Result result = new CalendarStore(this, prefs)
-                    .load(layout.first, lastPreview.first.plusDays(lastPreview.weeks * 7L), requestedZone);
+            CalendarStore store = new CalendarStore(this, prefs);
+            if (needSaved) {
+                CalendarStore.Result saved = store.loadCached(range.from, range.until, requestedZone);
+                handler.post(() -> {
+                    if (isDestroyed() || request != generation || !range.covers(month, zone)) return;
+                    cachedRange = range;
+                    cachedCalendars = saved;
+                    showCachedCalendars();
+                });
+            }
+            CalendarStore.Result result = store.load(range.from, range.until, requestedZone);
             handler.post(() -> {
                 loading = false;
                 if (isDestroyed()) return;
-                if (request != generation) {
-                    if (active) loadCalendars();
-                    return;
+                boolean refreshAgain = calendarRefreshPending;
+                calendarRefreshPending = false;
+                if (request == generation) {
+                    cachedRange = range;
+                    cachedCalendars = result;
+                    if (showCachedCalendars()) {
+                        calendarStatus(android.text.TextUtils.join("  |  ", result.notices));
+                    }
                 }
-                calendar.show(requestedMonth, result.events, requestedZone);
-                previews.show(requestedMonth, result.events, requestedZone);
-                calendarStatus(android.text.TextUtils.join("  |  ", result.notices));
+                if (refreshAgain || request != generation || cachedRange == null || !cachedRange.covers(month, zone)) {
+                    loadCalendars();
+                } else syncIndicator.setVisibility(View.GONE);
             });
         });
+    }
+
+    private boolean showCachedCalendars() {
+        if (cachedRange == null || cachedCalendars == null || !cachedRange.covers(month, zone)) return false;
+        calendar.show(month, cachedCalendars.events, zone);
+        previews.show(month, cachedCalendars.events, zone);
+        return true;
     }
 
     private void calendarStatus(String message) {
@@ -245,15 +348,50 @@ public class MainActivity extends Activity {
     }
 
     private void loadPanel() {
+        if (!extensionReady) return;
         panelStatus.setVisibility(View.VISIBLE);
         String url = prefs.getString("ha_url", "");
         if (url.isEmpty()) {
             panelStatus.setText("Connect Home Assistant in Settings");
+            panelFailed = false;
+            handler.removeCallbacks(retryPanel);
+            panelRetryScheduled = false;
             return;
         }
         panelStatus.setText("Home Assistant - connecting...");
-        panelFailed = false;
+        panelFailed = true;
+        browser.coverUntilFirstPaint(CalendarView.BACKGROUND);
+        schedulePanelRetry();
         session.loadUri(url);
+    }
+
+    private void schedulePanelRetry() {
+        handler.removeCallbacks(retryPanel);
+        handler.postDelayed(retryPanel, 30000);
+        panelRetryScheduled = true;
+    }
+
+    private boolean networkAvailable() {
+        ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo network = manager == null ? null : manager.getActiveNetworkInfo();
+        return network != null && network.isConnected();
+    }
+
+    private void fadeFromDream() {
+        if (!dreamWasActive) return;
+        dreamWasActive = false;
+        if (wakeFade != null) wakeFade.cancel();
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        attributes.alpha = 0f;
+        getWindow().setAttributes(attributes);
+        wakeFade = ValueAnimator.ofFloat(0f, 1f);
+        wakeFade.setDuration(450);
+        wakeFade.addUpdateListener(animation -> {
+            WindowManager.LayoutParams frame = getWindow().getAttributes();
+            frame.alpha = (Float) animation.getAnimatedValue();
+            getWindow().setAttributes(frame);
+        });
+        wakeFade.start();
     }
 
     private void controls() {
@@ -309,6 +447,8 @@ public class MainActivity extends Activity {
                 edit.apply();
                 zone = ZoneId.of(config.getString("timezone"));
                 generation++;
+                cachedRange = null;
+                cachedCalendars = null;
                 loadCalendars();
                 loadPanel();
                 dialog.dismiss();
@@ -386,34 +526,42 @@ public class MainActivity extends Activity {
         importConfig(intent);
         applyHome(intent);
         applyConsoleFlag(intent);
-        zone = ZoneId.of(prefs.getString("timezone", "Europe/London"));
-        generation++;
-        loadCalendars();
-        loadPanel();
+        if (intent.getBooleanExtra("import_config", false)) {
+            zone = ZoneId.of(prefs.getString("timezone", "Europe/London"));
+            generation++;
+            cachedRange = null;
+            cachedCalendars = null;
+            loadCalendars();
+            loadPanel();
+        }
     }
 
     private void scheduleRefresh() {
         handler.removeCallbacks(refresh);
         handler.postDelayed(refresh, 5 * 60 * 1000);
+        refreshScheduled = true;
     }
 
     @Override protected void onResume() {
         super.onResume();
         active = true;
+        NavigationService.setCalendarVisible(true);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         if (session != null) session.setActive(true);
-        if (panelFailed) handler.postDelayed(retryPanel, 30000);
-        loadCalendars();
-        scheduleRefresh();
+        if (dreamWasActive) fadeFromDream();
+        if (panelFailed && !panelRetryScheduled) schedulePanelRetry();
+        if (cachedRange == null && !loading) loadCalendars();
+        if (!refreshScheduled) scheduleRefresh();
     }
 
     @Override protected void onPause() {
         active = false;
-        handler.removeCallbacks(refresh);
-        handler.removeCallbacks(retryPanel);
-        if (session != null) session.setActive(false);
+        NavigationService.setCalendarVisible(false);
         super.onPause();
+        handler.postDelayed(() -> {
+            if (!isDestroyed() && session != null && session.isOpen()) session.setActive(true);
+        }, 500);
     }
 
     @Override protected void onSaveInstanceState(Bundle state) {
@@ -422,6 +570,8 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        unregisterReceiver(systemEvents);
+        if (wakeFade != null) wakeFade.cancel();
         handler.removeCallbacksAndMessages(null);
         worker.shutdownNow();
         if (session != null) session.close();
