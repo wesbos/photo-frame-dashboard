@@ -798,7 +798,8 @@ public class MainActivity extends Activity {
     for (ResolveInfo info : getPackageManager().queryIntentActivities(home, 0)) {
       String pkg = info.activityInfo.packageName;
       if (pkg.equals(getPackageName()) || pkg.equals("com.android.settings")) continue;
-      startActivity(new Intent(home).setComponent(new ComponentName(pkg, info.activityInfo.name)));
+      startActivity(new Intent(home).setComponent(new ComponentName(pkg, info.activityInfo.name))
+          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
       return;
     }
     startActivity(new Intent(Settings.ACTION_SETTINGS));
