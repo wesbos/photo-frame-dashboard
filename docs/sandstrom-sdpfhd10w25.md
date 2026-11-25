@@ -205,6 +205,10 @@ stock WebView 91 installed (`pm uninstall-system-updates com.android.webview`). 
 appeared only once something used WebView (Frameo never did here). So any WebView-based app
 (the Home Assistant app, this repo's kiosk, Fully Kiosk) hangs on this frame.
 
+On a different model, the [SDPFAG1025](sandstrom-sdpfag1025.md#webview-renders-in-process), the same
+abort stopped once WebView ran in-process (`cmd webviewupdate disable-multiprocess`), and its WebView 134
+rendered the kiosk. One unit; not tried on the SDPFHD10W25. It drops the renderer sandbox.
+
 ## Dashboard: Firefox web app, started by a Home app
 
 Firefox brings its own engine (Gecko). Its tab and GPU processes are ordinary app processes, not
