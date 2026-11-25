@@ -25,9 +25,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 final class CalendarStore {
-    static final String[] KEYS = {"personal", "family", "tripit"};
-    static final String[] NAMES = {"Personal (Woodwardweb)", "Catherine Woodward", "TripIt"};
-    static final int[] COLORS = {0xff89b4fa, 0xfff5c2e7, 0xffa6adc8};
+    static final String[] KEYS = {"personal", "family", "tripit", "holidays"};
+    static final String[] NAMES = {"Martin", "Catherine", "TripIt", "UK holidays"};
+    static final int[] COLORS = {0xff89b4fa, 0xfff5c2e7, 0xffa6adc8, 0xffa6e3a1};
     private final Context context;
     private final SharedPreferences prefs;
     private String accessToken;

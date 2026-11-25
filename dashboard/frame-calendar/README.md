@@ -29,7 +29,7 @@ unrelated sites or expose ADB to the internet.
 
 ## Connect calendars and the panel
 
-Open **Settings > Connections and time zone**:
+Open the **gear icon > Connections and time zone**:
 
 - For each Google calendar, use Google Calendar on a computer: **Settings >
   Settings for my calendars > [calendar] > Integrate calendar > Secret address in
@@ -38,6 +38,8 @@ Open **Settings > Connections and time zone**:
   you do not own; in that case the calendar owner must provide a feed, or configure
   an authorized integration in Home Assistant.
 - Paste a TripIt private iCalendar feed in the TripIt field.
+- Use the Martin and Catherine fields for personal calendars, and UK holidays
+  for a public UK holiday iCalendar feed.
 - Alternatively, enter `ha:calendar.entity_id` for calendars already integrated
   with Home Assistant. These are read using the panel's authenticated session.
 - Enter the Home Assistant dashboard URL and sign in in the right-hand panel.
@@ -57,9 +59,13 @@ Home Assistant dashboards. The browser subscribes to `lovelace_updated` on the
 frontend's authenticated, reconnecting websocket and reloads the current dashboard
 when its configuration changes. Live entity updates remain Home Assistant's own
 frontend behavior. Browser chrome is hidden without changing server configuration.
+The successful panel status is hidden; connection and discovery errors remain visible.
 
 Calendar feeds refresh every five minutes and when changing month or pressing
-**Reload**. The grid supports Sunday-first months, four to six weeks, recurring
+the **reload icon**. Calendar names appear only in settings and event details;
+successful refreshes do not reserve a status row. Three compact previews below
+the main grid show the following months, shading dates with events from any
+configured calendar. The grid supports Sunday-first months, four to six weeks, recurring
 events, exclusions and moved/cancelled occurrences, exclusive all-day end dates,
 and bars spanning days/weeks. Tap an event for details, or tap an empty part of a
 day to see all its events, including overflow. Unavailable feeds show an explicit
@@ -97,6 +103,11 @@ Select the previous launcher with **Always**. Uninstalling Frame Calendar remove
 its settings and saved logins. No flash, `/system`, vendor app, screensaver setting
 or boot partition change is required.
 
+The dashboard does not keep the display awake. Android's existing screen timeout
+and selected screensaver still apply; dismissing the screensaver returns to the
+dashboard and refreshes the calendars. In-flight calendar updates are retained
+while the screensaver is active, so returning does not discard a completed sync.
+
 For temporary diagnostics, launch MainActivity with `--ez debug true` to print
 browser console messages to local Android logs; `--ez debug false` turns this off.
 Console output and remote debugging are off by default. Do not publish logs
@@ -105,7 +116,8 @@ without checking them for private dashboard data.
 ## Private ADB provisioning
 
 For unattended setup, a private JSON object can have the fields `personal`,
-`family`, `tripit`, `ha_url`, and `timezone`. Optional `ha_auth` is the Home
+`family`, `tripit`, `holidays`, `ha_url`, and `timezone`. Omitted fields retain
+their saved values. Optional `ha_auth` is the Home
 Assistant frontend's `hassTokens` object; only provision a session authorized by
 the owner, and never place it in source control.
 

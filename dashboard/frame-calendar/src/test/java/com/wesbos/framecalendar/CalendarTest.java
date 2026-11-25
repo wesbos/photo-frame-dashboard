@@ -88,6 +88,33 @@ public class CalendarTest {
         assertEquals(LocalDate.of(2026, 12, 1), item.lastDay(LONDON));
     }
 
+    @Test public void previewsCoverFollowingMonthsAndShadeRecurrencesAndSpanningEvents() throws Exception {
+        YearMonth displayed = YearMonth.of(2026, 11);
+        CalendarLayout last = new CalendarLayout(displayed.plusMonths(3), Collections.emptyList(), LONDON);
+        LocalDate until = last.first.plusDays(last.weeks * 7L);
+        String text = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+                + event("UID:monthly\r\nDTSTART;VALUE=DATE:20261110\r\nDTEND;VALUE=DATE:20261111\r\n"
+                        + "RRULE:FREQ=MONTHLY;COUNT=4\r\nSUMMARY:Monthly\r\n")
+                + event("UID:year-end\r\nDTSTART;VALUE=DATE:20261231\r\nDTEND;VALUE=DATE:20270103\r\n"
+                        + "SUMMARY:New year trip\r\n") + "END:VCALENDAR\r\n";
+        List<Event> events = IcsReader.read(text, displayed.atDay(1), until, LONDON, 0);
+        List<CalendarLayout> previews = CalendarLayout.followingMonths(displayed, events, LONDON);
+        assertEquals(3, previews.size());
+        for (int i = 0; i < previews.size(); i++) {
+            CalendarLayout preview = previews.get(i);
+            LocalDate tenth = displayed.plusMonths(i + 1).atDay(10);
+            int offset = (int) java.time.temporal.ChronoUnit.DAYS.between(preview.first, tenth);
+            assertEquals(1, preview.days.get(offset).size());
+            assertTrue(preview.days.get(offset + 1).isEmpty());
+        }
+        CalendarLayout january = previews.get(1);
+        int first = (int) java.time.temporal.ChronoUnit.DAYS.between(january.first, LocalDate.of(2027, 1, 1));
+        assertEquals(1, january.days.get(first).size());
+        assertEquals(1, january.days.get(first + 1).size());
+        assertTrue(january.days.get(first + 2).isEmpty());
+        assertEquals(LocalDate.of(2027, 2, 1), previews.get(2).first.plusDays(1));
+    }
+
     @Test public void allDayDurationWithoutEndDate() throws Exception {
         List<Event> events = parse(event("DTSTART;VALUE=DATE:20261201\r\nDURATION:P3D\r\nSUMMARY:Trip\r\n"));
         assertEquals(LocalDate.of(2026, 12, 3), events.get(0).lastDay(LONDON));

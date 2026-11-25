@@ -16,6 +16,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -43,6 +44,7 @@ public class MainActivity extends Activity {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private SharedPreferences prefs;
     private CalendarView calendar;
+    private MonthPreviewsView previews;
     private TextView monthTitle, status, panelStatus;
     private GeckoSession session;
     private ZoneId zone;
@@ -63,7 +65,7 @@ public class MainActivity extends Activity {
         importConfig(getIntent());
         zone = ZoneId.of(prefs.getString("timezone", "Europe/London"));
         month = state == null ? YearMonth.now(zone) : YearMonth.parse(state.getString("month"));
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         buildUi();
         session = new GeckoSession();
         GeckoView browser = new GeckoView(this);
@@ -72,6 +74,7 @@ public class MainActivity extends Activity {
             @Override public GeckoResult<String> onLoadError(GeckoSession s, String uri,
                     org.mozilla.geckoview.WebRequestError error) {
                 panelStatus.setText("Home Assistant unavailable - check Wi-Fi; Reload to retry");
+                panelStatus.setVisibility(View.VISIBLE);
                 panelFailed = true;
                 handler.removeCallbacks(retryPanel);
                 handler.postDelayed(retryPanel, 30000);
@@ -83,6 +86,7 @@ public class MainActivity extends Activity {
                 if (success && !panelFailed) handler.removeCallbacks(retryPanel);
                 else {
                     panelStatus.setText("Home Assistant unavailable - retrying shortly");
+                    panelStatus.setVisibility(View.VISIBLE);
                     handler.removeCallbacks(retryPanel);
                     handler.postDelayed(retryPanel, 30000);
                 }
@@ -113,10 +117,13 @@ public class MainActivity extends Activity {
                                         prefs.edit().putString("ha_auth", auth.toString()).apply();
                                     }
                                 } else if ("status".equals(object.optString("type"))) {
-                                    panelStatus.setText(object.optString("text", "Home Assistant"));
+                                    String messageText = object.optString("text", "Home Assistant");
+                                    panelStatus.setText(messageText);
+                                    panelStatus.setVisibility("Frame - live".equals(messageText) ? View.GONE : View.VISIBLE);
                                 }
                             } catch (JSONException e) {
                                 panelStatus.setText("Home Assistant integration error - Reload to retry");
+                                panelStatus.setVisibility(View.VISIBLE);
                             }
                             return null;
                         }
@@ -144,18 +151,12 @@ public class MainActivity extends Activity {
         button(toolbar, ">", () -> changeMonth(month.plusMonths(1)));
         monthTitle = text("", 23);
         toolbar.addView(monthTitle, new LinearLayout.LayoutParams(0, -2, 1));
-        button(toolbar, "Reload", () -> { loadCalendars(); loadPanel(); });
-        button(toolbar, "Settings", this::controls);
-        LinearLayout legend = new LinearLayout(this);
-        legend.setPadding(14, 0, 14, 6);
-        for (int i = 0; i < CalendarStore.NAMES.length; i++) {
-            TextView label = text(CalendarStore.NAMES[i] + "    ", 12);
-            label.setTextColor(CalendarStore.COLORS[i]);
-            legend.addView(label);
-        }
-        left.addView(legend);
+        iconButton(toolbar, R.drawable.mdi_reload, "Reload", () -> { loadCalendars(); loadPanel(); });
+        iconButton(toolbar, R.drawable.mdi_cog, "Settings", this::controls);
         calendar = new CalendarView(this);
         left.addView(calendar, new LinearLayout.LayoutParams(-1, 0, 1));
+        previews = new MonthPreviewsView(this);
+        left.addView(previews, new LinearLayout.LayoutParams(-1, 160));
         status = text("Loading calendars...", 11);
         status.setPadding(12, 6, 10, 6);
         left.addView(status);
@@ -164,6 +165,7 @@ public class MainActivity extends Activity {
         right.addView(panelStatus);
         setContentView(root);
         calendar.show(month, Collections.emptyList(), zone);
+        previews.show(month, Collections.emptyList(), zone);
         updateMonthTitle();
     }
 
@@ -186,10 +188,23 @@ public class MainActivity extends Activity {
         button.setOnClickListener(view -> action.run());
     }
 
+    private void iconButton(LinearLayout row, int drawable, String label, Runnable action) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(drawable);
+        button.setColorFilter(CalendarView.MUTED);
+        button.setContentDescription(label);
+        android.util.TypedValue background = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, background, true);
+        button.setBackgroundResource(background.resourceId);
+        row.addView(button, new LinearLayout.LayoutParams(44, 44));
+        button.setOnClickListener(view -> action.run());
+    }
+
     private void changeMonth(YearMonth value) {
         month = value;
         generation++;
         calendar.show(month, Collections.emptyList(), zone);
+        previews.show(month, Collections.emptyList(), zone);
         updateMonthTitle();
         loadCalendars();
     }
@@ -199,29 +214,38 @@ public class MainActivity extends Activity {
     }
 
     private void loadCalendars() {
-        if (loading) { status.setText("Calendar refresh queued..."); return; }
+        if (loading) { calendarStatus("Calendar refresh queued..."); return; }
         loading = true;
         int request = ++generation;
         YearMonth requestedMonth = month;
         ZoneId requestedZone = zone;
         CalendarLayout layout = new CalendarLayout(requestedMonth, Collections.emptyList(), requestedZone);
-        status.setText("Syncing calendars...");
+        CalendarLayout lastPreview = new CalendarLayout(requestedMonth.plusMonths(3), Collections.emptyList(), requestedZone);
+        calendarStatus("Syncing calendars...");
         worker.execute(() -> {
             CalendarStore.Result result = new CalendarStore(this, prefs)
-                    .load(layout.first, layout.first.plusDays(layout.weeks * 7L), requestedZone);
+                    .load(layout.first, lastPreview.first.plusDays(lastPreview.weeks * 7L), requestedZone);
             handler.post(() -> {
                 loading = false;
-                if (!active) return;
-                if (request != generation) { loadCalendars(); return; }
+                if (isDestroyed()) return;
+                if (request != generation) {
+                    if (active) loadCalendars();
+                    return;
+                }
                 calendar.show(requestedMonth, result.events, requestedZone);
-                status.setText(result.notices.isEmpty() ? "Updated " + java.time.LocalTime.now(zone)
-                        .format(DateTimeFormatter.ofPattern("HH:mm")) + "  -  refreshes every 5 minutes"
-                        : android.text.TextUtils.join("  |  ", result.notices));
+                previews.show(requestedMonth, result.events, requestedZone);
+                calendarStatus(android.text.TextUtils.join("  |  ", result.notices));
             });
         });
     }
 
+    private void calendarStatus(String message) {
+        status.setText(message);
+        status.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
     private void loadPanel() {
+        panelStatus.setVisibility(View.VISIBLE);
         String url = prefs.getString("ha_url", "");
         if (url.isEmpty()) {
             panelStatus.setText("Connect Home Assistant in Settings");
@@ -257,15 +281,15 @@ public class MainActivity extends Activity {
         form.addView(text("Use Google Calendar Settings > Integrate calendar > Secret address in iCal format."
                 + "\nAlternatively enter ha:calendar.entity_id for a Home Assistant calendar."
                 + "\nSign in to Home Assistant in the right-hand panel. Keep feed links private.", 13));
-        String[] keys = {"personal", "family", "tripit", "ha_url", "timezone"};
-        String[] labels = {"Personal (Woodwardweb)", "Catherine Woodward", "TripIt private feed",
+        String[] keys = {"personal", "family", "tripit", "holidays", "ha_url", "timezone"};
+        String[] labels = {"Martin", "Catherine", "TripIt private feed", "UK holidays",
                 "Home Assistant panel URL", "Time zone"};
         EditText[] fields = new EditText[keys.length];
         for (int i = 0; i < keys.length; i++) {
             form.addView(text(labels[i], 14));
             fields[i] = new EditText(this);
-            fields[i].setText(prefs.getString(keys[i], i == 4 ? "Europe/London" : ""));
-            fields[i].setInputType(i < 3 ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
+            fields[i].setText(prefs.getString(keys[i], "timezone".equals(keys[i]) ? "Europe/London" : ""));
+            fields[i].setInputType(i < CalendarStore.KEYS.length ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
                     : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
             fields[i].setTextColor(Color.WHITE);
             fields[i].setSingleLine(true);
@@ -330,7 +354,7 @@ public class MainActivity extends Activity {
             JSONObject config = new JSONObject(CalendarStore.read(in));
             validate(config);
             SharedPreferences.Editor edit = prefs.edit();
-            for (String key : new String[]{"personal", "family", "tripit", "ha_url", "timezone"}) {
+            for (String key : new String[]{"personal", "family", "tripit", "holidays", "ha_url", "timezone"}) {
                 if (config.has(key)) edit.putString(key, config.getString(key));
             }
             if (config.has("ha_auth")) edit.putString("ha_auth", config.getJSONObject("ha_auth").toString());

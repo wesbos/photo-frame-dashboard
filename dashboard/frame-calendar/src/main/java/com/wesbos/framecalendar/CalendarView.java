@@ -118,6 +118,17 @@ final class CalendarView extends View {
                         top + weekHeight - 8 * scale, 11, MUTED, false);
             }
         }
+        int todayIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(layout.first, today);
+        if (todayIndex >= 0 && todayIndex < layout.days.size()) {
+            float left = todayIndex % 7 * dayWidth;
+            float top = heading + todayIndex / 7 * weekHeight;
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2 * scale);
+            paint.setColor(TODAY);
+            canvas.drawRect(left + scale, top + scale,
+                    left + dayWidth - scale, top + weekHeight - scale, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
     }
 
     private void label(Canvas c, String text, float x, float y, float size, int color, boolean center) {

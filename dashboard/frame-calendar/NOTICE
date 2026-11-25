@@ -1,0 +1,10 @@
+Frame Calendar originated in https://github.com/wesbos/photo-frame-dashboard.
+The original MIT license is retained in LICENSE.
+
+The reload and cog vector icons are adapted from Material Design Icons by
+Pictogrammers (https://github.com/Templarian/MaterialDesign), licensed under
+Apache-2.0. Their Android vector format and reload geometry have been adapted.
+See LICENSE-MDI and LICENSE-APACHE2 for the licenses.
+
+Gradle's wrapper and the Android/GeckoView/biweekly dependencies retain their
+own licenses. Dependency license and notice resources are preserved in the APK.

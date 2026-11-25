@@ -27,6 +27,12 @@ final class CalendarLayout {
     final List<List<Span>> spans = new ArrayList<>();
     final List<List<Event>> days = new ArrayList<>();
 
+    static List<CalendarLayout> followingMonths(YearMonth month, List<Event> events, ZoneId zone) {
+        List<CalendarLayout> result = new ArrayList<>();
+        for (int i = 1; i <= 3; i++) result.add(new CalendarLayout(month.plusMonths(i), events, zone));
+        return result;
+    }
+
     CalendarLayout(YearMonth month, List<Event> events, ZoneId zone) {
         first = month.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
         weeks = (int) (ChronoUnit.DAYS.between(first, month.atEndOfMonth()) / 7) + 1;
