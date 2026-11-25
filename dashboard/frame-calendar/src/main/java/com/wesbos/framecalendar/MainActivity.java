@@ -72,6 +72,9 @@ public class MainActivity extends Activity {
     private boolean refreshScheduled, connected, dreamWasActive;
     private boolean dreamRequestPending, dreamStartFailed;
     private boolean clockReady;
+    /** Once per process: photos start straight after boot while the clock, calendars and HA load behind them. */
+    private static boolean bootDreamHandled;
+    private boolean bootDreamPending;
     private LocalDate lastToday;
     private final Runnable clockRetry = () -> refreshClock(false);
     private static final ComponentName DREAM_STARTER =
@@ -276,6 +279,7 @@ public class MainActivity extends Activity {
         calendar = new CalendarView(this);
         left.addView(calendar, new LinearLayout.LayoutParams(-1, 0, 1));
         previews = new MonthPreviewsView(this);
+        previews.setOnMonthSelected(this::changeMonth);
         left.addView(previews, new LinearLayout.LayoutParams(-1, 160));
         status = text("", 11);
         status.setPadding(12, 6, 10, 6);
@@ -347,6 +351,7 @@ public class MainActivity extends Activity {
         lastToday = today;
         calendar.setVisibility(View.VISIBLE);
         previews.setVisibility(View.VISIBLE);
+        calendar.invalidate();
         if (changed || showToday) {
             changeMonth(YearMonth.from(today));
             if (!loading) syncIndicator.setVisibility(View.GONE);
@@ -491,7 +496,7 @@ public class MainActivity extends Activity {
             return;
         }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        handler.postDelayed(idle, prefs.getInt("idle_minutes", 3) * 60_000L);
+        handler.postDelayed(idle, bootDreamPending ? 5_000L : prefs.getInt("idle_minutes", 3) * 60_000L);
     }
 
     private void startScreensaver() {
@@ -500,6 +505,7 @@ public class MainActivity extends Activity {
             scheduleIdle();
             return;
         }
+        bootDreamPending = false;
         try {
             dreamRequestPending = true;
             handler.postDelayed(dreamWatchdog, 5000);
@@ -688,6 +694,10 @@ public class MainActivity extends Activity {
         if (panelFailed && !panelRetryScheduled) schedulePanelRetry();
         refreshClock(true);
         if (!refreshScheduled) scheduleRefresh();
+        if (!bootDreamHandled) {
+            bootDreamHandled = true;
+            bootDreamPending = android.os.SystemClock.elapsedRealtime() < 10 * 60_000L;
+        }
         scheduleIdle();
     }
 
@@ -714,6 +724,7 @@ public class MainActivity extends Activity {
 
     @Override public void onUserInteraction() {
         super.onUserInteraction();
+        bootDreamPending = false;
         scheduleIdle();
     }
 }

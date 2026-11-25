@@ -73,9 +73,12 @@ event details; a thin animated line marks synchronization without moving the
 calendar. Three compact
 previews below the main grid show the following months, shading dates with events
 from any configured calendar. Only the outer edges show adjacent-month dates.
+Tap a preview to jump to that month.
 The grid supports Sunday-first months, four to six weeks, recurring events,
 exclusions and moved/cancelled occurrences, exclusive all-day end dates, and
 bars spanning days/weeks. Events are ordered by day and fill the available space.
+When today has more events than fit, appointments that have already ended move
+into "more" first, so upcoming ones stay visible.
 Tap an event for details, or tap an empty part of a day to see all its events,
 including overflow. Unavailable feeds show an explicit notice.
 Exact duplicates across calendars are displayed once, preferring Martin's
@@ -125,6 +128,8 @@ Android's selected screensaver without a dimming phase. Change the delay under
 screensaver launcher, without root; on firmware that omits it or when no
 screensaver is enabled, Android's existing screen timeout remains in use.
 Screensaver-start failures are reported and also restore the Android timeout.
+After boot the screensaver starts within seconds, so photos show while the clock,
+calendars and Home Assistant load behind it; touching the screen first skips this.
 Dismissal returns to today's calendar with a brief fade. Calendar sync and Home
 Assistant updates continue while the screensaver is showing, subject to Android's
 background restrictions. Overnight hours belong to the photo screensaver's settings.

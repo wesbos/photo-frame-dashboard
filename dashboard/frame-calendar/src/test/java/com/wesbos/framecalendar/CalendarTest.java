@@ -255,4 +255,45 @@ public class CalendarTest {
     @Test(expected = java.io.IOException.class) public void rejectsLoginHtmlInsteadOfCalendar() throws Exception {
         IcsReader.read("<html>Please log in</html>", FROM, TO, LONDON, 0);
     }
+
+    @Test public void previewTapSelectsColumn() {
+        assertEquals(0, MonthPreviewsView.previewAt(10, 1024, 3));
+        assertEquals(1, MonthPreviewsView.previewAt(512, 1024, 3));
+        assertEquals(2, MonthPreviewsView.previewAt(1023, 1024, 3));
+        assertEquals(-1, MonthPreviewsView.previewAt(1024, 1024, 3));
+        assertEquals(-1, MonthPreviewsView.previewAt(900, 1024, 2));
+    }
+
+    @Test public void todayOverflowHidesFinishedAppointmentsFirst() {
+        ZonedDateTime day = ZonedDateTime.of(2026, 11, 25, 0, 0, 0, 0, LONDON);
+        Event bar = new Event("Trip", "", "", day.minusDays(1), day.plusDays(2), true, 0);
+        Event[] timed = new Event[5];
+        for (int i = 0; i < timed.length; i++) {
+            timed[i] = new Event("T" + i, "", "", day.plusHours(8 + i * 2), day.plusHours(9 + i * 2), false, 0);
+        }
+        List<Event> events = new java.util.ArrayList<>(Arrays.asList(bar));
+        events.addAll(Arrays.asList(timed));
+        CalendarLayout layout = new CalendarLayout(YearMonth.of(2026, 11), events, LONDON);
+        int index = (int) java.time.temporal.ChronoUnit.DAYS.between(layout.first, day.toLocalDate());
+        List<CalendarLayout.Span> week = layout.entries.get(index / 7);
+        // 13:30: T0 (08-09), T1 (10-11) and T2 (12-13) have finished; four rows fit.
+        CalendarLayout.TodayCell cell = CalendarLayout.today(week, index % 7,
+                layout.days.get(index), 4, day.plusHours(13).plusMinutes(30).toInstant());
+        assertEquals(1, cell.fixed.size());
+        assertEquals(3, cell.hidden);
+        assertEquals(3, cell.moreLane);
+        assertEquals(Arrays.asList(timed[3], timed[4]),
+                Arrays.asList(cell.moved.get(0).event, cell.moved.get(1).event));
+        assertEquals(1, cell.moved.get(0).lane);
+        // Only as many finished appointments are hidden as needed.
+        cell = CalendarLayout.today(week, index % 7, layout.days.get(index), 5,
+                day.plusHours(13).plusMinutes(30).toInstant());
+        assertEquals(2, cell.hidden);
+        assertEquals(timed[2], cell.moved.get(0).event);
+        // Before anything has ended the usual overflow applies.
+        cell = CalendarLayout.today(week, index % 7, layout.days.get(index), 4, day.plusHours(7).toInstant());
+        assertEquals(3, cell.hidden);
+        assertEquals(timed[0], cell.moved.get(0).event);
+        assertFalse(CalendarLayout.ended(bar, day.plusHours(23).toInstant()));
+    }
 }

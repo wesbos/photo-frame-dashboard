@@ -5,7 +5,9 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.view.MotionEvent;
 import android.view.View;
+import java.util.function.Consumer;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -19,11 +21,12 @@ final class MonthPreviewsView extends View {
     private final List<CalendarLayout> layouts = new ArrayList<>();
     private YearMonth month;
     private ZoneId zone;
+    private Consumer<YearMonth> onMonthSelected;
 
     MonthPreviewsView(Context context) {
         super(context);
         setBackgroundColor(CalendarView.BACKGROUND);
-        setContentDescription("Next three months. Shaded dates have calendar events.");
+        setContentDescription("Next three months. Shaded dates have calendar events. Tap a month to open it.");
     }
 
     void show(YearMonth displayedMonth, List<Event> events, ZoneId zone) {
@@ -32,6 +35,30 @@ final class MonthPreviewsView extends View {
         layouts.clear();
         layouts.addAll(CalendarLayout.followingMonths(month, events, zone));
         invalidate();
+    }
+
+    void setOnMonthSelected(Consumer<YearMonth> listener) {
+        onMonthSelected = listener;
+        setClickable(listener != null);
+    }
+
+    /** Index of the preview column under x, or -1 outside the view. */
+    static int previewAt(float x, int width, int count) {
+        if (width <= 0 || x < 0 || x >= width) return -1;
+        int index = (int) (x / (width / 3f));
+        return index < count ? index : -1;
+    }
+
+    @Override public boolean onTouchEvent(MotionEvent event) {
+        if (onMonthSelected == null || month == null) return super.onTouchEvent(event);
+        if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+            int index = previewAt(event.getX(), getWidth(), layouts.size());
+            if (index >= 0) {
+                playSoundEffect(android.view.SoundEffectConstants.CLICK);
+                onMonthSelected.accept(month.plusMonths(index + 1));
+            }
+        }
+        return true;
     }
 
     @Override protected void onDraw(Canvas canvas) {

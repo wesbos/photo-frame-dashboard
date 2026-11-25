@@ -74,10 +74,18 @@ final class CalendarView extends View {
                 int count = layout.days.get(week * 7 + d).size();
                 visible[d] = CalendarLayout.visibleEvents(count, slots);
             }
+            int todayColumn = (int) java.time.temporal.ChronoUnit.DAYS.between(layout.first.plusDays(week * 7L), today);
+            CalendarLayout.TodayCell todayCell = null;
+            if (todayColumn >= 0 && todayColumn < 7) {
+                List<Event> todays = layout.days.get(week * 7 + todayColumn);
+                if (todays.size() > slots) todayCell = CalendarLayout.today(entries, todayColumn, todays,
+                        slots, java.time.Instant.now());
+            }
             for (CalendarLayout.Span span : entries) {
                 int start = -1;
                 for (int d = span.first; d <= span.last + 1; d++) {
-                    boolean show = d <= span.last && span.lane < visible[d];
+                    boolean show = d <= span.last && (todayCell != null && d == todayColumn
+                            ? todayCell.fixed.contains(span) : span.lane < visible[d]);
                     if (show && start < 0) start = d;
                     else if (!show && start >= 0) {
                         drawEntry(canvas, span, start, d - 1, top);
@@ -85,6 +93,7 @@ final class CalendarView extends View {
                     }
                 }
             }
+            if (todayCell != null) for (CalendarLayout.Span span : todayCell.moved) drawEntry(canvas, span, span.first, span.last, top);
             for (int d = 0; d < 7; d++) {
                 LocalDate date = layout.first.plusDays(week * 7L + d);
                 float left = d * dayWidth;
@@ -97,9 +106,11 @@ final class CalendarView extends View {
                         : Integer.toString(date.getDayOfMonth());
                 label(canvas, number, left + dayWidth / 2, top + 19 * scale, 12,
                         date.equals(today) ? BACKGROUND : date.getMonth() == month.getMonth() ? TEXT : MUTED, true);
-                int hidden = layout.days.get(week * 7 + d).size() - visible[d];
+                boolean todayOverflow = todayCell != null && d == todayColumn;
+                int hidden = todayOverflow ? todayCell.hidden : layout.days.get(week * 7 + d).size() - visible[d];
+                int moreLane = todayOverflow ? todayCell.moreLane : visible[d];
                 if (hidden > 0 && slots > 0) label(canvas, hidden + " more", left + 8 * scale,
-                        top + (42 + visible[d] * 18) * scale, 11, MUTED, false);
+                        top + (42 + moreLane * 18) * scale, 11, MUTED, false);
             }
         }
         int todayIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(layout.first, today);

@@ -1,14 +1,18 @@
 package com.wesbos.framecalendar;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class CalendarLayout {
     static final class Span {
@@ -45,6 +49,51 @@ final class CalendarLayout {
 
     static int visibleEvents(int count, int rows) {
         return count > rows ? Math.max(0, rows - 1) : count;
+    }
+
+    /** Today's cell when it overflows: bars keep their lanes, single-cell entries are packed into the free lanes. */
+    static final class TodayCell {
+        final Set<Span> fixed = new HashSet<>();
+        final List<Span> moved = new ArrayList<>();
+        int hidden;
+        int moreLane;
+    }
+
+    static boolean ended(Event event, Instant now) {
+        if (event.allDay) return false;
+        ZonedDateTime end = event.end.isAfter(event.start) ? event.end : event.start;
+        return !end.toInstant().isAfter(now);
+    }
+
+    /** Hides finished appointments (earliest first) into "more" so the rest of today stays visible. */
+    static TodayCell today(List<Span> week, int column, List<Event> events, int rows, Instant now) {
+        TodayCell cell = new TodayCell();
+        Set<Event> hide = new HashSet<>();
+        int excess = events.size() - Math.max(0, rows - 1);
+        for (Event event : events) {
+            if (hide.size() >= excess) break;
+            if (ended(event, now)) hide.add(event);
+        }
+        int remaining = events.size() - hide.size();
+        int limit = remaining > rows || !hide.isEmpty() ? Math.max(0, rows - 1) : remaining;
+        boolean[] used = new boolean[Math.max(limit, 0)];
+        List<Span> movable = new ArrayList<>();
+        for (Span span : week) {
+            if (span.first > column || span.last < column || hide.contains(span.event)) continue;
+            if (span.first == column && span.last == column) movable.add(span);
+            else if (span.lane < limit) { cell.fixed.add(span); used[span.lane] = true; }
+        }
+        movable.sort(Comparator.comparingInt(span -> span.lane));
+        int lane = 0;
+        for (Span span : movable) {
+            while (lane < limit && used[lane]) lane++;
+            if (lane >= limit) break;
+            cell.moved.add(new Span(span.event, column, column, lane));
+            used[lane++] = true;
+        }
+        cell.hidden = events.size() - cell.fixed.size() - cell.moved.size();
+        cell.moreLane = limit;
+        return cell;
     }
 
     CalendarLayout(YearMonth month, List<Event> events, ZoneId zone) {
