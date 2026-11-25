@@ -4,6 +4,7 @@
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <queries>
+    <package android:name="com.android.systemui" />
     <provider android:authorities="io.github.martinwoodward.iphotoframesaver.playback" />
   </queries>
   <application android:name=".FrameApplication" android:label="Frame Calendar" android:icon="@drawable/calendar_icon"

@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.animation.ValueAnimator;
 import android.content.BroadcastReceiver;
+import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.pm.ActivityInfo;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
@@ -36,6 +38,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -67,6 +70,22 @@ public class MainActivity extends Activity {
     private int generation;
     private boolean active, loading, calendarRefreshPending, panelFailed, extensionReady, panelRetryScheduled;
     private boolean refreshScheduled, connected, dreamWasActive;
+    private boolean dreamRequestPending, dreamStartFailed;
+    private boolean clockReady;
+    private LocalDate lastToday;
+    private final Runnable clockRetry = () -> refreshClock(false);
+    private static final ComponentName DREAM_STARTER =
+            new ComponentName("com.android.systemui", "com.android.systemui.Somnambulator");
+    private final Runnable idle = this::startScreensaver;
+    private final Runnable dreamWatchdog = () -> {
+        if (dreamRequestPending) {
+            dreamRequestPending = false;
+            dreamStartFailed = true;
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            android.util.Log.w("FrameCalendar", "Screensaver did not start; restoring Android's screen timeout");
+            Toast.makeText(this, "Screensaver did not start - check Android screensaver settings", Toast.LENGTH_LONG).show();
+        }
+    };
     private ValueAnimator wakeFade;
     private final Runnable retryPanel = () -> {
         panelRetryScheduled = false;
@@ -95,13 +114,23 @@ public class MainActivity extends Activity {
                     if (extensionReady) schedulePanelRetry();
                 } else if (nowConnected && !connected) {
                     if (extensionReady) loadPanel();
-                    loadCalendars();
+                    if (refreshClock(false)) loadCalendars();
                 }
                 connected = nowConnected;
             } else if (Intent.ACTION_DREAMING_STARTED.equals(action)) {
                 dreamWasActive = true;
+                dreamRequestPending = false;
+                handler.removeCallbacks(idle);
+                handler.removeCallbacks(dreamWatchdog);
             } else if (Intent.ACTION_DREAMING_STOPPED.equals(action) && active) {
                 fadeFromDream();
+                refreshClock(true);
+                scheduleIdle();
+            } else if (Intent.ACTION_TIME_CHANGED.equals(action) || Intent.ACTION_DATE_CHANGED.equals(action)
+                    || Intent.ACTION_TIMEZONE_CHANGED.equals(action)) {
+                refreshClock(true);
+            } else if (Intent.ACTION_TIME_TICK.equals(action)) {
+                refreshClock(false);
             }
         }
     };
@@ -111,7 +140,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("frame-calendar", MODE_PRIVATE);
         importConfig(getIntent());
         zone = ZoneId.of(prefs.getString("timezone", "Europe/London"));
-        month = state == null ? YearMonth.now(zone) : YearMonth.parse(state.getString("month"));
+        month = YearMonth.now(zone);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         buildUi();
         session = new GeckoSession();
@@ -212,6 +241,10 @@ public class MainActivity extends Activity {
         IntentFilter systemFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
         systemFilter.addAction(Intent.ACTION_DREAMING_STARTED);
         systemFilter.addAction(Intent.ACTION_DREAMING_STOPPED);
+        systemFilter.addAction(Intent.ACTION_TIME_CHANGED);
+        systemFilter.addAction(Intent.ACTION_DATE_CHANGED);
+        systemFilter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+        systemFilter.addAction(Intent.ACTION_TIME_TICK);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(systemEvents, systemFilter, Context.RECEIVER_EXPORTED);
         else registerReceiver(systemEvents, systemFilter);
         applyHome(getIntent());
@@ -225,6 +258,7 @@ public class MainActivity extends Activity {
         FrameLayout leftPane = new FrameLayout(this);
         left.setOrientation(LinearLayout.VERTICAL);
         right.setOrientation(LinearLayout.VERTICAL);
+        right.setPadding(0, 6, 0, 0);
         root.addView(leftPane, new LinearLayout.LayoutParams(0, -1, 3));
         leftPane.addView(left, new FrameLayout.LayoutParams(-1, -1));
         root.addView(right, new LinearLayout.LayoutParams(0, -1, 1));
@@ -282,6 +316,7 @@ public class MainActivity extends Activity {
     }
 
     private void changeMonth(YearMonth value) {
+        if (!clockReady) return;
         month = value;
         updateMonthTitle();
         if (!showCachedCalendars()) {
@@ -295,7 +330,32 @@ public class MainActivity extends Activity {
         monthTitle.setText("  " + month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.UK)));
     }
 
+    private boolean refreshClock(boolean showToday) {
+        handler.removeCallbacks(clockRetry);
+        LocalDate today = LocalDate.now(zone);
+        if (!CalendarClock.isReady(today)) {
+            clockReady = false;
+            calendar.setVisibility(View.INVISIBLE);
+            previews.setVisibility(View.INVISIBLE);
+            monthTitle.setText("Waiting for date and time...");
+            syncIndicator.setVisibility(View.VISIBLE);
+            handler.postDelayed(clockRetry, 5000);
+            return false;
+        }
+        boolean changed = !clockReady || !today.equals(lastToday);
+        clockReady = true;
+        lastToday = today;
+        calendar.setVisibility(View.VISIBLE);
+        previews.setVisibility(View.VISIBLE);
+        if (changed || showToday) {
+            changeMonth(YearMonth.from(today));
+            if (!loading) syncIndicator.setVisibility(View.GONE);
+        }
+        return true;
+    }
+
     private void loadCalendars() {
+        if (!clockReady) return;
         if (loading) { calendarRefreshPending = true; return; }
         loading = true;
         syncIndicator.setVisibility(View.VISIBLE);
@@ -312,7 +372,7 @@ public class MainActivity extends Activity {
                     if (isDestroyed() || request != generation || !range.covers(month, zone)) return;
                     cachedRange = range;
                     cachedCalendars = saved;
-                    showCachedCalendars();
+                    if (clockReady) showCachedCalendars();
                 });
             }
             CalendarStore.Result result = store.load(range.from, range.until, requestedZone);
@@ -324,13 +384,13 @@ public class MainActivity extends Activity {
                 if (request == generation) {
                     cachedRange = range;
                     cachedCalendars = result;
-                    if (showCachedCalendars()) {
+                    if (clockReady && showCachedCalendars()) {
                         calendarStatus(android.text.TextUtils.join("  |  ", result.notices));
                     }
                 }
                 if (refreshAgain || request != generation || cachedRange == null || !cachedRange.covers(month, zone)) {
                     loadCalendars();
-                } else syncIndicator.setVisibility(View.GONE);
+                } else if (clockReady) syncIndicator.setVisibility(View.GONE);
             });
         });
     }
@@ -396,18 +456,93 @@ public class MainActivity extends Activity {
 
     private void controls() {
         new AlertDialog.Builder(this).setTitle("Frame Calendar")
-                .setItems(new String[]{"Connections and time zone", "Android settings", "Wi-Fi settings",
+                .setItems(new String[]{"Connections and time zone", "Screensaver delay", "Android settings", "Wi-Fi settings",
                         "Reload calendars and panel", "Use another Home app"}, (dialog, choice) -> {
                     if (choice == 0) connections();
-                    if (choice == 1) startActivity(new Intent(Settings.ACTION_SETTINGS));
-                    if (choice == 2) startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
-                    if (choice == 3) { loadCalendars(); loadPanel(); }
-                    if (choice == 4) {
+                    if (choice == 1) screensaverSettings();
+                    if (choice == 2) startActivity(new Intent(Settings.ACTION_SETTINGS));
+                    if (choice == 3) startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
+                    if (choice == 4) { loadCalendars(); loadPanel(); }
+                    if (choice == 5) {
                         getPackageManager().setComponentEnabledSetting(new ComponentName(this, "com.wesbos.framecalendar.Home"),
                                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
                         startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME));
                     }
                 }).setNegativeButton("Close", null).show();
+    }
+
+    private boolean canStartScreensaver() {
+        if (dreamStartFailed || Settings.Secure.getInt(getContentResolver(), "screensaver_enabled", 0) != 1) return false;
+        String components = Settings.Secure.getString(getContentResolver(), "screensaver_components");
+        if (components == null || components.isEmpty()) return false;
+        try {
+            ActivityInfo info = getPackageManager().getActivityInfo(DREAM_STARTER, 0);
+            return info.enabled && info.exported && (info.permission == null
+                    || checkSelfPermission(info.permission) == PackageManager.PERMISSION_GRANTED);
+        } catch (PackageManager.NameNotFoundException error) {
+            return false;
+        }
+    }
+
+    private void scheduleIdle() {
+        handler.removeCallbacks(idle);
+        if (!active || dreamRequestPending || !canStartScreensaver()) {
+            if (!dreamRequestPending) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            return;
+        }
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        handler.postDelayed(idle, prefs.getInt("idle_minutes", 3) * 60_000L);
+    }
+
+    private void startScreensaver() {
+        if (!active) return;
+        if (!getWindow().getDecorView().hasWindowFocus()) {
+            scheduleIdle();
+            return;
+        }
+        try {
+            dreamRequestPending = true;
+            handler.postDelayed(dreamWatchdog, 5000);
+            startActivity(new Intent(Intent.ACTION_MAIN).setComponent(DREAM_STARTER)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (ActivityNotFoundException | SecurityException error) {
+            dreamRequestPending = false;
+            dreamStartFailed = true;
+            handler.removeCallbacks(dreamWatchdog);
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            android.util.Log.w("FrameCalendar", "Native screensaver start unavailable; restoring Android's screen timeout");
+            Toast.makeText(this, "Native screensaver start unavailable on this device", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void screensaverSettings() {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(24, 10, 24, 10);
+        form.addView(text("Minutes without interaction before showing the screensaver (1-60)."
+                + "\nThe calendar stays bright until then. Overnight hours are configured in the photo screensaver.", 13));
+        EditText minutes = new EditText(this);
+        minutes.setInputType(InputType.TYPE_CLASS_NUMBER);
+        minutes.setText(Integer.toString(prefs.getInt("idle_minutes", 3)));
+        form.addView(minutes);
+        if (!canStartScreensaver()) form.addView(text(
+                "Android's screen timeout is currently in use. Enable a screensaver; this firmware must provide its native screensaver launcher.",
+                13));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Screensaver delay").setView(form)
+                .setPositiveButton("Save", null).setNegativeButton("Cancel", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            try {
+                int value = Integer.parseInt(minutes.getText().toString().trim());
+                if (value < 1 || value > 60) throw new NumberFormatException();
+                prefs.edit().putInt("idle_minutes", value).apply();
+                dreamStartFailed = false;
+                dialog.dismiss();
+                scheduleIdle();
+            } catch (NumberFormatException error) {
+                minutes.setError("Enter a number from 1 to 60");
+            }
+        }));
+        dialog.show();
     }
 
     private void connections() {
@@ -551,22 +686,19 @@ public class MainActivity extends Activity {
         if (session != null) session.setActive(true);
         if (dreamWasActive) fadeFromDream();
         if (panelFailed && !panelRetryScheduled) schedulePanelRetry();
-        if (cachedRange == null && !loading) loadCalendars();
+        refreshClock(true);
         if (!refreshScheduled) scheduleRefresh();
+        scheduleIdle();
     }
 
     @Override protected void onPause() {
         active = false;
+        handler.removeCallbacks(idle);
         NavigationService.setCalendarVisible(false);
         super.onPause();
         handler.postDelayed(() -> {
             if (!isDestroyed() && session != null && session.isOpen()) session.setActive(true);
         }, 500);
-    }
-
-    @Override protected void onSaveInstanceState(Bundle state) {
-        state.putString("month", month.toString());
-        super.onSaveInstanceState(state);
     }
 
     @Override protected void onDestroy() {
@@ -579,4 +711,9 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() { controls(); }
+
+    @Override public void onUserInteraction() {
+        super.onUserInteraction();
+        scheduleIdle();
+    }
 }

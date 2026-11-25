@@ -129,6 +129,43 @@ public class CalendarTest {
         assertEquals(3, CalendarLayout.availableRows(87, 1));
     }
 
+    @Test public void calendarWaitsForTheConfiguredMinimumDate() {
+        assertFalse(CalendarClock.isReady(LocalDate.of(1970, 1, 1)));
+        assertFalse(CalendarClock.isReady(LocalDate.of(2026, 3, 9)));
+        assertTrue(CalendarClock.isReady(LocalDate.of(2026, 3, 10)));
+        assertTrue(CalendarClock.isReady(LocalDate.of(2026, 11, 25)));
+    }
+
+    @Test public void exactCrossCalendarDuplicatesPreferMartin() {
+        ZonedDateTime start = FROM.atTime(9, 0).atZone(LONDON);
+        Event family = new Event("Meeting", "Office", "Notes", start, start.plusHours(1), false, 1);
+        Event martin = new Event("Meeting", "Office", "Notes", start.withZoneSameInstant(ZoneId.of("America/New_York")),
+                start.plusHours(1).withZoneSameInstant(ZoneId.of("America/New_York")), false, 0);
+        Event different = new Event("Meeting", "Office", "Different notes", start, start.plusHours(1), false, 2);
+        assertEquals(Arrays.asList(martin, different),
+                EventDeduplicator.unique(Arrays.asList(family, different, martin)));
+        assertEquals(Collections.singletonList(martin),
+                EventDeduplicator.unique(Arrays.asList(martin, family, martin)));
+        assertEquals(Arrays.asList(martin, martin), EventDeduplicator.unique(Arrays.asList(martin, martin)));
+    }
+
+    @Test public void similarAppointmentsRemainDistinct() {
+        ZonedDateTime start = FROM.atTime(9, 0).atZone(LONDON);
+        Event original = new Event("Meeting", "Office", "Notes", start, start.plusHours(1), false, 0);
+        Event later = new Event("Meeting", "Office", "Notes", start.plusHours(1), start.plusHours(2), false, 1);
+        Event elsewhere = new Event("Meeting", "Home", "Notes", start, start.plusHours(1), false, 1);
+        List<Event> distinct = Arrays.asList(original, later, elsewhere);
+        assertEquals(distinct, EventDeduplicator.unique(distinct));
+    }
+
+    @Test public void allDayDuplicatesCompareCalendarDatesNotTimeZones() {
+        ZonedDateTime start = FROM.atStartOfDay(LONDON);
+        Event family = new Event("Holiday", "", "", start, start.plusDays(1), true, 1);
+        ZonedDateTime otherZone = FROM.atStartOfDay(ZoneId.of("America/New_York"));
+        Event martin = new Event("Holiday", "", "", otherZone, otherZone.plusDays(1), true, 0);
+        assertEquals(Collections.singletonList(martin), EventDeduplicator.unique(Arrays.asList(family, martin)));
+    }
+
     @Test public void previewAdjacentDatesAppearOnlyAtTheOuterEdges() {
         YearMonth december = YearMonth.of(2026, 12);
         YearMonth january = december.plusMonths(1);

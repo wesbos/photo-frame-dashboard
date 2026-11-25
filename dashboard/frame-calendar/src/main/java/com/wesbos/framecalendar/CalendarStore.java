@@ -35,6 +35,12 @@ final class CalendarStore {
     static final class Result {
         final List<Event> events = new ArrayList<>();
         final List<String> notices = new ArrayList<>();
+
+        void deduplicate() {
+            List<Event> unique = EventDeduplicator.unique(events);
+            events.clear();
+            events.addAll(unique);
+        }
     }
 
     CalendarStore(Context context, SharedPreferences prefs) {
@@ -55,6 +61,7 @@ final class CalendarStore {
                 Log.w("FrameCalendar", "Saved calendar source " + source + " could not be read");
             }
         }
+        result.deduplicate();
         return result;
     }
 
@@ -92,6 +99,7 @@ final class CalendarStore {
                 }
             }
         }
+        result.deduplicate();
         return result;
     }
 

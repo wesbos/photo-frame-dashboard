@@ -78,8 +78,16 @@ exclusions and moved/cancelled occurrences, exclusive all-day end dates, and
 bars spanning days/weeks. Events are ordered by day and fill the available space.
 Tap an event for details, or tap an empty part of a day to see all its events,
 including overflow. Unavailable feeds show an explicit notice.
+Exact duplicates across calendars are displayed once, preferring Martin's
+version. Matching includes title, start/end, all-day status, location and description;
+timed events compare instants rather than time-zone labels.
 `RECURRENCE-ID;RANGE=THISANDFUTURE` is reported as unsupported rather than silently
 displaying an incorrect schedule.
+
+Opening or waking the calendar returns to the current month. Midnight and
+network-time changes also update today's date; manual month browsing remains
+available. If the device date is earlier than 10 March 2026, the calendar waits
+for a corrected clock instead of displaying or downloading the wrong month.
 
 ## Default Home and undo
 
@@ -111,10 +119,15 @@ Select the previous launcher with **Always**. Uninstalling Frame Calendar remove
 its settings and saved logins. No flash, `/system`, vendor app, screensaver setting
 or boot partition change is required.
 
-The dashboard does not keep the display awake. Android's existing screen timeout
-and selected screensaver still apply; dismissing the screensaver returns to the
-dashboard with a brief fade. Calendar sync and Home Assistant updates continue
-while the screensaver is showing, subject to Android's background restrictions.
+The calendar stays bright for three minutes after interaction, then starts
+Android's selected screensaver without a dimming phase. Change the delay under
+**Settings > Screensaver delay** (1-60 minutes). This uses SystemUI's native
+screensaver launcher, without root; on firmware that omits it or when no
+screensaver is enabled, Android's existing screen timeout remains in use.
+Screensaver-start failures are reported and also restore the Android timeout.
+Dismissal returns to today's calendar with a brief fade. Calendar sync and Home
+Assistant updates continue while the screensaver is showing, subject to Android's
+background restrictions. Overnight hours belong to the photo screensaver's settings.
 
 ## Floating navigation
 
