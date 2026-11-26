@@ -161,3 +161,25 @@ and sizes, including `userdata` at 6,669,312 with 53,885,888 sectors.
   flat at −67 dBFS (peak −50.6 dBFS). No mic hole was visible.
 - **Time zone:** the frame shipped on `America/New_York`. As root,
   `service call alarm 3 s16 <zone>` changed it.
+
+## Third unit: 15.6-inch April build (2026-11-25 to 2026-11-26, macOS)
+
+A separate 15.6-inch AMABOO unit tested from an Apple silicon Mac reported `RAM_S101_15.6_20260411`
+and Frameo `v1.30.13 (69600)`. Android reported `rockchip/rk3326_go/rk3326_go:8.1.0/OC/031316:user/release-keys`.
+The panel is 1920×1080 at 213 dpi, and the WebView provider was `com.android.webview` 106.0.5249.126.
+The 32 MiB boot partition had the same SHA-256 as the March unit above:
+`9628624b04b574b65c10672889b19c17331da6b514dff54f1d0f969a4536020f`.
+
+- **USB ADB:** With a working USB-A to USB-C data cable, macOS enumerated the frame as `2207:0012`.
+  With photo transfer off, the observed ID was `2207:0006`. After enabling **ADB access** via the
+  Frameo beta menu and accepting the on-screen debugging prompt, the same Mac could reconnect
+  and use USB ADB after an Android reboot. ADB was tested over USB only.
+- **Backup:** With temporary root ADB, the first 8 MiB and the 15 logical NAND partitions before
+  `userdata` were read over USB. Each region passed byte-count, gzip readback and on-device
+  SHA-256 verification. Afterwards the USB shell returned to UID 2000. Recovery boot and restore
+  remain untested.
+- **Kiosk:** Home HQ showed a bundled test page after Android reboot and after a cold start with
+  USB disconnected. Frameo remained available as a fallback. The Wi-Fi settings screen had no
+  system navigation bar. Enabling **Home HQ navigation** through Android Accessibility settings
+  provided a working **Dashboard** button before and after reboot, without a
+  `WRITE_SECURE_SETTINGS` grant.
