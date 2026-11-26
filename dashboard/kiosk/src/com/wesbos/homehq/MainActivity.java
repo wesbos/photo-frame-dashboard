@@ -22,6 +22,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.text.InputType;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -36,12 +37,15 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Locale;
@@ -50,7 +54,7 @@ import java.util.Map;
 /**
  * Full-screen kiosk WebView for the Home HQ wall tablet.
  * - Immersive mode hides the status + navigation bars (true 1280x800).
- * - Controls: hold two fingers still on the screen for 1.5s for launcher/settings/Wi-Fi/reload.
+ * - Controls: hold two fingers still on the screen for 1.5s for launcher/settings/Wi-Fi/URL/reload.
  *   Optional single-tap Menu button: launch with --ez menu_button true (false removes it).
  * - Offline: a failed page load shows a native screen instead of WebView's error page (which
  *   prints the full URL, including any token in it). With no Wi-Fi it offers Wi-Fi settings.
@@ -172,16 +176,65 @@ public class MainActivity extends Activity {
       cancelPageTouches();
       new AlertDialog.Builder(MainActivity.this)
           .setTitle("Home HQ")
-          .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings", "Reload dashboard"},
+          .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings",
+              "Dashboard URL", "Reload dashboard"},
               (dialog, which) -> {
                 if (which == 0) openLauncher();
                 else if (which == 1) startActivity(new Intent(Settings.ACTION_SETTINGS));
                 else if (which == 2) openWifiSettings();
+                else if (which == 3) editDashboardUrl();
                 else web.reload();
               })
           .setNegativeButton("Back to dashboard", null).show();
     }
   };
+
+  private void editDashboardUrl() {
+    EditText address = new EditText(this);
+    address.setSingleLine(true);
+    address.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+    address.setHint("http:// or https://");
+    address.setContentDescription("Dashboard address");
+    address.setText(savedUrl());
+    address.setSelectAllOnFocus(true);
+
+    LinearLayout form = new LinearLayout(this);
+    form.setPadding(dp(24), dp(8), dp(24), 0);
+    form.addView(address, new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+    AlertDialog dialog = new AlertDialog.Builder(this)
+        .setTitle("Dashboard URL")
+        .setView(form)
+        .setNegativeButton("Cancel", null)
+        .setPositiveButton("Save and open", null)
+        .create();
+    address.requestFocus();
+    dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+        | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+    dialog.show();
+    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+      String url = address.getText().toString().trim();
+      if (!isDashboardAddress(url)) {
+        address.setError("Enter a complete http:// or https:// address");
+        return;
+      }
+      saveUrl(url);
+      dialog.dismiss();
+      openDashboardUrl(url);
+    });
+  }
+
+  private static boolean isDashboardAddress(String url) {
+    try {
+      URI address = new URI(url);
+      return address.getHost() != null && address.getPort() != 0 && address.getPort() <= 65535
+          && ("http".equalsIgnoreCase(address.getScheme())
+              || "https".equalsIgnoreCase(address.getScheme()));
+    } catch (URISyntaxException e) {
+      return false;
+    }
+  }
 
   @Override
   protected void onCreate(Bundle state) {
@@ -375,14 +428,16 @@ public class MainActivity extends Activity {
     applyMenuButtonFlag(intent);
     applyBootanimFlag(intent);
     String url = urlFrom(intent);
-    if (url != null) {
-      closePortal();
-      handler.removeCallbacks(retry);
-      handler.removeCallbacks(stall);
-      retryPending = false;
-      retryUrl = url;
-      load(url);
-    }
+    if (url != null) openDashboardUrl(url);
+  }
+
+  private void openDashboardUrl(String url) {
+    closePortal();
+    handler.removeCallbacks(retry);
+    handler.removeCallbacks(stall);
+    retryPending = false;
+    retryUrl = url;
+    load(url);
   }
 
   /** A "url" extra is saved for later launches. A VIEW link from another app is shown, not saved. */
@@ -393,9 +448,13 @@ public class MainActivity extends Activity {
       return link != null && isWebUrl(link) ? link : null;
     }
     if (!isWebUrl(saved)) return null;
-    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, saved).apply();
-    Log.i(TAG, "Saved kiosk URL: " + forLog(saved));
+    saveUrl(saved);
     return saved;
+  }
+
+  private void saveUrl(String url) {
+    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_URL, url).apply();
+    Log.i(TAG, "Saved kiosk URL: " + forLog(url));
   }
 
   /**
