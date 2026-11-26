@@ -4,12 +4,37 @@ Hold two fingers still on the dashboard for 1.5 seconds to open the native contr
 fingers at least an inch (about 2.5 cm) apart: on PF1007L frames the `gslX680` touchscreen reads
 closer fingers as one touch.
 
+- **Back** goes to the previous page (opening the controls already hides the keyboard).
 - **Open launcher** opens another installed Home app, such as Rootless Launcher.
   If none is available, it opens Android Settings.
 - **Android settings** opens the device's Settings app.
 - **Wi-Fi settings** opens Android's Wi-Fi list directly.
 - **Reload dashboard** reloads the current URL.
 - **Back to dashboard** dismisses the controls.
+
+## Edge-swipe Back
+
+Frames without a SystemUI have no Back key and no navigation bar, so a focused text
+field can trap you behind the keyboard. Enable edge-swipe Back with:
+
+```sh
+adb shell am start -n com.wesbos.homehq/.MainActivity --ez edge_back true
+```
+
+Start within 20 dp of the left edge or 32 dp of the right edge. Swipe 48 dp
+inward, mostly horizontally. If the keyboard is open, the swipe closes it first.
+Otherwise it goes to the previous page. The kiosk holds the starting touch back
+so a swipe cannot scroll the page, while a stationary tap in the strip still
+passes through. Home HQ saves the setting, and `--ez edge_back false` turns it
+off.
+
+Add `--ez edge_reload true` to reload the page when there is no previous page.
+Some pages, such as Home Assistant's searchable pickers, open a native dialog
+without adding a history entry. Back cannot close that dialog, so reloading the
+page clears it. This option is off by default.
+
+The two-finger / Menu control sheet also hides the keyboard before it opens, and
+lists **Back** as its first item.
 
 ## Optional single-tap Menu button
 

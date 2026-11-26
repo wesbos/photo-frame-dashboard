@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -28,7 +29,9 @@ import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -50,8 +53,12 @@ import java.util.Map;
 /**
  * Full-screen kiosk WebView for the Home HQ wall tablet.
  * - Immersive mode hides the status + navigation bars (true 1280x800).
- * - Controls: hold two fingers still on the screen for 1.5s for launcher/settings/Wi-Fi/reload.
+ * - Controls: hold two fingers still on the screen for 1.5s for Back/launcher/settings/Wi-Fi/reload.
  *   Optional single-tap Menu button: launch with --ez menu_button true (false removes it).
+ * - Optional edge-swipe Back: launch with --ez edge_back true (false turns it off).
+ *   Swipe 48dp inward from the left 20dp strip or the right 32dp strip. If the keyboard is open,
+ *   Back closes it first. Otherwise Back goes to the previous page. Launch with --ez edge_reload
+ *   true to reload when there is no previous page, which clears dialogs that Back cannot close.
  * - Offline: a failed page load shows a native screen instead of WebView's error page (which
  *   prints the full URL, including any token in it). With no Wi-Fi it offers Wi-Fi settings.
  * - Remote debugging is OFF unless launched with the debug extra (every app on this device
@@ -76,6 +83,8 @@ public class MainActivity extends Activity {
   static final String PREFS = "kiosk";
   static final String PREF_URL = "url";
   static final String PREF_MENU_BUTTON = "menu_button";
+  static final String PREF_EDGE_BACK = "edge_back";
+  static final String PREF_EDGE_RELOAD = "edge_reload";
   static final String PREF_BOOTANIM_EXIT = "bootanim_exit";
   static final long EXIT_HOLD_MS = 1500;
   static final int CANCEL_POINTER_IDS = 10; // touch ids 0-9
@@ -106,6 +115,12 @@ public class MainActivity extends Activity {
   private final float[] exitX = new float[2];
   private final float[] exitY = new float[2];
   private boolean exitArmed;
+  private boolean edgeGesture;
+  private boolean edgeFired;
+  private boolean edgeTracking;
+  private boolean edgeMoved;
+  private int edgePointerId = MotionEvent.INVALID_POINTER_ID;
+  private float edgeStartX, edgeStartY;
   private String retryUrl;
   private String mainUrl;
   private boolean pageFailed;
@@ -170,13 +185,16 @@ public class MainActivity extends Activity {
       handler.removeCallbacks(showControls);
       Log.i(TAG, "Opening kiosk controls");
       cancelPageTouches();
+      hideKeyboard();
       new AlertDialog.Builder(MainActivity.this)
           .setTitle("Home HQ")
-          .setItems(new String[] {"Open launcher", "Android settings", "Wi-Fi settings", "Reload dashboard"},
+          .setItems(new String[] {"Back", "Open launcher", "Android settings", "Wi-Fi settings",
+                  "Reload dashboard"},
               (dialog, which) -> {
-                if (which == 0) openLauncher();
-                else if (which == 1) startActivity(new Intent(Settings.ACTION_SETTINGS));
-                else if (which == 2) openWifiSettings();
+                if (which == 0) performBack();
+                else if (which == 1) openLauncher();
+                else if (which == 2) startActivity(new Intent(Settings.ACTION_SETTINGS));
+                else if (which == 3) openWifiSettings();
                 else web.reload();
               })
           .setNegativeButton("Back to dashboard", null).show();
@@ -193,6 +211,9 @@ public class MainActivity extends Activity {
     keepNavigationEnabled();
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         | WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    // Ask Android to resize the window instead of panning it. FLAG_FULLSCREEN ignores resize,
+    // so keyboardShown() checks getWindowVisibleDisplayFrame(), which still shrinks for the keyboard.
+    getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
     web = new WebView(this);
     WebSettings s = web.getSettings();
@@ -323,6 +344,7 @@ public class MainActivity extends Activity {
     menuPosition.setMargins(dp(12), dp(12), dp(12), dp(12));
     root.addView(menuButton, menuPosition);
     applyMenuButtonFlag(getIntent());
+    applyEdgeBackFlag(getIntent());
     setContentView(root);
 
     String url = urlFrom(getIntent());
@@ -373,6 +395,7 @@ public class MainActivity extends Activity {
     applyHomeFlag(intent);
     applyBootFlag(intent);
     applyMenuButtonFlag(intent);
+    applyEdgeBackFlag(intent);
     applyBootanimFlag(intent);
     String url = urlFrom(intent);
     if (url != null) {
@@ -829,6 +852,54 @@ public class MainActivity extends Activity {
         .getBoolean(PREF_MENU_BUTTON, false) ? View.VISIBLE : View.GONE);
   }
 
+  /** Saves the edge_back and edge_reload intent extras to preferences when present. */
+  private void applyEdgeBackFlag(Intent intent) {
+    if (intent != null && intent.hasExtra(PREF_EDGE_BACK)) {
+      getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+          .putBoolean(PREF_EDGE_BACK, intent.getBooleanExtra(PREF_EDGE_BACK, false)).apply();
+    }
+    if (intent != null && intent.hasExtra(PREF_EDGE_RELOAD)) {
+      getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+          .putBoolean(PREF_EDGE_RELOAD, intent.getBooleanExtra(PREF_EDGE_RELOAD, false)).apply();
+    }
+  }
+
+  /** If the keyboard is open, closes it. Otherwise goes back in page history, or reloads if enabled. */
+  private void performBack() {
+    if (keyboardShown()) {
+      hideKeyboard();
+      return;
+    }
+    if (web.canGoBack()) {
+      web.goBack();
+    } else if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_EDGE_RELOAD, false)) {
+      // Some pages, such as Home Assistant pickers, open a native dialog without a history entry.
+      // Back cannot close that dialog, so reload the page to clear it.
+      Log.i(TAG, "Back: nothing to go back to, reloading");
+      web.reload();
+    } else {
+      Log.i(TAG, "Back: nothing to go back to");
+    }
+  }
+
+  private void hideKeyboard() {
+    InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+    if (imm != null) imm.hideSoftInputFromWindow(web.getWindowToken(), 0);
+    web.clearFocus();
+  }
+
+  /**
+   * Returns true when the keyboard covers the bottom of the screen.
+   * InputMethodManager.isAcceptingText() stays true whenever a text field has focus, even after the
+   * keyboard hides. The visible display frame shrinks with the keyboard even under FLAG_FULLSCREEN.
+   */
+  private boolean keyboardShown() {
+    Rect visible = new Rect();
+    getWindow().getDecorView().getWindowVisibleDisplayFrame(visible);
+    int screen = getResources().getDisplayMetrics().heightPixels;
+    return screen - visible.bottom > Math.round(100 * getResources().getDisplayMetrics().density);
+  }
+
   /**
    * A saved opt-in for frames whose vendor boot animation keeps covering the kiosk after a power
    * cut. sys.bootanim.exit is a per-boot property, so it has to be set again on every start. It
@@ -916,9 +987,111 @@ public class MainActivity extends Activity {
     Log.i(TAG, "Start after boot " + (boot ? "on" : "off"));
   }
 
+  private void resetEdgeGesture() {
+    edgeGesture = false;
+    edgeFired = false;
+    edgeTracking = false;
+    edgeMoved = false;
+    edgePointerId = MotionEvent.INVALID_POINTER_ID;
+  }
+
   /** Watches for the two-finger exit hold; all touches still go to the page (after a stale-touch reset). */
   @Override
   public boolean dispatchTouchEvent(MotionEvent e) {
+    boolean edgeBackEnabled = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_EDGE_BACK, false);
+    if (edgeBackEnabled || edgeGesture) {
+      float density = getResources().getDisplayMetrics().density;
+      // Keep the left strip to 20dp so sidebar icons stay easy to tap. Use 32dp on the right
+      // because the gslX680 panel reports x=1259 at the right glass edge of a 1280px screen.
+      int edge = Math.round(20 * density);
+      int edgeRight = Math.round(32 * density);
+      int travel = Math.round(48 * density);
+      int width = getResources().getDisplayMetrics().widthPixels;
+      switch (e.getActionMasked()) {
+        case MotionEvent.ACTION_DOWN:
+          resetEdgeGesture();
+          if (edgeBackEnabled) {
+            edgeStartX = e.getX();
+            edgeStartY = e.getY();
+            if ((edgeStartX <= edge || edgeStartX >= width - edgeRight) && !hitsNativeOverlay(e)) {
+              edgeGesture = true;
+              edgeTracking = true;
+              edgePointerId = e.getPointerId(0);
+              cancelPageTouches();
+              return true;   // claim the gesture from the first touch so the page cannot scroll
+            }
+          }
+          break;
+        case MotionEvent.ACTION_POINTER_DOWN:
+          if (edgeTracking) {
+            // A second finger turns this into a two-finger gesture. Let the exit hold below arm.
+            edgeTracking = false;
+            edgePointerId = MotionEvent.INVALID_POINTER_ID;
+            edgeMoved = true;
+          }
+          if (edgeFired) return true;
+          break;
+        case MotionEvent.ACTION_POINTER_UP:
+          if (edgeTracking && e.getPointerId(e.getActionIndex()) == edgePointerId) {
+            edgeTracking = false;
+            edgePointerId = MotionEvent.INVALID_POINTER_ID;
+          }
+          if (edgeFired) return true;
+          break;
+        case MotionEvent.ACTION_MOVE:
+          if (edgeTracking) {
+            int idx = e.findPointerIndex(edgePointerId);
+            if (idx < 0) {
+              edgeTracking = false;
+              edgePointerId = MotionEvent.INVALID_POINTER_ID;
+              return true;
+            }
+            float dx = e.getX(idx) - edgeStartX;
+            float dy = Math.abs(e.getY(idx) - edgeStartY);
+            int touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+            if (!edgeMoved && Math.hypot(dx, dy) > touchSlop) edgeMoved = true;
+            boolean inward = edgeStartX <= edge ? dx > 0 : dx < 0;
+            if (inward && Math.abs(dx) >= travel && Math.abs(dx) > dy * 1.5f) {
+              edgeTracking = false;
+              edgeFired = true;
+              edgePointerId = MotionEvent.INVALID_POINTER_ID;
+              Log.i(TAG, "Edge back gesture");
+              performBack();
+            }
+            return true;
+          }
+          if (edgeFired) return true;
+          break;
+        case MotionEvent.ACTION_UP:
+          if (edgeGesture) {
+            boolean tap = edgeTracking && !edgeMoved && !edgeFired
+                && e.getEventTime() - e.getDownTime() < ViewConfiguration.getLongPressTimeout();
+            resetEdgeGesture();
+            cancelExit();
+            if (tap) {
+              MotionEvent down = MotionEvent.obtain(
+                  e.getDownTime(), e.getDownTime(), MotionEvent.ACTION_DOWN,
+                  edgeStartX, edgeStartY, e.getPressure(), e.getSize(), e.getMetaState(),
+                  e.getXPrecision(), e.getYPrecision(), e.getDeviceId(), e.getEdgeFlags());
+              down.setSource(e.getSource());
+              super.dispatchTouchEvent(down);
+              down.recycle();
+              return super.dispatchTouchEvent(e);
+            }
+            return true;   // consume an incomplete drag or long hold in the edge strip
+          }
+          break;
+        case MotionEvent.ACTION_CANCEL:
+          if (edgeGesture) {
+            resetEdgeGesture();
+            cancelExit();
+            return true;
+          }
+          break;
+        default:
+          break;
+      }
+    }
     switch (e.getActionMasked()) {
       case MotionEvent.ACTION_DOWN:
         // Android sends DOWN only when every earlier finger has lifted. If the page still holds a
@@ -959,7 +1132,21 @@ public class MainActivity extends Activity {
       default:
         break;
     }
+    if (edgeGesture) return true;   // super never saw ACTION_DOWN for this gesture, so keep the rest too
     return super.dispatchTouchEvent(e);
+  }
+
+  private boolean hitsNativeOverlay(MotionEvent e) {
+    return (offline != null && offline.getVisibility() == View.VISIBLE)
+        || hitsVisibleView(menuButton, e) || hitsVisibleView(portalBar, e);
+  }
+
+  private static boolean hitsVisibleView(View v, MotionEvent e) {
+    if (v == null || v.getVisibility() != View.VISIBLE || !v.isAttachedToWindow()) return false;
+    int[] loc = new int[2];
+    v.getLocationInWindow(loc);
+    return e.getX() >= loc[0] && e.getX() < loc[0] + v.getWidth()
+        && e.getY() >= loc[1] && e.getY() < loc[1] + v.getHeight();
   }
 
   private void cancelExit() {
@@ -998,7 +1185,10 @@ public class MainActivity extends Activity {
   public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
     if (hasFocus) hideSystemUi();
-    else cancelPageTouches(); // a dialog or another app took over mid-touch
+    else {
+      resetEdgeGesture();
+      cancelPageTouches(); // a dialog or another app took over mid-touch
+    }
   }
 
   private void hideSystemUi() {

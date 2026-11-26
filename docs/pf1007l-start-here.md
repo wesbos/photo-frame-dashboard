@@ -538,6 +538,9 @@ launcher, WebView 106, kiosk and memory. Known differences on these units, from
   own dashboard on `*.workers.dev` failed with `net_error -202` too. Add the three roots listed
   in the [Uhale guide](si006-uhale.md), checked by SHA-256.
 - WebView 106 lacks `oklch()`, `color-mix()`, CSS nesting and `:has()`. Tailwind v4 colours break.
+- Home Assistant searchable pickers on WebView 106 open a nested native `<dialog>`. Its
+  `::backdrop` swallows clicks outside the picker, even on the close X. Use Back or reload the
+  page to exit.
 - The time zone ships as `America/New_York`.
 - `adb reboot` hangs on many units (one rebooted cleanly). Plan to power-cycle instead.
 - After the WebView 106 swap, a hub-powered unit may need one boot with Wi-Fi off (dexopt).
