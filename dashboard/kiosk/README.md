@@ -8,6 +8,7 @@ closer fingers as one touch.
   If none is available, it opens Android Settings.
 - **Android settings** opens the device's Settings app.
 - **Wi-Fi settings** opens Android's Wi-Fi list directly.
+- **Dashboard URL** edits the saved address with the device's keyboard.
 - **Reload dashboard** reloads the current URL.
 - **Back to dashboard** dismisses the controls.
 
@@ -47,7 +48,12 @@ property writes from an app, and the attempt fails quietly while the splash stay
 
 ## Dashboard URL
 
-The kiosk opens the hosted demo dashboard by default. To show your own, save its URL once:
+The kiosk opens the hosted demo dashboard by default. To change it on the frame, open the native
+controls, select **Dashboard URL**, enter a complete `http://` or `https://` address, and tap
+**Save and open**. The controls also work from the offline screen, so you can correct an address
+when the server is unavailable.
+
+You can also set the address over USB:
 
 ```sh
 adb shell am start -n com.wesbos.homehq/.MainActivity --es url https://your-dashboard/
