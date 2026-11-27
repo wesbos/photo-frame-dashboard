@@ -19,7 +19,7 @@ One 32 GB unit sold by [Bunnings Australia](https://www.bunnings.com.au/mistral-
 
 ## USB and Wi-Fi ADB
 
-Enable **Beta Program** and then **ADB Access** under Frameo **Settings → About**. With the frame on its power adapter, connect it using a **USB-A to USB-C data cable**, with USB-A at the PC and USB-C at the frame. This was the working connection on the tested unit. Windows detected both MTP and ADB. The initial 40 Gb/s USB-C cable setup produced no Windows USB device or ADB entry.
+Enable **Beta Program** and then **ADB Access** under Frameo **Settings → About**. Those were the only settings the owner needed to enable for USB ADB. With the frame on its power adapter, connect it using a **USB-A to USB-C data cable**, with USB-A at the PC and USB-C at the frame. Windows detected both MTP and ADB with this cable. Neither of the two USB-C to USB-C cables tested, including a 40 Gb/s cable, produced a Windows USB device or ADB entry.
 
 Use `adb devices` to check the connection. The default sandboxed Windows shell did not see the ADB transport even after Windows had bound WinUSB. Running ADB directly on the Windows host worked. The USB shell reported `uid=0` without a separate root command.
 
