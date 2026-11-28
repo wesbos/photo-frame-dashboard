@@ -1,15 +1,19 @@
 # Frameo 15.6-inch 159K (RK3326, Android 8.1)
 
-Status: **historical success reports from two units.** The original macOS
+Status: **hardware-tested on three units (including end-to-end `install` and
+`undo` of the revised format-2 builder and guarded recipe).** The original macOS
 owner confirmed that a boot-ramdisk TCP ADB patch booted to the Frameo home
 screen, with network ADB and root through the shipped `su`. A second owner,
 [ozzyonfire, using ArchLinux](https://github.com/wesbos/photo-frame-dashboard/pull/213#issuecomment-6457452772),
 reported success after changing `/adb_keys` from root:root 0600 to
 root:root 0644 and using separate ramdisk/header writes. The 0600 key
-left ADB `unauthorized` on that unit. **The revised builder and guarded
-recipe below have not been hardware-tested.** Other firmware variants
-remain untested. An alternative that needs no flash write — an SD-card
-package run through the frame's manufacturer update task — is in
+left ADB `unauthorized` on that unit. A third owner (macOS Apple silicon,
+2026-11-27) confirmed the revised format-2 builder and guarded split-write
+recipe below end-to-end for both `install` (boot to Frameo, network ADB,
+shipped `su 0` root) and `undo` (verified 64 MiB stock `boot` restoration).
+Unknown-key rejection and other firmware variants remain untested. An
+alternative that needs no flash write — an SD-card package run through the
+frame's manufacturer update task — is in
 [SD-card owner ADB setup](#sd-card-owner-adb-setup-no-flash-write) below.
 
 **This patch enables TCP ADB on port 5555 on all network interfaces after
@@ -424,14 +428,46 @@ Frameo home-screen boot, network ADB and shipped-`su` root. Those are
 historical results for that owner's candidate. The second ArchLinux
 [report by ozzyonfire](https://github.com/wesbos/photo-frame-dashboard/pull/213#issuecomment-6457452772)
 confirms that root:root 0644 resolved `unauthorized`, with separate
-ramdisk/header writes. These owner reports motivate the revised builder;
-neither is a hardware test of its current output or this guarded recipe.
+ramdisk/header writes.
 
-For a newly built candidate, these checks are still pending on hardware:
+A third unit (macOS Apple silicon, Darwin 27.2.0, `rkdeveloptool`
+`304f073752fd25c854e1bcf05d8e7f925b1f4e14`, `xrock`
+`50effcef229a7e8ff85fde916e635cdd58fe8c09`, 2026-11-27) hardware-tested the
+revised format-2 builder (`scripts/build-frameo159k-boot.py`) and the guarded
+split-write recipe end-to-end on `RK3326_8.1_AY_FRAMEO_202605131837` (Frameo
+`1.30.19` / `69880` initially, updated via Beta to `1.32.18` / `80340`;
+`arm64-v8a` userspace, `1920x1080` at density `160`, ~953 MiB RAM + 471 MiB
+swap, stock `com.android.webview` `113.0.5672.136`, `com.android.systemui`
+disabled):
 
-- [ ] Verify both write ranges and the full boot image with the recipe above.
-- [ ] Boot to the Frameo home screen and connect over network ADB.
-- [ ] Confirm shell uid and root through the shipped `su`.
+- Verified DDR v2.07 verbatim at flash offset `0x8800`, loaded DDR v2.07 +
+  patched `rk3326_usbplug_v1.36` into RAM after `rd 3`, matched pinned stock
+  `boot` (`8ab5a0be...`) across two reads and pinned `/etc/prop.default`
+  (`7f751495...`, `ro.adb.secure=1`) from `system`, and cross-checked a
+  pre-userdata gzip backup (`LBA 0x0`–`0x584400`, omitting `userdata`) against
+  independent reads of `first-32MiB`, `boot`, and `system`.
+- Ran guarded `operation=install`, verified both split readbacks and the full
+  64 MiB `boot` readback, booted to Frameo via `rkdeveloptool rd`, and
+  confirmed `adb shell id` (`uid=2000`), `adb shell su 0 id` (`uid=0`),
+  `ro.secure=1`, `ro.adb.secure=1`, and `sys.config.rootservice=started`.
+- Ran guarded `operation=undo` in a subsequent Loader → MaskROM → RAM-reader
+  session, verified full 64 MiB `boot` readback matched stock `8ab5a0be...`,
+  and booted cleanly back to stock Frameo.
+- **Host note (macOS Sequoia/Tahoe):** Apps without **System Settings →
+  Privacy & Security → Local Network** permission get `No route to host` on
+  same-subnet TCP ADB while cross-VLAN traffic succeeds via the gateway; run
+  `adb` from a terminal with Local Network access.
+- **1 GB RAM workload note:** Running Kiosk Satellite `2026.11.35` (`arm64-v8a`)
+  as Home with Frameo, Adups FOTA, and Rockchip updater disabled (and Voice
+  Satellite + Wake Word off) still sat at ~81% CPU, 71°C, and ~0.3 GB free RAM
+  with an Immich screensaver failing to load; this board is best suited to
+  lightweight static/simple web dashboards.
+
+Hardware test checklist on the revised builder and guarded recipe:
+
+- [x] Verify both write ranges and the full boot image with the recipe above (`install` and `undo`, one macOS unit).
+- [x] Boot to the Frameo home screen and connect over network ADB.
+- [x] Confirm shell uid (`2000`) and root (`0`) through the shipped `su`.
 - [ ] Test that a fresh, unauthorized host key is rejected.
 
 The following are verification examples, not a transcript of the owner's
